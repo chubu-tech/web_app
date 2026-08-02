@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="8" fill="#FF385C" />
+  <g
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-width="2.1"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <!-- Scissors: the brand mark, matching the app's nav logotype. -->
+    <circle cx="11" cy="22" r="2.6" />
+    <circle cx="21" cy="22" r="2.6" />
+    <path d="M12.9 20.1 22 8" />
+    <path d="M19.1 20.1 10 8" />
+  </g>
+</svg>

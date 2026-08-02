@@ -1,0 +1,197 @@
+# Bhutan Salons — landing page
+
+The public marketing site. One route, fully static — no database, no API, no
+auth. The platform is **Bhutan Salons**; the app you download is **Tho**.
+
+- Next.js 16 (App Router, Turbopack) · React 19 · TypeScript
+- Tailwind CSS v4 (tokens in `app/globals.css`, no `tailwind.config`)
+- `motion` (Framer Motion 12) for animation, `lucide-react` for icons
+- Statically prerendered — the landing page ships as static HTML
+
+## Related repos
+
+This used to live inside the product repo as `tho/web/`. It is now standalone.
+
+| Repo | What's in it |
+|---|---|
+| [`chubu-tech/tho`](https://github.com/chubu-tech/tho) | The Flutter app + Supabase backend. **Source of truth for anything factual on this page** — plan prices and features come from `app/lib/business/plans/plans_config.dart`. |
+| [`chubu-tech/admin_dashboard`](https://github.com/chubu-tech/admin_dashboard) | The internal operator console (`../admin`). It is not, and will not be, routes in this app. |
+
+## Run
+
+```bash
+cd landing_page
+npm install
+npm run dev      # http://localhost:3000
+npm run build    # production build (also typechecks)
+npm run lint
+```
+
+## Page architecture
+
+Seven blocks, in the order a first-time visitor needs them:
+
+| # | Block | Job |
+|---|---|---|
+| 1 | `hero.tsx` | What this is, in one sentence — plus the App Store / Google Play buttons and a live-queue card showing the product working |
+| 2 | `service-marquee.tsx` | What you can book (texture band) |
+| 3 | `two-ways.tsx` | The two ways to use it: book ahead, or walk in and scan |
+| 4 | `queue-live.tsx` | The virtual queue, actually moving |
+| 5 | `for-salons.tsx` | The owner side — one pinned dashboard, four features |
+| 6 | `pricing.tsx` → `faq.tsx` | What it costs, then the objections |
+| 7 | `download-band.tsx` | The download, again |
+
+```
+app/
+  layout.tsx            fonts, metadata, skip-link
+  page.tsx              composition + JSON-LD graph
+  globals.css           design tokens, keyframes, utilities
+  icon.svg              favicon (scissors mark)
+  opengraph-image.tsx   1200×630 share card, generated at build
+  sitemap.ts / robots.ts
+components/
+  site-header.tsx       floating pill nav, scroll progress, mobile sheet
+  hero.tsx / service-marquee.tsx / two-ways.tsx / queue-live.tsx
+  for-salons.tsx / pricing.tsx / faq.tsx / download-band.tsx / site-footer.tsx
+  ui/
+    bhutan.tsx          TextileRule, MotifDiamond, MountainRule
+    store-badges.tsx    App Store + Google Play buttons
+    reveal.tsx text-reveal.tsx parallax-image.tsx marquee.tsx
+    button.tsx section.tsx
+lib/
+  content.ts        ALL copy + image URLs (single place to edit)
+  heading.ts        `_accent_` / `|` heading parser (server-safe)
+  utils.ts          cn()
+```
+
+## Bhutanese design cues
+
+Deliberately restrained — three motifs, used as ornament only, all `aria-hidden`:
+
+- **Dzong-window arch** (`arch` utility) frames the two pictorial cards in
+  `two-ways.tsx` — the strongest architectural cue on the page.
+- **Kira-weave rule** (`TextileRule`) — the uneven stripe band from Bhutanese
+  textiles. Opens the hero and the footer.
+- **Woven diamond** (`MotifDiamond`) separates the services ticker, and a
+  **Himalayan skyline** (`MountainRule`) closes the download band.
+
+Plus a Dzongkha greeting — *Kuzuzangpo la* — in saffron serif above the
+headline, and saffron/maroon/jade accent tokens taken from dzong trim and
+monastic cloth. Rausch stays the only action colour.
+
+## SEO
+
+- One `<h1>`; every band is a `<section aria-labelledby>` pointing at its `<h2>`
+- Full metadata in `layout.tsx`: canonical, keywords, Open Graph, Twitter,
+  `max-image-preview:large`
+- `app/sitemap.ts` and `app/robots.ts` (add a row to the sitemap per new route)
+- Build-time OG image at `app/opengraph-image.tsx`
+- One JSON-LD `@graph` in `page.tsx` linking Organization → WebSite →
+  SoftwareApplication (with the plan offers) → FAQPage
+- Statically prerendered, `next/image` everywhere with `sizes`, alt text on
+  every photo, skip-to-content link
+
+## Design system
+
+Colour tokens mirror `DESIGN.md` and `app/lib/ui/tokens.dart` **in the tho
+repo** so the site and the Flutter app read as one brand: rausch `#FF385C` used only for primary
+CTAs and active states, ink `#222222` (never pure black), the single
+`shadow-card` tier.
+
+**Type is deliberately different.** Three faces, each with one job:
+
+| Token | Face | Used for |
+|---|---|---|
+| `font-sans` | DM Sans | everything — geometric, open, low contrast |
+| `font-display` | Bricolage Grotesque | the hero `<h1>` only |
+| `font-serif` | Instrument Serif italic | the accent word in a heading |
+
+The Flutter app stays on Inter (tho's `DESIGN.md` names it as the substitute for
+Cereal); this page is the cleaner-typed surface, not a mirror of the app's type
+stack. **This divergence is intentional — don't "fix" it to match the app.**
+
+The landing page also adds a **marketing-only** editorial layer the in-app system
+deliberately does not use: a warm cream canvas (`--color-canvas`), an oversized
+display scale (`text-display-*`), and Instrument Serif italic for the accent word
+in a heading. In-app screens should keep DESIGN.md's quieter display sizes.
+
+## Writing rules
+
+1. **No technical words.** Never "dashboard", "admin", "analytics", "CRM",
+   "roster", "storefront". Say "one screen", "your customer list", "how the week
+   went". A salon owner in Thimphu should not have to decode anything.
+2. **Say who pays, early and often.** The most likely misreading of this page is
+   "do I pay to book?". The answer (no — only salons subscribe) appears in the
+   hero chip, the pricing section's lead panel, the FAQ and the download band.
+   Don't remove any of those.
+
+Write headings with the accent syntax: `"Free to get listed. _Pay when you grow._"`
+— underscores become serif italic, `|` forces a line break.
+
+## Animation
+
+Everything runs on one curve (`cubic-bezier(0.16, 1, 0.3, 1)`) so the whole
+scroll feels like one motion language:
+
+| Where | Motion |
+|---|---|
+| Hero load | image un-zooms 1.2 → 1; headline rises word-by-word from behind a clip mask; kira rule wipes in; purpose line, free-for-customers chip, store badges and queue card stagger in |
+| Hero live card | the queue position and wait time **tick down** (`#7 → #3`, `40 → 18 min`) — the clearest demo of what the app does |
+| Hero scroll | photo drifts down + scales, copy lifts and fades |
+| Nav | condenses into a floating blurred pill past 28px; brand-coloured read-progress line; each link's label slides out the top while a copy rises to replace it |
+| Buttons | magnetic — the pill leans toward the cursor and springs back; the arrow lifts diagonally |
+| Services ticker | velocity-linked: it drifts on its own, speeds up as you scroll down, reverses as you scroll up, and skews slightly with the shove |
+| Sections | `Reveal` / `RevealGroup` — opacity + short travel, staggered, fires once |
+| Large photos | `ParallaxImage` — spring-damped drift as the slab crosses the viewport |
+| Arch cards | `Curtain` lifts to reveal the photo, `Tilt` leans it toward the cursor, image scales under the fixed arch mask on hover |
+| Queue band | `Spotlight` — a warm saffron light follows the cursor behind the content |
+| Queue board | a 5-deep window slides along a ring every 2.6s; "You" climbs to the chair; the "two away" notification fires at position #2. Pauses when off-screen |
+| Salon screen | panels advance on a 5s timer with a dwell bar per row; tapping a row takes over. A light sheen sweeps the card |
+| Week numbers | `CountUp` on the three figures |
+| Pricing | breathing halo behind the free-for-customers panel; a brand gradient rim rotates around the recommended plan (`rim-card`, driven by an `@property` angle); cards lift on hover |
+| Marquees | the motif divider drifts on CSS alone |
+| FAQ | height-animated accordion, one open at a time |
+
+### Why the salon section is on a timer, not on scroll
+
+It used to pin the mock and pick the active feature from scroll position. That
+only worked on a wide screen: on a phone the mock had scrolled away by the time
+you reached the feature it was illustrating. Now a plain 5s timer drives the
+active index (tap to take over), and the mock is `sticky` inside a **block-flow**
+wrapper that only becomes a grid at `lg` — in a single-column *grid* the mock's
+row is exactly its own height, so it would have no room to stick. The
+`useInView` sensor is on the mock, not the whole block: the block is taller than
+a phone screen, so its intersection ratio is unstable and the timer would die
+the moment it dipped below the threshold.
+
+`prefers-reduced-motion` is honoured: `useReducedMotion` drops travel/loops and
+`globals.css` collapses all durations.
+
+## Before this goes live
+
+1. **Add the store URLs.** `brand.stores` in `content.ts` is empty, so both
+   badges currently fall back to the on-page `#download` section. Paste the real
+   App Store / Play listing URLs once the apps are published.
+2. **Replace the placeholder photography.** Every image is an Unsplash URL built
+   in `lib/content.ts`. Put real salon photos in `public/photos/`, point
+   `content.ts` at them, then delete `images.remotePatterns` from
+   `next.config.ts`.
+3. **Re-check the plan prices.** The tiers here mirror
+   `app/lib/business/plans/plans_config.dart` in the tho repo, which flags its
+   own prices as placeholders. The launch plan
+   (`docs/launch/2026-07-27-production-launch-and-marketing-plan.md` §pricing)
+   proposes Nu 899 / Nu 1,999 instead. Whatever the business settles on, the app
+   is the source of truth and this page follows it.
+4. Fill in the real support email, WhatsApp number and domain in `brand`
+   (`content.ts`) — the domain drives `metadataBase`, the canonical URL, the
+   sitemap and every JSON-LD `@id`. The WhatsApp number is still the same
+   `+975 17 00 00 00` placeholder the app carries.
+5. Add the `/privacy` and `/terms` routes (the footer no longer links to them,
+   but the store listings need a hosted privacy policy — tho's
+   `docs/deployment/PRIVACY_POLICY.md` has the copy). Add each to `sitemap.ts`.
+   tho's `STORE_DEPLOYMENT_CHECKLIST.md` also expects this site to host
+   `/q/<id>`, `/.well-known/assetlinks.json` and `apple-app-site-association`
+   for deep links.
+6. Social proof was removed on purpose: the earlier testimonials and stat
+   figures were invented. Add them back only with real, consented quotes and
+   measured numbers.

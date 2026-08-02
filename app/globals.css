@@ -1,0 +1,276 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens — mirrors DESIGN.md / app/lib/ui/tokens.dart so the marketing
+   site and the product read as one brand. The landing page adds an editorial
+   layer on top (cream canvas, oversized display type, full-bleed photography)
+   that the in-app system deliberately does not use.
+   Do not hardcode hex values in components; add a token here instead.
+--------------------------------------------------------------------------- */
+@theme {
+  /* Brand voltage (Rausch) — primary CTAs + active states only. */
+  --color-rausch: #ff385c;
+  --color-rausch-active: #e00b41;
+  --color-rausch-soft: #ffe8ec;
+
+  /* Ink / text. Never pure black. */
+  --color-ink: #222222;
+  --color-body: #3f3f3f;
+  --color-muted: #6a6a6a;
+  --color-muted-soft: #929292;
+
+  /* Hairlines. */
+  --color-hairline: #dddddd;
+  --color-hairline-soft: #ebebeb;
+
+  /* Surfaces — the marketing canvas is warm, not white. */
+  --color-canvas: #f6f3ee;
+  --color-canvas-deep: #efe9e1;
+  --color-paper: #ffffff;
+  --color-sand: #e6ded2;
+
+  /* Dark bands (footer, dashboard showcase, CTA). */
+  --color-obsidian: #141312;
+  --color-obsidian-soft: #201e1c;
+
+  /* Semantic. */
+  --color-success: #0b6b3a;
+  --color-success-soft: #e3f3ea;
+  --color-star: #f5a623;
+
+  /* Bhutanese accents — drawn from dzong trim, monastic cloth and kira
+     weaving. Decorative only: rausch stays the single action colour. */
+  --color-saffron: #e8a33d;
+  --color-saffron-soft: #fbeed6;
+  --color-maroon: #722030;
+  --color-jade: #1f6f5c;
+
+  /* Type families. DM Sans is the marketing face — geometric, open apertures,
+     low contrast: it reads cleaner than Inter at display sizes. The serif is
+     the editorial accent, used only for emphasised words in headings. */
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-instrument), Georgia, serif;
+  /* Display face — the hero headline only. Bricolage Grotesque has tighter
+     joins and more character than DM Sans, which is what you want at 5rem. */
+  --font-display: var(--font-bricolage), var(--font-dm-sans), sans-serif;
+
+  /* Editorial display scale (marketing only). */
+  /* Capped so the hero headline still breaks on its intended two lines inside
+     the 7-of-12 column it occupies. */
+  --text-display-2xl: clamp(2.75rem, 5.6vw, 5rem);
+  --text-display-xl: clamp(2.25rem, 5.5vw, 4.5rem);
+  --text-display-lg: clamp(1.875rem, 3.6vw, 3rem);
+  --text-display-md: clamp(1.5rem, 2.4vw, 2rem);
+
+  /* Radii — generous, matching the reference's soft rounded slabs. */
+  --radius-slab: 2rem;
+  --radius-slab-lg: 2.75rem;
+
+  /* Motion. */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-marquee: marquee 42s linear infinite;
+  --animate-marquee-slow: marquee 70s linear infinite;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 2.4s ease-out infinite;
+  --animate-draw-x: draw-x 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-glow: glow 4.5s ease-in-out infinite;
+  --animate-sheen: sheen 3.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  --animate-spin-rim: spin-rim 7s linear infinite;
+}
+
+@keyframes marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+/* Animatable angle for the rotating gradient rim on the recommended plan.
+   Registered so it can be tweened; without @property it would snap. */
+@property --rim-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes spin-rim {
+  to {
+    --rim-angle: 360deg;
+  }
+}
+
+/* Left-anchored wipe — the kira rule draws itself in. */
+@keyframes draw-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Slow breathing halo behind the recommended plan. */
+@keyframes glow {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.03);
+  }
+}
+
+/* Light sweeping across a surface. */
+@keyframes sheen {
+  0% {
+    transform: translateX(-120%);
+  }
+  60%,
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    /* Photography carries the hierarchy; type stays crisp beneath it. */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-rausch);
+    color: #fff;
+  }
+
+  /* Display headings run tight and slightly negative-tracked (DESIGN.md note
+     on Inter as the Cereal substitute). */
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-rausch);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+}
+
+@utility shadow-card {
+  /* The one shadow tier from DESIGN.md — a surface either has it or none. */
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.02),
+    0 2px 6px rgb(0 0 0 / 0.04),
+    0 4px 8px rgb(0 0 0 / 0.1);
+}
+
+@utility shadow-lift {
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.02),
+    0 18px 40px -12px rgb(0 0 0 / 0.28);
+}
+
+/* Edge-to-edge fade used on marquees and the logo strip. */
+@utility mask-edges {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 8%,
+    black 92%,
+    transparent
+  );
+}
+
+/* Dzong-window arch: an elliptical head over a squared foot. Used on the
+   pictorial cards so the photography reads as Bhutanese architecture. */
+@utility arch {
+  border-radius: 50% 50% 2rem 2rem / 30% 30% 3% 3%;
+}
+
+/* A white card with a slowly rotating brand rim. Two backgrounds on one
+   element — the flat fill clipped to padding-box, the spinning gradient to
+   border-box — so there is no extra layer to fight over z-index. */
+@utility rim-card {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--color-paper), var(--color-paper)) padding-box,
+    conic-gradient(
+        from var(--rim-angle),
+        color-mix(in oklab, var(--color-rausch) 12%, transparent) 0deg,
+        var(--color-rausch) 60deg,
+        var(--color-saffron) 105deg,
+        color-mix(in oklab, var(--color-rausch) 12%, transparent) 190deg,
+        color-mix(in oklab, var(--color-rausch) 12%, transparent) 360deg
+      )
+      border-box;
+  animation: var(--animate-spin-rim);
+}
+
+@utility grain {
+  position: relative;
+
+  /* Subtle film grain over dark photography bands — keeps large flat images
+     from banding on cheap displays. */
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.16;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
