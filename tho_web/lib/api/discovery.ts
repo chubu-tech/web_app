@@ -1,0 +1,212 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Business, Category } from "../types/salon";
+import type { WorkingHour } from "../types/booking";
+import { toBusiness, toBusinessHour, toCategory, withRating } from "./mappers";
+
+/**
+ * Discovery reads, ported from `Api.businesses` and friends in
+ * `tho/app/lib/data/api.dart`.
+ *
+ * All of this is anon-readable: `businesses_select` lets `anon` see approved,
+ * active, non-deleted salons, so browsing needs no session.
+ */
+
+export type SalonSort = "name" | "rating";
+
+export type BusinessQuery = {
+  categoryId?: string | null;
+  sort?: SalonSort;
+  /** From the gender filter; unisex is always included by the caller. */
+  serviceGenders?: string[] | null;
+  minPrice?: number | null;
+  maxPrice?: number | null;
+};
+
+/**
+ * Ratings for a set of salons, from the `business_rating_summary` view.
+ * Scoped to the ids shown rather than the whole table.
+ */
+async function ratingsFor(
+  supabase: SupabaseClient,
+  ids: string[],
+): Promise<Map<string, { avg: number | null; count: number }>> {
+  const out = new Map<string, { avg: number | null; count: number }>();
+  if (ids.length === 0) return out;
+
+  const { data } = await supabase
+    .from("business_rating_summary")
+    .select("*")
+    .in("business_id", ids);
+
+  for (const r of data ?? []) {
+    out.set(r.business_id as string, {
+      avg: r.avg_rating == null ? null : Number(r.avg_rating),
+      count: Number(r.review_count ?? 0),
+    });
+  }
+  return out;
+}
+
+/**
+ * Discover salons, optionally narrowed by category and by their services'
+ * gender/price, with aggregate ratings merged in.
+ *
+ * Two things here are not incidental:
+ *
+ * 1. **The services filter is an inner join, so rows multiply** — one per
+ *    matching service. De-duplicate *before* merging ratings, keeping first-seen
+ *    order so the `name` sort survives.
+ * 2. **`sort: 'rating'` is applied client-side**, because the rating lives in a
+ *    view that isn't part of the query. Unrated salons sort last (`-1`), not
+ *    first, which is what treating null as 0 would do.
+ */
+export async function fetchBusinesses(
+  supabase: SupabaseClient,
+  { categoryId = null, sort = "name", serviceGenders = null, minPrice = null, maxPrice = null }: BusinessQuery = {},
+): Promise<Business[]> {
+  const byService = serviceGenders != null || minPrice != null || maxPrice != null;
+
+  const select = [
+    "*",
+    categoryId != null ? "business_categories!inner(category_id)" : null,
+    byService ? "services!inner(gender, price)" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  let query = supabase.from("businesses").select(select);
+
+  if (categoryId != null) {
+    query = query.eq("business_categories.category_id", categoryId);
+  }
+  if (byService) {
+    query = query.eq("services.is_active", true);
+    if (serviceGenders != null) {
+      // A service with no recorded gender counts as "might suit", not "excluded".
+      //
+      // The Dart original uses a plain `in`, and SQL `IN` never matches NULL —
+      // which matters because **24 of 31 live services have `gender = null`**.
+      // Filtering strictly drops 8 of the 10 salons that have any services at
+      // all, not because they don't serve women or men but because nobody filled
+      // the field in. Measured against live data: "women" returns 2 salons
+      // strictly and 10 inclusively.
+      //
+      // Treating unspecified as eligible also matches the product's own logic,
+      // which already decided unisex counts for everyone. Price bounds still
+      // narrow normally, so this is not a filter that matches everything.
+      query = query.or(
+        `gender.is.null,gender.in.(${serviceGenders.join(",")})`,
+        { referencedTable: "services" },
+      );
+    }
+    if (minPrice != null) query = query.gte("services.price", minPrice);
+    if (maxPrice != null) query = query.lte("services.price", maxPrice);
+  }
+
+  const { data, error } = await query.order("name", { ascending: true });
+  if (error) throw error;
+
+  // The select string is built at runtime, so supabase-js can't infer the row
+  // shape and falls back to `GenericStringError`. Widen through `unknown`.
+  const rows = (data ?? []) as unknown as Record<string, unknown>[];
+  let list = rows.map(toBusiness);
+
+  // An inner join returns one row per matching service, so a salon with several
+  // qualifying services would repeat. Keep first-seen, which is `name` order.
+  if (byService) {
+    const seen = new Set<string>();
+    list = list.filter((b) => (seen.has(b.id) ? false : (seen.add(b.id), true)));
+  }
+
+  const ratings = await ratingsFor(supabase, list.map((b) => b.id));
+  list = list.map((b) => {
+    const r = ratings.get(b.id);
+    return withRating(b, r?.avg ?? null, r?.count ?? 0);
+  });
+
+  if (sort === "rating") {
+    list.sort((a, b) => (b.avgRating ?? -1) - (a.avgRating ?? -1));
+  }
+  return list;
+}
+
+export async function fetchBusinessById(
+  supabase: SupabaseClient,
+  id: string,
+): Promise<Business | null> {
+  const { data } = await supabase.from("businesses").select("*").eq("id", id).maybeSingle();
+  if (!data) return null;
+
+  const ratings = await ratingsFor(supabase, [id]);
+  const r = ratings.get(id);
+  return withRating(toBusiness(data as Record<string, unknown>), r?.avg ?? null, r?.count ?? 0);
+}
+
+export async function fetchCategories(supabase: SupabaseClient): Promise<Category[]> {
+  const { data } = await supabase
+    .from("categories")
+    .select("*")
+    .order("sort", { ascending: true });
+  return (data ?? []).map((m) => toCategory(m as Record<string, unknown>));
+}
+
+/**
+ * Weekly opening hours for every salon, grouped by id — one round trip.
+ *
+ * The recommender needs hours for the whole list to score availability, so
+ * fetching per salon would be N round trips on the Discover screen.
+ */
+export async function fetchAllBusinessHours(
+  supabase: SupabaseClient,
+): Promise<Record<string, WorkingHour[]>> {
+  const { data } = await supabase
+    .from("business_hours")
+    .select("id, business_id, day_of_week, open_time, close_time");
+
+  const out: Record<string, WorkingHour[]> = {};
+  for (const row of data ?? []) {
+    const id = row.business_id as string;
+    (out[id] ??= []).push(toBusinessHour(row as Record<string, unknown>));
+  }
+  for (const list of Object.values(out)) list.sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+  return out;
+}
+
+export async function fetchBusinessHours(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<WorkingHour[]> {
+  const { data } = await supabase
+    .from("business_hours")
+    .select("id, business_id, day_of_week, open_time, close_time")
+    .eq("business_id", businessId)
+    .order("day_of_week", { ascending: true });
+  return (data ?? []).map((m) => toBusinessHour(m as Record<string, unknown>));
+}
+
+/** Category ids per salon, for the recommender's category affinity. */
+export async function fetchAllBusinessCategories(
+  supabase: SupabaseClient,
+): Promise<Record<string, Set<string>>> {
+  const { data } = await supabase
+    .from("business_categories")
+    .select("business_id, category_id");
+
+  const out: Record<string, Set<string>> = {};
+  for (const row of data ?? []) {
+    const id = row.business_id as string;
+    (out[id] ??= new Set()).add(row.category_id as string);
+  }
+  return out;
+}
+
+export async function fetchBusinessCategoryIds(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<Set<string>> {
+  const { data } = await supabase
+    .from("business_categories")
+    .select("category_id")
+    .eq("business_id", businessId);
+  return new Set((data ?? []).map((r) => r.category_id as string));
+}
