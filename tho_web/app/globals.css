@@ -1,0 +1,180 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens — a one-to-one port of `tho/app/lib/ui/tokens.dart` and the
+   type scale in `theme.dart`, which are themselves a mirror of tho's DESIGN.md.
+
+   This is the *product's* system, not the marketing site's. The landing page
+   adds an editorial layer (cream canvas, oversized display type, DM Sans /
+   Bricolage / Instrument Serif) that the app deliberately does not use — so do
+   not reach for landing_page's globals.css when adding a token here.
+
+   Light only. DESIGN.md has no dark mode; the canvas is always pure white.
+
+   Do not hardcode a hex, radius or duration in a component. Add it here.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* --- Brand ------------------------------------------------------------- */
+  /* Rausch. Used scarcely: accents, active states, links, badges, tints. */
+  --color-rausch: #ff385c;
+  --color-rausch-active: #e00b41;
+  --color-rausch-disabled: #ffd1da;
+
+  /* The background for a *filled* CTA carrying white text.
+     NOT --color-rausch: white on #FF385C measures 3.53:1 and fails WCAG AA.
+     This is the same hue a step deeper — 4.89:1, which passes — and is used
+     only where white sits on top of it. This is an accessibility fix, not a
+     style preference: using rausch for a filled button reintroduces the bug. */
+  --color-rausch-cta: #e00b41;
+  --color-rausch-cta-pressed: #be0937; /* 6.40:1 on white */
+
+  /* --- Ink / text -------------------------------------------------------- */
+  --color-ink: #222222; /* headlines, body, most links — never pure black */
+  --color-body: #3f3f3f; /* secondary running text */
+  --color-muted: #6a6a6a; /* sub-labels, inactive tabs */
+  --color-muted-soft: #929292; /* disabled text */
+
+  /* --- Hairlines & borders ---------------------------------------------- */
+  --color-hairline: #dddddd;
+  --color-hairline-soft: #ebebeb;
+  --color-border-strong: #c1c1c1;
+
+  /* --- Surfaces --------------------------------------------------------- */
+  --color-canvas: #ffffff;
+  --color-surface-soft: #f7f7f7;
+  --color-surface-strong: #f2f2f2;
+  --color-on-primary: #ffffff;
+
+  /* --- Semantic --------------------------------------------------------- */
+  --color-error-text: #c13515;
+  --color-error-text-hover: #b32505;
+  --color-error-soft: #fbe9e3;
+  --color-success-text: #0b6b3a;
+  --color-success-soft: #e3f3ea;
+
+  /* Gold: the one warm accent in a coral-and-ink system, reserved for
+     ratings. Every star in the app is this colour, so a rating always reads
+     as the same thing. Never use it for anything else. */
+  --color-star: #e8a317;
+
+  /* --- Radii ------------------------------------------------------------ */
+  /* sm buttons + inputs · md cards/dialogs · lg sheet tops · full pills */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 32px;
+
+  /* --- Spacing (4px base, 2px micro-step) ------------------------------- */
+  --spacing-xxs: 2px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-base: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+  --spacing-section: 64px;
+
+  /* --- Motion ----------------------------------------------------------- */
+  /* The rule these tiers encode: the smaller the thing, the faster it moves.
+     Anything slower than --duration-page starts to feel like waiting. */
+  --duration-fast: 120ms; /* chip fills, press scales, colour swaps */
+  --duration-base: 180ms; /* segmented controls, toggles, small reveals */
+  --duration-slow: 260ms; /* a card expanding, a sheet settling */
+  --duration-page: 220ms; /* route transitions */
+
+  --ease-enter: cubic-bezier(0.215, 0.61, 0.355, 1); /* easeOutCubic */
+  --ease-exit: cubic-bezier(0.55, 0.055, 0.675, 0.19); /* easeInCubic */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* easeOutBack */
+
+  /* --- Type scale (theme.dart AppText) ---------------------------------- */
+  /* THO-57 dropped the scale two steps (~12%); the app read large on a phone.
+     `badge` holds at 11px — it is the smallest text in the app and lives in
+     count pills, where a further drop stops being legible. */
+  --text-display-xl: 24px;
+  --text-display-xl--line-height: 1.2;
+  --text-display-lg: 19px;
+  --text-display-lg--line-height: 1.18;
+  --text-display-lg--letter-spacing: -0.44px;
+  --text-display-md: 19px;
+  --text-display-md--line-height: 1.25;
+  --text-display-sm: 17px;
+  --text-display-sm--line-height: 1.2;
+  --text-display-sm--letter-spacing: -0.18px;
+  --text-title: 14px;
+  --text-title--line-height: 1.25;
+  --text-body-md: 14px;
+  --text-body-md--line-height: 1.5;
+  --text-body-sm: 12px;
+  --text-body-sm--line-height: 1.43;
+  --text-caption: 12px;
+  --text-caption--line-height: 1.29;
+  --text-caption-sm: 11px;
+  --text-caption-sm--line-height: 1.23;
+  --text-badge: 11px;
+  --text-badge--line-height: 1.18;
+
+  /* --- Breakpoints (DESIGN.md:518-537) ---------------------------------- */
+  /* Mobile <744 · Tablet 744–1128 · Desktop 1128–1440 · Wide >1440.
+     The rule: always reduce columns, never reflow rows. */
+  --breakpoint-tablet: 744px;
+  --breakpoint-desktop: 1128px;
+  --breakpoint-wide: 1440px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-size: var(--text-body-md);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* One visible focus treatment for the whole app. */
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* Material 3 ships icon buttons at 40x40, under both the 48dp floor and the
+     iOS 44pt one; tokens.dart documents fixing that in the app. Keep every
+     interactive target at 48px here too — see `min-h-12` in the UI kit. */
+  button,
+  [role="button"],
+  a[href] {
+    touch-action: manipulation;
+  }
+}
+
+/* The single shadow tier from DESIGN.md. A surface either has this one shadow
+   or none — there are no progressive elevation tiers. */
+@utility shadow-card {
+  box-shadow:
+    rgba(0, 0, 0, 0.02) 0 0 0 1px,
+    rgba(0, 0, 0, 0.04) 0 2px 6px,
+    rgba(0, 0, 0, 0.1) 0 4px 8px;
+}
+
+/* Scrim behind sheets and dialogs — black at 50%, as applied at render time. */
+@utility scrim {
+  background-color: rgb(0 0 0 / 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
