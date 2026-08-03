@@ -48,11 +48,83 @@ export const brand = {
 } as const;
 
 export const nav = [
+  { label: "Find a salon", href: "#find" },
   { label: "How it works", href: "#how-it-works" },
   { label: "Live queue", href: "#queue" },
   { label: "For salons", href: "#for-salons" },
   { label: "Pricing", href: "#pricing" },
 ] as const;
+
+/**
+ * The search band. Plain words on purpose — a salon owner or a customer in
+ * Thimphu should not have to decode "filters" or "facets".
+ *
+ * Note what the wording does NOT claim: choosing a day and a time narrows to
+ * salons that are *open* then. Picking an actual slot happens in the app, since
+ * there is no public availability lookup.
+ */
+export const search = {
+  eyebrow: "Find a salon",
+  title: "What do you need, _and when_?",
+  body: "Every salon here is live on Tho. Pick what you want done, where, and roughly when — then book or join the queue in the app.",
+  treatment: {
+    label: "What you want done",
+    placeholder: "Anything",
+    anyLabel: "Anything",
+    heading: "Popular with these salons",
+  },
+  place: {
+    label: "Where",
+    placeholder: "Anywhere",
+    anyLabel: "Anywhere",
+    nearMe: "Use my location",
+    locating: "Finding you…",
+    denied: "We couldn't get your location — pick a town instead.",
+    unsupported: "This browser can't share a location — pick a town instead.",
+  },
+  when: {
+    label: "When",
+    placeholder: "Any day",
+    anyLabel: "Any day",
+    today: "Today",
+    tomorrow: "Tomorrow",
+    timeLabel: "Time of day",
+    anyTime: "Any time",
+    note: "Shows salons open then. You'll pick an exact time in the app.",
+  },
+  submit: "Search",
+  clear: "Clear",
+  counts: {
+    salons: "Salons",
+    treatments: "Treatments",
+    professionals: "Stylists",
+  },
+} as const;
+
+/** Copy for the salon grid — recommendations, nearby, and search results. */
+export const results = {
+  /** A shortlist, and the wording has to say so — see `recommended()`. */
+  recommendedTitle: "Recommended",
+  recommendedBody:
+    "Our pick of the highest-rated salons customers have actually reviewed.",
+  nearbyTitle: "Near you",
+  nearbyBody: "The closest salons to where you are now.",
+  nearbyPrompt: "Share your location and we'll show the salons closest to you.",
+  nearbyAction: "Show salons near me",
+  nearbyNone:
+    "None of the salons near you have put themselves on the map yet.",
+  resultsTitle: "Salons",
+  partialHeading: "Might also suit",
+  partialBody:
+    "These haven't filled in everything yet, so we couldn't check them against all of your choices.",
+  emptyTitle: "Nothing matched everything",
+  emptyBody: "Try widening one of your choices.",
+  featured: "Featured",
+  noRating: "New",
+  cta: "Book in the app",
+  offline:
+    "The salon list isn't available right now. Everything else on this page still works.",
+} as const;
 
 export const hero = {
   eyebrow: brand.cities.join(" · "),

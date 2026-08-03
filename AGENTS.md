@@ -7,8 +7,33 @@ This version has breaking changes — APIs, conventions, and file structure may 
 # Bhutan Salons — landing page
 
 The public marketing site for a Bhutan-first salon & barber booking marketplace.
-One route (`/`), **fully static** — no database, no API routes, no auth, no
-Supabase client. Next.js 16 (App Router), React 19, Tailwind 4, `motion`.
+One route (`/`), **statically served** — no API routes, no auth, no runtime
+network calls. Next.js 16 (App Router), React 19, Tailwind 4, `motion`.
+
+**One data dependency.** The "Find a salon" band lists real salons. `lib/salons.ts`
+reads them from the `tho` Supabase project **at build time** with the publishable
+key and `export const revalidate = 3600` in `app/page.tsx`, so the page stays
+prerendered static HTML and the browser makes no request. Everything it reads is
+anon-readable by RLS (approved+active businesses, their services, categories,
+opening hours, ratings), so there is nothing to authorise and no service key.
+
+If the fetch fails or the env vars are missing, `getSalonIndex()` returns an
+empty index and the band renders a short "not available" note. A marketing site
+must never fail to build because a database blinked.
+
+Two things that fall out of using real data:
+
+- **Fields are often blank.** Some salons have no cover photo, no opening hours,
+  no services and no map pin. `lib/search.ts` therefore never *excludes* a salon
+  for missing data — unjudgeable salons surface under "Might also suit". A blank
+  field is the salon's gap, not a reason to hide them.
+- **Placeholders leak.** The operator console can approve anything, and salons
+  named "Test 2" / "Test 01" are live right now. `PLACEHOLDER_NAME` in
+  `lib/salons.ts` drops them. Suspending them in the console is the real fix.
+
+The "when" filter matches salons that are **open** at that time, from
+`business_hours`. It cannot know whether a chair is free — `compute_availability`
+is `authenticated`-only — so no copy anywhere may imply it does.
 
 Naming: the platform, company and site are **Bhutan Salons**. The app you
 download is **Tho** — that is the Android label, the iOS display name and the

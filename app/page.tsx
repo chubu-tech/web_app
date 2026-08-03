@@ -1,5 +1,6 @@
 import { DownloadBand } from "@/components/download-band";
 import { Faq } from "@/components/faq";
+import { FindSalon } from "@/components/find-salon";
 import { ForSalons } from "@/components/for-salons";
 import { Hero } from "@/components/hero";
 import { Pricing } from "@/components/pricing";
@@ -10,8 +11,22 @@ import { SiteHeader } from "@/components/site-header";
 import { TwoWays } from "@/components/two-ways";
 import { MotifDivider } from "@/components/ui/bhutan";
 import { brand, faq, hero, pricing } from "@/lib/content";
+import { getSalonIndex } from "@/lib/salons";
 
 const SITE = `https://${brand.domain}`;
+
+/**
+ * Rebuild the salon list hourly.
+ *
+ * The salons are read at build time and inlined, so the page keeps being served
+ * as static HTML with no request on load. An hour is short enough that a newly
+ * approved salon appears without a deploy, and long enough that the database is
+ * hit once an hour rather than once a visit.
+ *
+ * Note this is the pre-Cache-Components model, which is correct here because
+ * `cacheComponents` is not enabled in `next.config.ts`.
+ */
+export const revalidate = 3600;
 
 /**
  * Structured data. Kept in one graph so crawlers resolve the relationships
@@ -100,7 +115,9 @@ const jsonLd = {
   ],
 };
 
-export default function Home() {
+export default async function Home() {
+  const salonIndex = await getSalonIndex();
+
   return (
     <>
       <SiteHeader />
@@ -108,13 +125,15 @@ export default function Home() {
         {/* 1. What this is + get the app. */}
         <Hero />
         <ServiceMarquee />
-        {/* 2. The two ways to use it. */}
+        {/* 2. Real salons, searchable — the proof the marketplace exists. */}
+        <FindSalon index={salonIndex} />
+        {/* 3. The two ways to use it. */}
         <TwoWays />
-        {/* 3. The queue, working. */}
+        {/* 4. The queue, working. */}
         <QueueLive />
-        {/* 4. The owner side. */}
+        {/* 5. The owner side. */}
         <ForSalons />
-        {/* 5. Who pays what, 6. questions, 7. download. */}
+        {/* 6. Who pays what, 7. questions, 8. download. */}
         <Pricing />
         <MotifDivider />
         <Faq />

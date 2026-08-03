@@ -11,6 +11,13 @@ const nextConfig: NextConfig = {
         port: "",
         pathname: "/**",
       },
+      {
+        // Real salon cover photos, uploaded by owners to Supabase storage.
+        protocol: "https",
+        hostname: "izlyevebmxqlxinigote.supabase.co",
+        port: "",
+        pathname: "/storage/v1/object/public/**",
+      },
     ],
   },
 };

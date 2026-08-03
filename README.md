@@ -1,12 +1,14 @@
 # Bhutan Salons — landing page
 
-The public marketing site. One route, fully static — no database, no API, no
-auth. The platform is **Bhutan Salons**; the app you download is **Tho**.
+The public marketing site. One route, statically served — no API routes, no
+auth, no runtime network calls. The platform is **Bhutan Salons**; the app you
+download is **Tho**.
 
 - Next.js 16 (App Router, Turbopack) · React 19 · TypeScript
 - Tailwind CSS v4 (tokens in `app/globals.css`, no `tailwind.config`)
 - `motion` (Framer Motion 12) for animation, `lucide-react` for icons
 - Statically prerendered — the landing page ships as static HTML
+- Real salons, read from Supabase **at build time** and inlined (see below)
 
 ## Related repos
 
@@ -22,10 +24,37 @@ This used to live inside the product repo as `tho/web/`. It is now standalone.
 ```bash
 cd landing_page
 npm install
+cp .env.example .env.local
 npm run dev      # http://localhost:3000
 npm run build    # production build (also typechecks)
 npm run lint
 ```
+
+## The salon data
+
+The "Find a salon" band (`components/find-salon.tsx`) lists **real salons**.
+
+| Variable | Notes |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | The `tho` project |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable key — safe to expose; RLS is the gate |
+
+`lib/salons.ts` reads them **once at build time**, and `app/page.tsx` sets
+`revalidate = 3600`, so `/` stays prerendered static HTML (confirm with
+`npm run build` — the route must print `○ (Static)`) and no request happens on
+load. Everything read is anon-readable by policy; there is no service-role key
+here and there must never be one.
+
+Without the env vars the build still succeeds — the band renders a short
+"not available" note instead. Filtering lives in `lib/search.ts` and runs
+entirely in the browser over the inlined data.
+
+Two behaviours worth knowing before changing them:
+
+- **Blank fields never exclude a salon.** Missing hours or services put a salon
+  under "Might also suit" rather than hiding it.
+- **"When" filters on opening hours, not free slots** — there is no public
+  availability lookup, so the copy must not imply one.
 
 ## Page architecture
 
