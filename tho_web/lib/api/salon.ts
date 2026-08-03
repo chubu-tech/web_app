@@ -57,6 +57,37 @@ export async function fetchStaff(
 }
 
 /**
+ * Which stylists perform which services, as `serviceId → Set<staffId>`.
+ *
+ * **This is load-bearing, not a nicety.** `create_booking` and `compute_availability`
+ * both require the pair to exist in `service_staff` and raise
+ * *"one or more services are invalid, inactive, or not performed by this staff"*
+ * otherwise. The salon page offers services and stylists as two independent lists, so
+ * without this a customer can build a pair nobody performs and reach a slot grid that
+ * can only fail — measured on live data: Norzin lists 5 services and its stylists
+ * perform 3 of them, so 2 of 10 pairings were dead ends.
+ *
+ * Anon-readable (`service_staff_select` covers `anon` for active services), so the
+ * salon page can narrow the choice before anyone signs in.
+ */
+export async function fetchServiceStaff(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<Record<string, string[]>> {
+  const { data } = await supabase
+    .from("service_staff")
+    .select("service_id, staff_member_id, services!inner(business_id)")
+    .eq("services.business_id", businessId);
+
+  const out: Record<string, string[]> = {};
+  for (const row of (data ?? []) as unknown as Record<string, unknown>[]) {
+    const serviceId = row.service_id as string;
+    (out[serviceId] ??= []).push(row.staff_member_id as string);
+  }
+  return out;
+}
+
+/**
  * Reviews with their photos.
  *
  * The `review_photos` embed is what populates `photoUrls`; a plain `*` select

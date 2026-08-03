@@ -10,10 +10,10 @@ The Bhutan Salons product in a browser: customers book chairs and join walk-in
 queues, owners run their salon, staff see their day. Next.js 16 (App Router),
 React 19, Tailwind 4, TypeScript.
 
-**Status: Phase 2a (browse).** Discover, the salon page and Saved are live against
-the real database, at all four breakpoints, for a visitor with no session. Next:
-2b booking → 2c the walk-in queue (`/q/<id>` as the QR target) → 2d products,
-loyalty, chat, notifications, profile, map. Then owner, then staff.
+**Status: Phase 2b (book).** Browse, sign in, book, reschedule, cancel and review
+all work against the real database. Next: 2c the walk-in queue (`/q/<id>` as the QR
+target, plus the walk-in card and the "I'm here" check-in deferred from 2a/2b) → 2d
+products, loyalty, chat, notifications, settings, map. Then owner, then staff.
 
 ## This repo owns no data
 
@@ -43,6 +43,27 @@ already granted to `authenticated`.
   is the entire security model.
 - **`../tho` is upstream.** Mirror it; never the reverse. When behaviour here
   disagrees with the Flutter app, the Flutter app is right.
+
+## Auth
+
+`/sign-in` and `/sign-up` are **routes**; the guest wall is a **sheet**. They do
+different jobs and both are needed:
+
+- A route is bookmarkable, survives a refresh, works with a password manager, and is
+  where the confirmation email lands (`app/auth/confirm/route.ts`). Without one an
+  existing customer could not sign in at all — `upgradeGuest` only converts an
+  *anonymous* session, and this project requires email confirmation, so it cannot
+  produce a signed-in user in one step.
+- The sheet keeps a half-finished booking on screen. It also offers "already have an
+  account", which the Flutter app has no equivalent of and which is what a returning
+  customer on the web usually needs.
+
+`?next=` is attacker-controlled, so it goes through `safeNext` (`lib/next-path.ts`)
+and is reduced to a same-origin path or dropped. **Never follow it raw** — a sign-in
+page that forwards anywhere is a phishing tool. Its tests are the spec.
+
+Sign-up is customer-only until the owner console exists; an owner or staff member who
+signs in lands on Discover rather than a route that isn't built.
 
 ## The account model
 
@@ -156,6 +177,26 @@ somewhere unfinished — flip the flag in the milestone that lands the route. Sa
 for links inside pages: `SpecialistCard` takes an optional `href` for exactly this
 reason.
 
+## Booking
+
+- **The idempotency key belongs to the caller.** `create_booking` catches its own
+  unique violation and returns the booking that key already made, so one key per
+  confirm attempt held across retries makes a double-click safe — and a fresh key per
+  press is exactly what produces two bookings.
+- **A service and a stylist are not independent.** `compute_availability` and
+  `create_booking` both require the pair in `service_staff` and raise otherwise. The
+  picker only offers stylists who perform the chosen service, and `/salon/[id]/book`
+  404s on a pair that isn't real. Without this, 2 of Norzin's 5 live services led to a
+  slot grid that could only error — the Flutter app still has that gap.
+- **Reference photos go to the private `booking-media` bucket as object *paths*,**
+  never URLs, uploaded only *after* the booking exists, and read back through 1-hour
+  signed URLs. `next.config.ts` must allow `/storage/v1/object/**` — not just
+  `/object/public/**` — or `next/image` throws during render and takes the page with
+  it.
+- **The confirmation sheet stays until dismissed.** It replaced a snackbar that
+  vanished while the screen was being popped. Do not regress it to a toast.
+- Errors are mapped by `errcode`, not message text — see `lib/api/booking-errors.ts`.
+
 ## Live data is messier than it looks
 
 Check assumptions against it before trusting a column:
@@ -169,6 +210,13 @@ Check assumptions against it before trusting a column:
 - Two rows named `Test 01`/`Test 2` are live and approved, so they appear in the
   catalogue. That's a data cleanup in the admin console, not something to filter out
   here.
+- **Norzin lists 5 services but its stylists perform 3.** `service_staff` is the
+  authority on what is bookable, not `services`.
+- No salon is on **Pro** (10 basic, 3 growth), so the Pro-gated hairstyle picker never
+  appears on live data. Its gate is covered by unit tests instead.
+- Seeded logins exist and are email-confirmed — `customer@bhutansalons.test` and
+  friends, password in `../tho/supabase/seed.sql`. Useful for verification; the app's
+  dev quick-login chips are deliberately **not** ported to the web.
 
 ## Verify
 

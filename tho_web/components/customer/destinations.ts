@@ -25,8 +25,8 @@ export const TABS: Destination[] = [
   { href: "/", label: "Discover", icon: Icons.discover, ready: true },
   { href: "/map", label: "Map", icon: Icons.map, ready: false },
   { href: "/messages", label: "Chats", icon: Icons.chat, ready: false },
-  { href: "/bookings", label: "Bookings", icon: Icons.booking, ready: false },
-  { href: "/profile", label: "Profile", icon: Icons.person, ready: false },
+  { href: "/bookings", label: "Bookings", icon: Icons.booking, ready: true },
+  { href: "/profile", label: "Profile", icon: Icons.person, ready: true },
 ];
 
 /**

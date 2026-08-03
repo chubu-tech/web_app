@@ -4,6 +4,7 @@ import type {
   BusinessPhoto,
   BusinessType,
   Category,
+  Hairstyle,
   Offer,
   Product,
   QueueJoinMode,
@@ -11,7 +12,15 @@ import type {
   ServiceItem,
   StaffMember,
 } from "../types/salon";
-import type { WorkingHour } from "../types/booking";
+import type {
+  Booking,
+  BookingItem,
+  BookingSource,
+  BookingStatus,
+  Payment,
+  Slot,
+  WorkingHour,
+} from "../types/booking";
 
 /**
  * Row → model mappers, one per table, ported from the `fromMap` factories in
@@ -187,4 +196,85 @@ export function toProduct(m: Row): Product {
 
 export function toBusinessPhoto(m: Row): BusinessPhoto {
   return { id: m.id as string, url: m.url as string };
+}
+
+/**
+ * A booking with its embeds, ported from `Booking.fromMap`.
+ *
+ * `businesses` / `staff_members` / `customer` arrive as embedded objects, and
+ * `booking_items` / `booking_attachments` as arrays. Every one is optional: the same
+ * mapper serves a bare `create_booking` return (no embeds at all) and the fully
+ * joined list read.
+ */
+export function toBooking(m: Row): Booking {
+  const biz = (m.businesses ?? null) as Row | null;
+  const staff = (m.staff_members ?? null) as Row | null;
+  const customer = (m.customer ?? null) as Row | null;
+  const rawItems = Array.isArray(m.booking_items) ? (m.booking_items as Row[]) : [];
+  const rawAttachments = Array.isArray(m.booking_attachments)
+    ? (m.booking_attachments as Row[])
+    : [];
+
+  return {
+    id: m.id as string,
+    status: (m.status as BookingStatus) ?? "pending",
+    source: (str(m.source) ?? "app") as BookingSource,
+    startTs: new Date(m.start_ts as string),
+    endTs: new Date(m.end_ts as string),
+    totalPrice: numOrNull(m.total_price) ?? 0,
+    businessId: str(m.business_id) ?? undefined,
+    staffMemberId: str(m.staff_member_id),
+    businessName: biz ? str(biz.name) : null,
+    businessAddress: biz ? str(biz.address_text) : null,
+    businessCoverUrl: biz ? str(biz.cover_url) : null,
+    staffName: staff ? str(staff.display_name) : null,
+    customerProfileId: str(m.customer_profile_id),
+    // The profile's own name wins over the walk-in snapshot, as the Dart does.
+    customerName: (customer ? str(customer.full_name) : null) ?? str(m.customer_name),
+    customerPhone: (customer ? str(customer.phone) : null) ?? str(m.customer_phone),
+    customerAvatarUrl: customer ? str(customer.avatar_url) : null,
+    customerNote: str(m.customer_note),
+    items: rawItems.map(toBookingItem),
+    // `url` is the column name, but the value is an object *path* in the private
+    // bucket. The field is named for what it holds, not for where it is stored.
+    attachmentPaths: rawAttachments
+      .map((a) => str(a.url))
+      .filter((p): p is string => p != null),
+  };
+}
+
+export function toBookingItem(m: Row): BookingItem {
+  return {
+    id: (str(m.id) ?? `${m.service_id}-${m.service_name}`) as string,
+    serviceId: str(m.service_id),
+    name: (str(m.service_name) ?? "Service") as string,
+    price: numOrNull(m.price) ?? 0,
+    durationMinutes: numOrNull(m.duration_minutes) ?? 0,
+  };
+}
+
+export function toSlot(m: Row): Slot {
+  return {
+    start: new Date(m.slot_start as string),
+    end: new Date(m.slot_end as string),
+  };
+}
+
+export function toPayment(m: Row): Payment {
+  return {
+    id: m.id as string,
+    amountNu: numOrNull(m.amount_nu) ?? 0,
+    kind: str(m.kind) ?? "payment",
+    method: str(m.method) ?? "cash",
+    createdAt: new Date(m.created_at as string),
+  };
+}
+
+export function toHairstyle(m: Row): Hairstyle {
+  return {
+    id: m.id as string,
+    name: m.name as string,
+    imageUrl: str(m.image_url),
+    gender: str(m.gender),
+  };
 }

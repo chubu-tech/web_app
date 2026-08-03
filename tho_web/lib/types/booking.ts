@@ -44,8 +44,96 @@ export type Booking = {
   customerAvatarUrl?: string | null;
   customerNote?: string | null;
   items?: BookingItem[];
-  attachmentUrls?: string[];
+  /**
+   * Object **paths** in the private `booking-media` bucket — never URLs.
+   *
+   * Reference photos can be identifying, so the bucket is not world-readable;
+   * resolve these through `signedBookingMediaUrls` at display time. Storing a public
+   * URL here would defeat the bucket's whole point.
+   */
+  attachmentPaths?: string[];
 };
+
+/* --------------------------------------------------------------------------
+   Derived reads, ported from the getters on `Booking` in
+   `tho/app/lib/data/models.dart`. Kept as functions rather than fields so the
+   mapper stays a straight row translation.
+   -------------------------------------------------------------------------- */
+
+/** A short human-facing code, e.g. `#A1B2C3D4`. */
+export function bookingCode(b: Pick<Booking, "id">): string {
+  return `#${b.id.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
+}
+
+/** The booked service ids, for re-running availability on a reschedule. */
+export function serviceIds(b: Pick<Booking, "items">): string[] {
+  return (b.items ?? [])
+    .map((it) => it.serviceId)
+    .filter((id): id is string => id != null);
+}
+
+/** "Haircut + Beard trim · 45 min" — the card's one-line summary. */
+export function servicesSummary(b: Pick<Booking, "items">): string {
+  const items = b.items ?? [];
+  if (items.length === 0) return "Appointment";
+  const names = items.map((it) => it.name).join(" + ");
+  const minutes = items.reduce((sum, it) => sum + it.durationMinutes, 0);
+  return minutes > 0 ? `${names} · ${minutes} min` : names;
+}
+
+export function hasNote(b: Pick<Booking, "customerNote">): boolean {
+  return (b.customerNote ?? "").trim().length > 0;
+}
+
+/** Pending or confirmed — the two states a customer can still act on. */
+export function isActive(b: Pick<Booking, "status">): boolean {
+  return b.status === "pending" || b.status === "confirmed";
+}
+
+/**
+ * Which tab a booking belongs in: 0 Upcoming · 1 Completed · 2 Cancelled.
+ *
+ * A direct port of `_tabOf` (`customer_home.dart:843`), including that it buckets by
+ * **status, not by date** — so a confirmed booking whose time has passed but which
+ * nobody has completed still reads as Upcoming. That is the honest answer: it is
+ * still live as far as the salon is concerned.
+ */
+export function bookingTab(b: Pick<Booking, "status">): 0 | 1 | 2 {
+  switch (b.status) {
+    case "pending":
+    case "confirmed":
+      return 0;
+    case "completed":
+      return 1;
+    default:
+      return 2;
+  }
+}
+
+/** A recorded payment against a booking, from the `payments` table. */
+export type Payment = {
+  id: string;
+  amountNu: number;
+  /** 'payment' | 'deposit' | 'refund' */
+  kind: string;
+  method: string;
+  createdAt: Date;
+};
+
+/**
+ * Whatever is still owed after deposits and refunds.
+ *
+ * Clamped at zero — an overpayment is the salon's to settle, not a negative number
+ * on a customer's receipt (`booking_detail_screen.dart:448`).
+ */
+export function outstandingNu(totalPrice: number, payments: Payment[]): number {
+  const paid = payments.reduce(
+    (sum, p) => sum + (p.kind === "refund" ? -p.amountNu : p.amountNu),
+    0,
+  );
+  const total = Math.round(totalPrice);
+  return Math.min(Math.max(total - paid, 0), total);
+}
 
 /**
  * A row of `business_hours` or a staff member's weekly hours.

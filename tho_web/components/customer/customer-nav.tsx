@@ -23,7 +23,7 @@ import { isCurrent, readySecondary, readyTabs, type Destination } from "./destin
  * stroke icon sets have no filled variant to swap in.
  */
 
-export function CustomerTopNav() {
+export function CustomerTopNav({ signedIn }: { signedIn: boolean }) {
   const pathname = usePathname();
   const items = [...readyTabs(), ...readySecondary()];
 
@@ -43,6 +43,17 @@ export function CustomerTopNav() {
             </li>
           ))}
         </ul>
+        {/* Signing in is the one thing a returning customer most often needs and
+            the tab bar has no room to say. Shown only when it applies — a guest
+            counts as not signed in, because they have a session but no account. */}
+        {signedIn ? null : (
+          <Link
+            href={`/sign-in?next=${encodeURIComponent(pathname)}`}
+            className="bg-rausch-cta text-on-primary text-title hover:bg-rausch-cta-pressed flex min-h-12 shrink-0 items-center rounded-sm px-4 font-medium"
+          >
+            Sign in
+          </Link>
+        )}
       </nav>
     </header>
   );

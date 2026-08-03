@@ -28,6 +28,7 @@ import {
   fetchProductsForBusiness,
   fetchReviews,
   fetchServices,
+  fetchServiceStaff,
   fetchStaff,
 } from "@/lib/api/salon";
 import { coverageLine, dayName, hhmm, todayHoursLine } from "@/lib/salon-copy";
@@ -91,6 +92,7 @@ export default async function SalonPage({
     products,
     offers,
     favouriteIds,
+    staffByService,
   ] = await Promise.all([
     fetchServices(supabase, id),
     fetchStaff(supabase, id),
@@ -112,6 +114,9 @@ export default async function SalonPage({
     fetchProductsForBusiness(supabase, id).catch(() => []),
     fetchOffersForBusiness(supabase, id).catch(() => []),
     fetchMyFavouriteIds(supabase).catch(() => new Set<string>()),
+    // Which stylist can do which service. Not decorative: an incompatible pair is
+    // refused by `create_booking`, so the picker must not offer one.
+    fetchServiceStaff(supabase, id).catch(() => ({}) as Record<string, string[]>),
   ]);
 
   const isTravelling = travels(business);
@@ -274,7 +279,12 @@ export default async function SalonPage({
             The bottom padding clears the fixed CTA bar plus the tab bar under it,
             so the last stylist is never hidden behind them. */}
         <aside className="border-hairline-soft p-base row-start-2 rounded-md border pb-[calc(140px+env(safe-area-inset-bottom))] desktop:col-start-2 desktop:row-start-1 desktop:row-span-2 desktop:sticky desktop:top-20 desktop:self-start desktop:pb-base">
-          <SalonBooking services={services} staff={staff} />
+          <SalonBooking
+            salonId={id}
+            services={services}
+            staff={staff}
+            staffByService={staffByService}
+          />
         </aside>
 
         <div className="row-start-3 min-w-0 desktop:col-start-1 desktop:row-start-2">

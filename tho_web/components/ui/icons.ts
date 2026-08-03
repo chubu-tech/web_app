@@ -5,15 +5,25 @@ import {
   Bell,
   CalendarCheck,
   CalendarDays,
+  CalendarX,
+  Camera,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
   Compass,
+  Eye,
+  EyeOff,
   Filter,
   Gift,
   Hand,
   Heart,
+  ImagePlus,
+  LogOut,
+  Plus,
+  Receipt,
+  Ticket,
   Image as ImageIcon,
   Info,
   ListOrdered,
@@ -68,6 +78,8 @@ export const Icons = {
   close: X,
   share: Share2,
   settings: Settings,
+  add: Plus,
+  logout: LogOut,
 
   // ------------------------------------------------------------------ search --
   search: Search,
@@ -79,6 +91,10 @@ export const Icons = {
   offline: WifiOff,
   error: AlertCircle,
   info: Info,
+  success: CheckCircle2,
+  /** The password reveal toggle. Paired: one concept, two states. */
+  visible: Eye,
+  hidden: EyeOff,
 
   // --------------------------------------------------------------- the salon --
   salon: Store,
@@ -106,6 +122,7 @@ export const Icons = {
   // --------------------------------------------------------------- the diary --
   booking: CalendarDays,
   bookingConfirmed: CalendarCheck,
+  bookingCancelled: CalendarX,
   clock: Clock,
   timer: Timer,
 
@@ -116,6 +133,8 @@ export const Icons = {
   shopBag: ShoppingBag,
   product: Package,
   qr: QrCode,
+  receipt: Receipt,
+  ticket: Ticket,
 
   // -------------------------------------------------------------------- talk --
   chat: MessageCircle,
@@ -125,6 +144,8 @@ export const Icons = {
 
   // ------------------------------------------------------------------- media --
   imageMissing: ImageIcon,
+  camera: Camera,
+  addPhoto: ImagePlus,
 
   // ------------------------------------------------------------- the places --
   location: MapPin,
