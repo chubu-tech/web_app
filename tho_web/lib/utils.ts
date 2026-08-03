@@ -19,10 +19,20 @@ export function formatDuration(minutes: number): string {
   return m === 0 ? `${h} hr` : `${h} hr ${m} min`;
 }
 
-/** Up to two initials for an avatar fallback. */
+/**
+ * Up to two initials for an avatar fallback.
+ *
+ * Only word-initial *letters* count. Live staff names carry parenthetical roles —
+ * "Tashi (Owner)" — and taking the last word's first character blindly rendered
+ * that as `T(`. A bracket is not an initial.
+ */
 export function initials(name: string | null | undefined): string {
-  if (!name?.trim()) return "?";
-  const parts = name.trim().split(/\s+/);
-  return (parts[0]![0]! + (parts.length > 1 ? parts[parts.length - 1]![0]! : ""))
-    .toUpperCase();
+  const letters = (name ?? "")
+    .split(/[^\p{L}]+/u)
+    .filter(Boolean)
+    .map((word) => word[0]!);
+  if (letters.length === 0) return "?";
+  const first = letters[0]!;
+  const last = letters.length > 1 ? letters[letters.length - 1]! : "";
+  return (first + last).toUpperCase();
 }

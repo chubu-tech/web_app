@@ -116,6 +116,21 @@
   --text-badge: 11px;
   --text-badge--line-height: 1.18;
 
+  /* --- Animation -------------------------------------------------------- */
+  /* The skeleton sweep. `app_skeleton.dart` runs a ShaderMask across a grey
+     block; this is the same left-to-right pass as a background gradient.
+     `prefers-reduced-motion` below neutralises it app-wide. */
+  --animate-shimmer: shimmer 1300ms linear infinite;
+
+  @keyframes shimmer {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: -100% 0;
+    }
+  }
+
   /* --- Breakpoints (DESIGN.md:518-537) ---------------------------------- */
   /* Mobile <744 · Tablet 744–1128 · Desktop 1128–1440 · Wide >1440.
      The rule: always reduce columns, never reflow rows. */

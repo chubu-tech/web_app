@@ -40,6 +40,10 @@ export function toBusiness(m: Row): Business {
     name: m.name as string,
     description: str(m.description),
     addressText: str(m.address_text),
+    // No `city`. The column exists, but on 8 of the 13 live salons it contradicts
+    // the salon's own `address_text` — "Norzin Lam, Thimphu" filed under Paro,
+    // "Zhung Lam, Phuentsholing" under Paro. `addressText` is the field the owner
+    // actually maintains and the only one worth showing.
     phone: str(m.phone),
     coverUrl: str(m.cover_url),
     timezone: (str(m.timezone) ?? "Asia/Thimphu") as string,

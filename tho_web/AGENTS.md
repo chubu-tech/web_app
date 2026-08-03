@@ -10,9 +10,10 @@ The Bhutan Salons product in a browser: customers book chairs and join walk-in
 queues, owners run their salon, staff see their day. Next.js 16 (App Router),
 React 19, Tailwind 4, TypeScript.
 
-**Status: Phase 1 (foundations).** Design tokens, the Supabase layer, the account
-model and the ported pure logic are in. `app/page.tsx` is a proof page, not the
-real Discover screen. Phases: customer → owner → staff.
+**Status: Phase 2a (browse).** Discover, the salon page and Saved are live against
+the real database, at all four breakpoints, for a visitor with no session. Next:
+2b booking → 2c the walk-in queue (`/q/<id>` as the QR target) → 2d products,
+loyalty, chat, notifications, profile, map. Then owner, then staff.
 
 ## This repo owns no data
 
@@ -108,11 +109,66 @@ a deliberate marketing-only layer that the product does not use.
 
 ## Ported logic
 
-`lib/time.ts`, `lib/calendar-logic.ts` and `lib/booking-guards.ts` are ports of
-the Dart originals, and their tests are ports of `../tho/app/test/*_test.dart`
-with the same cases and expectations. **Keep them in step**: if either platform
-changes a rule, both suites should change together. A silent off-by-one in
-Thimphu day bounds would corrupt every calendar view.
+`lib/time.ts`, `lib/calendar-logic.ts`, `lib/booking-guards.ts`,
+`lib/discover-logic.ts`, `lib/recommendations.ts`, `lib/salon-filters.ts` and
+`lib/whatsapp.ts` are ports of the Dart originals, and their tests are ports of
+`../tho/app/test/*_test.dart` with the same cases and expectations. **Keep them in
+step**: if either platform changes a rule, both suites should change together. A
+silent off-by-one in Thimphu day bounds would corrupt every calendar view.
+
+Two places diverge from the Dart **on purpose**, both commented at the call site:
+
+1. **Availability and opening hours are judged in Thimphu time**, not the device's
+   (`recommendations.ts`, `salon-copy.ts`). The app reads `DateTime.now()` locally,
+   which is sound on a phone in Bhutan and wrong in a browser that can be anywhere.
+2. **A service with no recorded `gender` counts as "might suit"** (`api/discovery.ts`).
+   SQL `IN` never matches NULL, and 24 of 31 live services have no gender — filtering
+   strictly dropped 8 of the 10 salons that have any services at all.
+
+## The UI kit
+
+`components/ui/` are ports of `../tho/app/lib/ui/widgets/` and
+`customer/detail_sections.dart`. Reuse them; don't restyle a one-off.
+
+- **Icons come from `components/ui/icons.ts`, never `lucide-react` directly.** One
+  name per concept, mirroring `../tho/app/lib/ui/icons.dart` — that indirection is
+  the whole point, and it's what stops `haircut` becoming three spellings.
+- Sizes come from `IconSize`, chosen by the **role** a glyph plays. `md` is the
+  default.
+- **The type scale needs no new tokens.** `theme.dart`'s `titleMd`/`titleSm`/
+  `buttonMd`/`buttonSm` differ from what's in `globals.css` only by *weight*:
+  `text-title font-semibold` / `text-title font-medium` / `text-title font-medium` /
+  `text-caption font-medium`. The rausch 10% tints are `bg-rausch/10`.
+- `Sheet` is **not** a port: it adds Escape, a focus trap, focus restoration,
+  `role="dialog"` and a scroll lock. The app's sheets and the admin console's mobile
+  nav lack all of that. Build every modal on it rather than starting over.
+- `SelectTile` wraps a real `<input type="radio">`, and `Chip`/`SegmentedControl`
+  carry `aria-pressed`/`role="tab"`. Keep new controls real elements.
+- `CoverImage` and `Avatar` fall back to a seeded gradient monogram on error. That
+  is both the port of Flutter's `errorBuilder` **and** the safety net for an image
+  host missing from `next.config.ts`'s `remotePatterns`.
+
+## The nav shows only what exists
+
+`components/customer/destinations.ts` holds all five tabs and the drawer items with
+a `ready` flag. A destination appears only when its route does, so no tab ever leads
+somewhere unfinished — flip the flag in the milestone that lands the route. Same rule
+for links inside pages: `SpecialistCard` takes an optional `href` for exactly this
+reason.
+
+## Live data is messier than it looks
+
+Check assumptions against it before trusting a column:
+
+- **`businesses.city` contradicts `address_text` on 8 of 13 live salons**
+  ("Norzin Lam, Thimphu" filed under Paro). `addressText` is the field owners
+  actually maintain; the mapper deliberately omits `city`.
+- 24 of 31 services have no `gender`; 4 salons have no cover; 1 has a gallery;
+  0 have offers; 0 are `home_based`/`mobile`, so the coverage-line branch has no
+  live example and is covered by unit tests instead.
+- Two rows named `Test 01`/`Test 2` are live and approved, so they appear in the
+  catalogue. That's a data cleanup in the admin console, not something to filter out
+  here.
 
 ## Verify
 
