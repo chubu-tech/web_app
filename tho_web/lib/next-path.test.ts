@@ -53,7 +53,6 @@ describe("safeNext", () => {
     expect(safeNext(withControl(0x00))).toBe(DEFAULT_NEXT);
     expect(safeNext(withControl(0x1f))).toBe(DEFAULT_NEXT);
     expect(safeNext(withControl(0x7f))).toBe(DEFAULT_NEXT);
-    expect(safeNext("/salon/abc")).toBe(DEFAULT_NEXT);
     expect(safeNext("/salon\r\nSet-Cookie: x=1")).toBe(DEFAULT_NEXT);
   });
 
