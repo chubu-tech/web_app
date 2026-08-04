@@ -5,7 +5,9 @@
       "namespace": "android_app",
       "package_name": "bt.tho.app",
       "sha256_cert_fingerprints": [
-        "94:12:9D:30:57:BD:54:22:EB:F1:B1:F0:72:A4:09:34:21:4F:F1:54:EC:BA:94:35:87:FC:0F:A9:0E:A1:C7:C0"
+        "94:12:9D:30:57:BD:54:22:EB:F1:B1:F0:72:A4:09:34:21:4F:F1:54:EC:BA:94:35:87:FC:0F:A9:0E:A1:C7:C0",
+        "15:FC:CB:BA:46:2E:37:07:DF:0A:67:17:1C:4B:1D:CC:BF:6C:E4:E7:05:DB:7D:50:6B:8B:8A:93:4C:A4:A7:EA",
+        "4F:6B:15:49:0F:3B:42:F7:E3:DE:76:83:C8:AA:D0:E3:43:D8:1B:BF:E4:90:CE:8F:E9:18:06:01:B4:FA:89:8C"
       ]
     }
   }
