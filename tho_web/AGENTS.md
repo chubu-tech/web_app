@@ -10,17 +10,39 @@ The Bhutan Salons product in a browser: customers book chairs and join walk-in
 queues, owners run their salon, staff see their day. Next.js 16 (App Router),
 React 19, Tailwind 4, TypeScript.
 
-**Status: Phase 3b (owner setup).** The customer role works end to end — browse, sign in,
-book, reschedule, cancel, review, take a place in a walk-in line, read notifications, message a
-salon, find a shop on the map, read a stylist's profile and edit your own. An owner signs in to
-their own console: today's book, the whole lifecycle of a booking, the live walk-in board, and
-booking someone in at the counter (3a) — and now **everything their salon is made of**:
-services and the common-services catalogue, the team and what each of them does, stylist working
-hours, the salon's own opening hours, the salon profile with its map pin, and creating a salon.
+**Status: Phase 3c (the owner back office) — the owner console is complete.** The customer role
+works end to end — browse, sign in, book, reschedule, cancel, review, take a place in a walk-in
+line, read notifications, message a salon, find a shop on the map, read a stylist's profile and
+edit your own. An owner signs in to a console that now covers the whole of the app's owner side:
+today's book, the booking lifecycle, the live walk-in board and the counter walk-in (3a);
+services, the catalogue, the team, stylist hours, the salon's opening hours, its profile and map
+pin, and creating a salon (3b); and the back office — **insights with all nine cards**, the client
+book, product orders, the storefront, offers, loyalty and its redemption counter, the salon's
+message inbox and notification bell, payroll, the tax estimate, and plan & billing **with the
+upgrade request put back** (3c).
 
-Two of three owner slices are in. Next: **3c** the back office (insights, client book, orders,
-offers, loyalty, the owner inbox, plan & billing with the upgrade request put back). **2f** —
-the customer shop — is still outstanding and sits behind it.
+**All five owner tabs are live and nothing is left of the app's eleven-item drawer.** Next: **2f**,
+the customer shop — products, cart, `place_order`, order tracking and redemption requests, the
+other end of what 3c reads. Then **Phase 4, staff**.
+
+### Where the web is now ahead of the app
+
+Four places, each because upstream removed or never built something a browser can carry. Do not
+"fix" any of them back:
+
+1. **Five analytics cards.** `insights_tab.dart` comments out New vs returning, Top services,
+   Staff leaderboard, Completion & no-shows and Peak hours (THO-55), calling them *"working
+   features expected back"*. `analytics_dashboard` returns all of that data on **every** call and
+   `analytics_peak_heatmap` had no caller in either client, so the app pays for it and discards it.
+2. **The upgrade request.** `bddb23f` deleted `Api.requestUpgrade` and the paywall CTA citing App
+   Store Guideline 3.1.1. A website is bound by neither store's rules;
+   `plan_change_requests` had no writer at all. See `components/owner/plan-cards.tsx`.
+3. **An owner notification feed and an owner voice for it.** `lib/notification-copy.ts` now has
+   two copy tables chosen by audience, because `booking_created` means opposite things to a
+   customer and to a salon.
+4. **Locked states four screens don't draw.** `ClientBookScreen`, `PayrollScreen`,
+   `TaxReportScreen` and `LoyaltySettingsScreen` have no plan check, so on an unentitled salon
+   they call the RPC and render *"Couldn't load"* — a plan limit dressed as a network fault.
 
 The original 2d covered eight surfaces at once — about four times the size of 2c — so it
 was split three ways, ordered by value per line rather than by the old sequence: the
@@ -236,12 +258,30 @@ The queue is **not** a destination and should not become one: it is contextual c
 queue FAB is too. A permanent tab for something you are in for twenty minutes a month
 would be a tab that is nearly always a dead end.
 
-`components/owner/destinations.ts` is the same idea for the console, and 3b turned on the third
-of its five tabs: **Calendar · Queue · Settings**, with Insights and Messages still `ready:
-false`. Settings is a **hub** — `SETUP_DESTINATIONS` lists Salon details, Opening hours, Services
-and Staff, each a real route, which is where the app's drawer items went. `alsoMatches` keeps the
-tab lit on all of them. Adding a walk-in is deliberately not a destination in either client: it
-is something you do *to* a day, and it is reached from the calendar.
+`components/owner/destinations.ts` is the same idea for the console, and after 3c **all five tabs
+are live**: Insights · Calendar · Queue · Messages · Settings, the app's own set in the app's own
+order.
+
+Settings is a **hub with two groups**, which is where the whole of the app's eleven-item drawer
+went: `SETUP_DESTINATIONS` (Salon details, Opening hours, Services, Staff) and
+`BACK_OFFICE_DESTINATIONS` (Client book, Product orders, Products, Offers, Loyalty, Payroll, Tax
+estimate, Plan & billing). Two groups rather than one list of twelve because they answer different
+questions: setup is what you finish once, the back office is what you come back to. Every row
+carries the live state of what it leads to — *"1 new order"*, *"4 products · 1 sold out"*,
+*"Growth · 3 requests pending"* — and a locked row states the tier instead of a count, and is not
+fetched at all.
+
+**The phone bar carries four of the five.** `phoneOwnerTabs()` drops Settings, which moves to a
+gear beside the bell in the header: five fixed items at 390px leaves each 78px, which is where
+"Calendar" starts truncating. The desktop header keeps all five.
+
+`alsoMatches` keeps a tab lit on every sub-route, and note which parent each one belongs to —
+Payroll and Tax light **Insights**, not Settings, because reading a report is the same job as
+reading the trends; they are only listed under Settings because that is where the list of them
+lives.
+
+Adding a walk-in is deliberately not a destination in either client: it is something you do *to*
+a day, and it is reached from the calendar.
 
 ## Booking
 
@@ -415,10 +455,20 @@ points (growth/pro, deduped by a unique index) and queues a review request; `no_
   switch; here `?d=&view=&seg=` is reloadable, shareable and back-button-correct.
   `salon-filters.ts`'s `fromParams`/`toParams` is the pattern.
 
-Plan gating is `lib/entitlements.ts` — **gate on a `Feature`, never a plan string.** The paywall
-is informational and ends in `Close`, which is upstream's shape after App Store Guideline 3.1.1
-took its CTA out. **3c puts the request back**, because a website is the channel that rule
-leaves open and `plan_change_requests` still has an owner-insert policy and no writer.
+Plan gating is `lib/entitlements.ts` — **gate on a `Feature`, never a plan string.** Prices and
+per-feature paywall copy live in `lib/plans.ts`, the one place pricing exists, so the sheet and
+`/business/plans` cannot quote different numbers at the same owner. The sheet stays an explanation
+and points at the price list; the **request** lives on `/business/plans`, where the tiers are side
+by side (see `components/owner/plan-cards.tsx` for the 3.1.1 story and the three things the
+request has to get right).
+
+**Not every gate is real, and the code says which.** Three of the six locked surfaces are gated in
+SQL too — `client_book`, `payroll_report` and `tax_estimate` each raise `P0001`. The other three
+are **client-side only**: `analytics_dashboard` and `analytics_peak_heatmap` never look at
+`businesses.plan` at all (measured: a `basic` salon gets the complete payload), and
+`loyalty_programs_write_owner` checks ownership and stops while
+`loyalty_programs_select_public` publishes any active program regardless of tier. Never describe
+the Insights or Loyalty paywall as enforced. Reported upstream; not worked around.
 
 ### `staff_members` had it too — the third instance
 
@@ -507,6 +557,104 @@ refused for anyone but the service role. `uploadOwnerImage` writes `<uid>/<label
 which means a salon's photos live under its **owner's** folder — a real consequence, and the
 layout the policy allows. Reordering is not offered anywhere: both photo tables have a `sort`
 column with no UPDATE policy.
+
+## The owner back office — insights, clients, orders, offers, loyalty, money
+
+### Charts, with no charting library
+
+Six visualisations and 3c adds no dependency. Each is built from the primitive that suits it:
+`trend-chart.tsx` is an inline SVG path (Catmull-Rom → cubic at the app's own `curveSmoothness`
+0.3, a coral→transparent gradient fill, a ringed dot on the **latest** bucket only), the gauge and
+donut are `stroke-dasharray` arcs, the heatmap and waffle are CSS grids, the leaderboard and
+breakdown table are flex rows with a share bar behind them. All server components, so every figure
+is in the first paint.
+
+The tooltip is a `<title>` inside each hover target — no listener, no state, and a screen reader
+reads the values as a list, which `fl_chart`'s gesture tooltip cannot offer at all.
+
+Two palette rules carry over from `chart_theme.dart` and are load-bearing:
+
+- **A bad outcome never wears the brand coral.** Completed is `success-text`, no-shows
+  `error-text`, cancelled `border-strong`. Coral is the one accent, for the trend line, the gauge
+  arc, share bars and the hot end of the heatmap.
+- **A zero heat cell stays canvas white, not the cold end of the ramp.** On a single-hue ramp "no
+  bookings ever" and "one booking" would be two barely-different pinks, and a salon closed on
+  Sunday would look faintly busy.
+
+### Do not mix a period's figures with the month's
+
+The goal card is always about the **calendar month** — `goal.monthToDateRevenue` and
+`monthly_goal` both are, whatever the period pills say — but `kpis.avgTicket` is scoped to the
+*selected* period. Dividing a monthly shortfall by a weekly average ticket is how the app arrives
+at *"258 more bookings closes the gap"*, measured on Norzin's weekly view. So the ticket
+restatement is offered **only** at monthly granularity; every other period states the shortfall
+plainly.
+
+### `offerHiddenReason` compares Thimphu days, not UTC ones
+
+`offers_public_read` filters on `(now() at time zone 'Asia/Thimphu')::date`, so anything deciding
+whether an offer has lapsed has to as well. Comparing UTC calendar days makes the owner's page and
+the customer's disagree for the six hours of every Thimphu day that fall on the previous UTC one —
+measured: an offer that had ended still read **"Live"** at 04:20 Thimphu while customers had
+already stopped seeing it. Use `thimphuToday(now)`; there is a test pinning the boundary.
+
+### The owner's notifications are addressed to a person, not a salon
+
+`notifications.recipient_profile_id` is the only routing there is, and
+`private.enqueue_order_notification` sends the salon's copies to `business_owner_profile(...)`.
+So the owner's feed spans **every** salon they run, switching salons changes nothing, and a linked
+stylist receives none of it. The page says so.
+
+**And the payload holds `start_ts` and nothing else** — often not even that
+(`booking_cancelled` and `order_placed` arrive as `{}`). No `private.enqueue_*` function writes a
+customer name. An earlier draft of `ownerNotificationText` read `payload.customer_name` so a row
+could say *"New booking — Pema, Fri 11:30"*, which is **the same mistake this repo criticises the
+app for** at `notifications_screen.dart` (it renders `payload['message']`, a key the server has
+never written). Say only what the row can support.
+
+### Orders are forward-only, so there is no Undo
+
+`set_order_status` allows `new → ready`, `ready → collected`, and `declined` from either. Every
+case is one-directional or terminal, so `canOwnerTransition(target, previous)` is never true for a
+reverse move and an Undo button could only ever fail. A decline **requires a reason**, and the
+customer reads it in their `order_declined` notification.
+
+Restoring an order during verification needs direct SQL: nothing in the schema can move a status
+backwards.
+
+### A walk-in has no client page
+
+`client_book` returns a null `customer_profile_id` for anyone the salon knows only from the
+counter, grouped by `walkin:<name>:<phone>`. There is nothing to open — `client_history` takes a
+profile id and `client_notes.customer_profile_id` is `not null` — so those rows are rendered as
+plain rows rather than links. The app pushes a detail screen and then hides both of its sections.
+
+**"Lapsed" is the salon's own rebooking window** (`businesses.rebooking_days`), never a constant.
+Verified by moving Norzin's from 42 to 10 to 3 and watching the same two clients cross the line
+and back.
+
+### `plan_change_requests` can never be withdrawn
+
+INSERT and SELECT policies, and nothing else — so the table-wide UPDATE and DELETE grants are
+dead. **Not with an error, either:** measured, an owner's `update … set status='cancelled'`
+succeeds having affected **0 rows**, because with no policy for the command the rows are not
+visible to it. A "withdraw" button would report success and change nothing, which is why none is
+offered and why the writer de-duplicates *before* inserting. Norzin already carries two pending
+`pro` requests and a pending `growth` request for the plan it is already on, all left by the old
+app flow.
+
+`status` is in the insert grant and `pcr_insert`'s WITH CHECK does not constrain it, so an owner
+*can* file a request already marked `done` and hide it from the operator's queue. Never write that
+column; the default is `pending`.
+
+### Offers are writable by staff, not just the owner
+
+`offers_member_write` is `ALL using private.is_business_member` — every other owner-configured
+table uses `is_business_owner`. Measured: Norzin's linked stylist can insert, edit **and
+hard-delete** offers, while the same account is refused on `products` and `loyalty_rewards` with
+`42501`. Since `offers_public_read` puts them on the salon page and in the customer feed, a
+stylist can publish a discount in the salon's name. Reported upstream; the console only ever acts
+as the owner.
 
 ## The inbox
 
@@ -791,7 +939,28 @@ npm run lint
 npm run test      # ported pure logic
 ```
 
-A clean build, lint and test run is the bar. Note `overrides.typescript-eslint`
-in `package.json` pins 8.65.0: upstream published a version depending on
-`@typescript-eslint/utils@8.66.0`, which does not exist. Remove the pin once that
-is consistent again.
+A clean build, lint and test run is the bar — currently **430 tests across 23 files** and
+**46 routes**. Note `overrides.typescript-eslint` in `package.json` pins 8.65.0: upstream
+published a version depending on `@typescript-eslint/utils@8.66.0`, which does not exist. Remove
+the pin once that is consistent again.
+
+### And check the numbers against SQL, not against themselves
+
+`analytics_dashboard` is 11,700 characters of window functions and timezone arithmetic. A chart
+that agrees with itself proves nothing, so every figure on `/business/insights` was recomputed
+from `bookings` / `booking_items` through the MCP and compared: revenue, booking count, average
+ticket, the per-service and per-staff splits, the three outcome counts and the goal figure. Same
+for `private.pit_2026` — `estimateIncomeTax` in `lib/analytics.ts` is a second implementation of
+one tax table specifically so the two can be diffed, and its test values were read straight out of
+the SQL function.
+
+**Two lessons from 3c's own harness**, both the kind that hide their own failure:
+
+- **Poll the thing you are asserting, never the page.** A "wait for status Ready" that tested all
+  of `main` matched the *"Mark ready"* **button** and returned true on the first poll, so three
+  later steps acted on a stale page and reported the app broken when it was correct throughout.
+  This is the second slice in a row to make that mistake — read the status pill, the specific
+  element, the exact node.
+- **Make a write idempotent before re-running it.** A fixed upload filename made the second run
+  return `409 Duplicate`, which reads identically to the policy refusal the check exists to
+  detect.

@@ -13,6 +13,7 @@ import {
   NOTIFICATION_FILTERS,
   notificationStyle,
   notificationText,
+  ownerNotificationText,
   type NotificationFilter,
   type NotificationIconName,
 } from "@/lib/notification-copy";
@@ -31,12 +32,27 @@ import { cn } from "@/lib/utils";
  *
  * Read state is optimistic: the row dims the moment it is tapped, and the RPC follows. A
  * failure puts it back rather than leaving the list lying about what has been seen.
+ *
+ * ## One list, two audiences
+ *
+ * `audience` is the only thing that differs between the customer's inbox and the salon's, and it
+ * changes exactly two things: **the words** and **where a row links**. Everything else — the
+ * grouping, the filter chips, the optimistic read, the row layout — is identical, which is why
+ * this is one parameterised component where `OwnerConversationList` is a second component: that
+ * one differs in four particulars, this one in one.
+ *
+ * The words matter more than they look. `booking_created` reaching a customer means *"your
+ * appointment is set"*; reaching a salon it means *"someone just booked"*. Same row, same
+ * payload, opposite readings — see `ownerNotificationText`.
  */
 export function NotificationList({
   initial,
   now,
+  audience = "customer",
 }: {
   initial: AppNotification[];
+  /** Whose inbox this is. Decides the copy table and the deep links. */
+  audience?: "customer" | "owner";
   /**
    * The render clock, passed in from the server page rather than read here.
    *
@@ -178,6 +194,7 @@ export function NotificationList({
                       notification={n}
                       now={now}
                       onRead={() => void markRead([n.id])}
+                      audience={audience}
                     />
                   ))}
                 </ul>
@@ -218,13 +235,18 @@ function Row({
   notification: n,
   now,
   onRead,
+  audience,
 }: {
   notification: AppNotification;
   now: Date;
   onRead: () => void;
+  audience: "customer" | "owner";
 }) {
   const style = notificationStyle(n.eventType);
-  const { title, body } = notificationText(n.eventType, n.payload);
+  const { title, body } =
+    audience === "owner"
+      ? ownerNotificationText(n.eventType, n.payload)
+      : notificationText(n.eventType, n.payload);
   const Glyph = GLYPHS[style.icon];
   const unread = isUnread(n);
 
@@ -277,14 +299,28 @@ function Row({
   );
 
   /**
-   * A booking is the only thing the inbox can link to today. **Order notifications get
-   * no link until 2f** — a row that navigates to a route which does not exist is exactly
-   * the dead end `destinations.ts` exists to prevent.
+   * Where a row goes, if anywhere.
+   *
+   * **A customer's order rows stay unlinked until 2f** — the customer order pages don't exist
+   * yet, and a row that navigates to a route which isn't there is exactly the dead end
+   * `destinations.ts` exists to prevent. The owner's do link, because `/business/orders/[id]`
+   * arrived with this slice.
    */
-  if (n.bookingId) {
+  const href =
+    audience === "owner"
+      ? n.bookingId
+        ? `/business/bookings/${n.bookingId}`
+        : n.orderId
+          ? `/business/orders/${n.orderId}`
+          : null
+      : n.bookingId
+        ? `/bookings/${n.bookingId}`
+        : null;
+
+  if (href) {
     return (
       <li>
-        <Link href={`/bookings/${n.bookingId}`} onClick={onRead} className={cn(shell, "hover:bg-surface-strong")}>
+        <Link href={href} onClick={onRead} className={cn(shell, "hover:bg-surface-strong")}>
           {inner}
         </Link>
       </li>

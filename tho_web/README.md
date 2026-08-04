@@ -6,16 +6,21 @@ as the Flutter app.
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4.
 
-> **Phase 3b.** The **customer** app is complete — discover, book, reschedule, cancel,
-> review, join a walk-in line, map, stylist profiles, inbox, messages, profile editing.
-> The **owner** console covers the daily job — today's book, the booking lifecycle, the
-> live walk-in board, booking someone in at the counter — and now the whole of setup:
-> services and the common-services catalogue, staff and what each of them performs,
-> stylist working hours, **the salon's own opening hours** (which neither client has ever
-> been able to edit), the salon profile with a draggable map pin, and creating a salon.
+> **Phase 3c — the owner console is complete.** The **customer** app covers discover, book,
+> reschedule, cancel, review, join a walk-in line, map, stylist profiles, inbox, messages and
+> profile editing. The **owner** console now covers everything the phone app's owner side does:
+> the daily job (today's book, the booking lifecycle, the live walk-in board, the counter
+> walk-in), the whole of setup (services and the catalogue, staff, stylist hours, **the salon's
+> own opening hours** — which neither client had ever been able to edit — the profile with a
+> draggable map pin, creating a salon), and the back office: insights, the client book, product
+> orders, the storefront, offers, loyalty and its redemption counter, the salon's messages and
+> notifications, payroll, the tax estimate, and plan & billing.
 >
-> Next: **3c** the owner back office (insights, client book, orders, offers, loyalty,
-> plan) · **2f** the customer shop · then **staff**.
+> Four things here are ahead of the app: **five analytics cards** it has parked, **the upgrade
+> request** it removed for App Store rule 3.1.1, **an owner notification feed** it has no
+> equivalent of, and **locked states** four of its screens draw as network errors.
+>
+> Next: **2f** the customer shop (products, cart, orders, loyalty) · then **staff**.
 
 ## Related repos
 
@@ -54,9 +59,12 @@ authorises the caller itself.
 ```
 app/
   (customer)/   the customer shell — 19 routes
-  business/     the owner console — 11 routes: calendar, queue, booking detail,
-                walk-in, settings hub, salon profile, opening hours, services,
-                the catalogue, staff, staff detail, create-salon
+  business/     the owner console — 26 routes. The day: calendar, queue, booking
+                detail, walk-in. Setup: the settings hub, salon profile, opening
+                hours, services, the catalogue, staff, staff detail, create-salon.
+                The back office: insights, clients + detail, orders + detail,
+                products, offers, loyalty + redemptions, messages + thread,
+                notifications, payroll, tax, plans.
                 (staff/ arrives with Phase 4)
 lib/
   supabase/     server.ts (cookie-bound) · client.ts (browser)
@@ -68,12 +76,16 @@ lib/
   calendar-logic.ts   ported from tho, with ported tests
   booking-guards.ts   ported from tho, with ported tests
   hours.ts            ported from tho, with ported tests — both hours editors
+  analytics.ts        ported from tho, with ported tests — the dashboard's
+                      derivations, the client book's rules, the order state
+                      machine and the 2026 Bhutan PIT bands
+  plans.ts      the three tiers and their prices — the only place pricing lives
   types/        TypeScript mirrors of tho's models.dart
 proxy.ts        session refresh only — this site is public
 app/globals.css design tokens, ported from tho's tokens.dart
 ```
 
-## Three things worth knowing before you change anything
+## Four things worth knowing before you change anything
 
 **Browsing works with no account.** People arrive from a search result or a QR
 code. A guest Supabase session is created *lazily*, at the first action that
@@ -88,6 +100,12 @@ library.
 **The ported logic has ported tests.** `lib/*.test.ts` reproduce the cases in
 `../tho/app/test/` exactly. If a rule changes on either platform, both suites
 should change together.
+
+**Time is one fixed zone, and that includes calendar days.** Anything deciding whether a date has
+passed compares *Thimphu* days, because that is what the RLS policies do
+(`(now() at time zone 'Asia/Thimphu')::date`). Comparing UTC days makes the owner's view and the
+customer's disagree for six hours out of every twenty-four — which is exactly the bug the offers
+list shipped with for an afternoon.
 
 Agent-facing conventions, including the design-token rules, are in
 [`AGENTS.md`](AGENTS.md).

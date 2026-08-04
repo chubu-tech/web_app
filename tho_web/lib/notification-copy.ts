@@ -241,9 +241,98 @@ export function notificationText(
     }
     // The worker also composes `loyalty_redemption_requested`, `order_placed` and
     // `order_cancelled`, but all three are addressed to the SALON, not the customer —
-    // they can never reach this inbox, so they are not restated here.
+    // they can never reach this inbox. See `ownerNotificationText` for those.
     default:
       return { title: notificationStyle(eventType).title, body: "" };
+  }
+}
+
+/**
+ * The same events, in the **owner's** voice.
+ *
+ * **The audience decides the meaning, not the event type**, and this is the clearest case of it
+ * in the whole product: `booking_created` reaching a customer is *"Booking confirmed — your
+ * appointment is set for Fri 09:00"*, and reaching a salon it is *"New booking — Fri 09:00"*.
+ * The same row, the same payload, opposite readings. So `notificationText` was not widened to
+ * cover both; a second table is chosen by who is looking, and the two never have to compromise.
+ *
+ * Three of the owner's four live event types are shared with the customer's inbox
+ * (`booking_created`, `booking_cancelled`, `booking_reminder`) and two are owner-only
+ * (`order_placed`, `order_cancelled`) with **no case at all** in the customer table — they would
+ * have fallen through to a humanised slug with an empty body. Those two are the ones the
+ * `process-notifications` worker addresses to `business_owner_profile`.
+ *
+ * Unknown events defer to the customer table rather than to a slug: an event this list has not
+ * met yet is more likely to be a new customer-facing one that also copies the salon than
+ * something wholly new, and the customer wording is at least a sentence.
+ *
+ * ## What the payload actually holds
+ *
+ * **`start_ts` and nothing else, and often not even that.** Checked against the 27 live rows
+ * addressed to this platform's one owner: `booking_created` carries `{"start_ts": …}`, and
+ * `booking_cancelled` and `order_placed` carry `{}`. None of `private.enqueue_notification`,
+ * `enqueue_order_notification`, `enqueue_queue_notification` or `enqueue_loyalty_notification`
+ * writes a customer name at all.
+ *
+ * The first version of this function read `payload.customer_name` so a row could say *"New
+ * booking — Pema, Fri 11:30"*. That name is never there — which is **the same mistake this
+ * module's header criticises the Flutter app for**, where `notifications_screen.dart` renders
+ * `payload['message']`, a key the server has never written. So the copy says only what the row
+ * can support: who booked is one tap away on the booking itself, and a body that silently drops
+ * half of its own sentence is worse than a short one.
+ */
+export function ownerNotificationText(
+  eventType: string,
+  payload: Record<string, unknown> = {},
+): { title: string; body: string } {
+  const when = formatWhen(payload.start_ts, tzOf(payload));
+
+  switch (eventType) {
+    case "booking_created":
+      return {
+        title: "New booking",
+        body: when ? `For ${when}. Open it to see who.` : "Someone booked in.",
+      };
+    case "booking_confirmed":
+      return {
+        title: "Booking confirmed",
+        body: when ? `For ${when}.` : "A booking was confirmed.",
+      };
+    case "booking_rescheduled":
+      return { title: "Booking moved", body: when ? `Now ${when}.` : "A booking moved." };
+    case "booking_cancelled":
+      return {
+        title: "Booking cancelled",
+        body: when ? `${when} is free again.` : "A booking was cancelled.",
+      };
+    case "booking_no_show":
+      return { title: "Marked no-show", body: when ? `${when} — nobody came.` : "A no-show." };
+    case "booking_completed":
+      return { title: "Booking completed", body: when ? `${when} is done.` : "A booking is done." };
+    case "booking_reminder":
+      // The worker sends reminders to the customer; a salon copy would be a reminder about
+      // somebody else's appointment, so it is stated as the diary entry it is.
+      return { title: "Coming up", body: when ? `An appointment at ${when}.` : "An appointment." };
+
+    // ---- owner-only. Neither of these has a case in `notificationText`. --------
+    case "order_placed":
+      return {
+        title: "New product order",
+        body: "Someone has ordered — mark it ready when it's waiting for them.",
+      };
+    case "order_cancelled":
+      return {
+        title: "Order cancelled",
+        body: "A customer cancelled their order before you got to it.",
+      };
+    case "loyalty_redemption_requested":
+      return {
+        title: "Reward claimed",
+        body: `Someone wants to redeem ${stringOf(payload.reward) ?? "a reward"} — confirm it at the counter.`,
+      };
+
+    default:
+      return notificationText(eventType, payload);
   }
 }
 

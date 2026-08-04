@@ -64,7 +64,31 @@ export type OwnerAction =
   | "saveSalon"
   | "createSalon"
   | "uploadPhoto"
-  | "removePhoto";
+  | "removePhoto"
+  // 3c — the back office. Almost all of these are `P0001` raises whose message is better
+  // than anything written here, because each one names a plan gate or a state machine.
+  | "loadClientBook"
+  | "saveClientNote"
+  | "orderReady"
+  | "orderCollected"
+  | "orderDecline"
+  | "saveProduct"
+  | "toggleProductStock"
+  | "archiveProduct"
+  | "restoreProduct"
+  | "saveOffer"
+  | "toggleOffer"
+  | "deleteOffer"
+  | "saveLoyaltyProgram"
+  | "saveReward"
+  | "toggleReward"
+  | "archiveReward"
+  | "confirmRedemption"
+  | "declineRedemption"
+  | "adjustPoints"
+  | "loadPayroll"
+  | "loadTaxEstimate"
+  | "requestPlanChange";
 
 const FALLBACK: Record<OwnerAction, string> = {
   callNext: "Couldn't call the next guest.",
@@ -90,6 +114,28 @@ const FALLBACK: Record<OwnerAction, string> = {
   createSalon: "Couldn't create the salon. Please try again.",
   uploadPhoto: "Couldn't upload that photo.",
   removePhoto: "Couldn't remove that photo.",
+  loadClientBook: "Couldn't load your client book.",
+  saveClientNote: "Couldn't save that note.",
+  orderReady: "Couldn't mark it ready.",
+  orderCollected: "Couldn't mark it collected.",
+  orderDecline: "Couldn't decline that order.",
+  saveProduct: "Couldn't save. Please try again.",
+  toggleProductStock: "Couldn't update availability.",
+  archiveProduct: "Couldn't remove that product.",
+  restoreProduct: "Couldn't bring it back.",
+  saveOffer: "Couldn't save. Please try again.",
+  toggleOffer: "Couldn't update that offer.",
+  deleteOffer: "Couldn't delete that offer.",
+  saveLoyaltyProgram: "Couldn't save your loyalty settings.",
+  saveReward: "Couldn't save. Please try again.",
+  toggleReward: "Couldn't update.",
+  archiveReward: "Couldn't remove.",
+  confirmRedemption: "Couldn't confirm — check the code.",
+  declineRedemption: "Couldn't decline.",
+  adjustPoints: "Couldn't adjust those points.",
+  loadPayroll: "Couldn't load payroll.",
+  loadTaxEstimate: "Couldn't load the tax estimate.",
+  requestPlanChange: "Couldn't send your request. Please try again.",
 };
 
 /**
@@ -115,10 +161,24 @@ export function ownerErrorMessage(action: OwnerAction, error: unknown): string {
   }
 
   if (code === OWNER_ERROR.checkFailed) {
-    // The form validates the same rules first, so this is the safety net rather than the
-    // message anyone should normally see. Naming the field beats passing through
-    // `new row for relation "services" violates check constraint "…"`.
-    return "One of those values isn't allowed. Check the duration, price and radius.";
+    // Every form validates the same rules first, so this is the safety net rather than the
+    // message anyone should normally see. Naming the fields beats passing through
+    // `new row for relation "services" violates check constraint "…"`, and which fields those
+    // are depends entirely on the form — a `23514` from the reward sheet has nothing to do
+    // with a duration.
+    switch (action) {
+      case "saveOffer":
+        return "Check the discount (1–100%) and the dates.";
+      case "saveReward":
+        // `loyalty_rewards_shape`, `percent_off` 1–100, `amount_nu` > 0, `point_cost` > 0.
+        return "Check the reward's value and its point cost.";
+      case "saveLoyaltyProgram":
+        return "Points per visit can't be negative, and Nu per point must be at least 1.";
+      case "saveProduct":
+        return "A price can't be negative.";
+      default:
+        return "One of those values isn't allowed. Check the duration, price and radius.";
+    }
   }
   if (code === OWNER_ERROR.duplicate) {
     return "Those hours are already listed for that day.";
@@ -159,6 +219,36 @@ export function ownerErrorMessage(action: OwnerAction, error: unknown): string {
       case "saveStaffPay":
         // 'payroll requires Pro' — the plan gate, and the one message that is the point.
         return messageOf(error, fallback);
+
+      // ---- 3c ---------------------------------------------------------------
+      case "loadClientBook":
+      case "loadPayroll":
+      case "loadTaxEstimate":
+        // 'client book not available' / 'payroll requires Pro' / 'tax report requires Pro'.
+        // Each page renders its locked state *instead of* calling, so reaching this means the
+        // salon's plan changed between the render and the fetch — and then the server's own
+        // words are the accurate ones.
+        return messageOf(error, fallback);
+      case "orderReady":
+      case "orderCollected":
+        // 'illegal order status transition' — somebody at another till moved it first. Same
+        // shape as the queue's race, and the same answer: say so and reload.
+        return "That order was already dealt with. Refreshing.";
+      case "orderDecline":
+        // 'a reason is required to decline an order' — the sheet requires one, so this is the
+        // server having the last word; and 'illegal order status transition' if it moved.
+        return messageOf(error, fallback);
+      case "adjustPoints":
+        // 'adjustment would make balance negative' / 'reason is required' /
+        // 'points must be non-zero'. All three name the exact thing to change.
+        return messageOf(error, fallback);
+      case "confirmRedemption":
+        // 'redemption not found' (a mistyped code, the common case) / 'redemption is not
+        // pending' (already honoured) / 'insufficient points'.
+        return messageOf(error, fallback);
+      case "declineRedemption":
+        return messageOf(error, fallback);
+
       default:
         return messageOf(error, fallback);
     }

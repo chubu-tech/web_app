@@ -11,8 +11,11 @@ import {
   CalendarX,
   Camera,
   ChartColumn,
+  ChartLine,
+  Check,
   CheckCircle2,
   Copy,
+  Crown,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -26,14 +29,19 @@ import {
   FilterX,
   Footprints,
   Gift,
+  Grid3x3,
   Hand,
   Heart,
   ImagePlus,
   Images,
+  Inbox,
+  Landmark,
   Link2,
   LogOut,
+  MoreHorizontal,
   Plus,
   Receipt,
+  StickyNote,
   Ticket,
   Image as ImageIcon,
   Info,
@@ -62,10 +70,13 @@ import {
   Tag,
   Timer,
   Trash2,
+  TrendingDown,
+  TrendingUp,
   Trophy,
   User,
   UserPlus,
   Users,
+  Wallet,
   WifiOff,
   X,
 } from "lucide-react";
@@ -175,6 +186,30 @@ export const Icons = {
    * utilisation whether they went up or down, and an arrow would editorialise.
    */
   insights: ChartColumn,
+  /**
+   * `AppIcons.chartLine` — a **series over time**, as opposed to `insights`, which is the
+   * tab. The revenue trend's own empty state uses it, and it is the only place in the app
+   * where the shape of the chart is the subject.
+   */
+  chartLine: ChartLine,
+  /**
+   * `AppIcons.heatmap` — the peak-hours grid. A 3×3 lattice: lucide has no heatmap glyph,
+   * and every alternative (`LayoutGrid`, `Table2`) reads as a layout or a spreadsheet.
+   */
+  heatmap: Grid3x3,
+  /**
+   * A tick on its own, for a feature line in a plan card. Deliberately **not** `success` —
+   * that is a ringed tick announcing something just worked, and a plan's feature list is a
+   * standing fact, so a ring on nine rows would be nine little celebrations.
+   */
+  check: Check,
+  /**
+   * Which way a figure moved. The only two icons in the set that editorialise, and that is
+   * the point: they sit beside a delta whose sign is the whole message. `insights` stays a
+   * neutral column chart for exactly this reason.
+   */
+  trendUp: TrendingUp,
+  trendDown: TrendingDown,
 
   // Service categories, matched by name in `categoryIcon` below.
   //
@@ -211,6 +246,23 @@ export const Icons = {
   receipt: Receipt,
   ticket: Ticket,
   payment: CreditCard,
+  /**
+   * `AppIcons.payroll` — what the salon pays *out*, where `payment` is what comes *in*. A
+   * wallet against a card: the card is the customer's, the wallet is the salon's.
+   */
+  payroll: Wallet,
+  /**
+   * `AppIcons.tax` — a government building. `Percent` was the other candidate and is worse:
+   * a percentage already means a discount everywhere else in this app (`offer`), and the tax
+   * page is about who you owe rather than a rate.
+   */
+  tax: Landmark,
+  /**
+   * `AppIcons.premium` — the subscription itself, on the Plan & billing row. A crown, not
+   * `locked`: that one means *you can't have this*, and an owner reading their own plan page
+   * is not being refused anything.
+   */
+  premium: Crown,
 
   // -------------------------------------------------------------------- talk --
   chat: MessageCircle,
@@ -221,6 +273,20 @@ export const Icons = {
   phone: Phone,
   /** `AppIcons.mail` — the email row on Profile, which is a fact and not a channel. */
   mail: Mail,
+  /**
+   * `AppIcons.inbox` — a queue of things waiting for the owner to act. Used for the
+   * redemptions list and its empty state. Distinct from `notification`, which is a bell that
+   * *tells* you: an inbox is work, a bell is news.
+   */
+  inbox: Inbox,
+  /**
+   * `AppIcons.note` — the salon's private note about a client. A sticky note, and never
+   * `edit`: this glyph marks a row that *has* one, which is a property of the client rather
+   * than an action on them.
+   */
+  note: StickyNote,
+  /** `AppIcons.more` — an overflow menu. Horizontal, matching the app's own dots. */
+  more: MoreHorizontal,
 
   // ------------------------------------------------------------------- media --
   imageMissing: ImageIcon,

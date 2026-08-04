@@ -25,6 +25,31 @@ import type {
 import { queueStatusFromWire, type QueueEntry } from "../types/queue";
 import type { Conversation, Message } from "../types/chat";
 import type { AppNotification } from "../types/notification";
+import type {
+  DashboardData,
+  HeatCell,
+  KpiSet,
+  ServiceStat,
+  StaffStat,
+  TrendPoint,
+} from "../types/analytics";
+import type {
+  ClientHistoryEntry,
+  ClientSummary,
+  LoyaltyBalance,
+  LoyaltyEarnMode,
+  LoyaltyProgram,
+  LoyaltyRedemption,
+  LoyaltyRedemptionStatus,
+  LoyaltyReward,
+  LoyaltyRewardType,
+  Order,
+  OrderItem,
+  OrderStatus,
+  PayrollRow,
+  PlanChangeRequest,
+  TaxEstimate,
+} from "../types/back-office";
 
 /**
  * Row → model mappers, one per table, ported from the `fromMap` factories in
@@ -378,6 +403,7 @@ export function toNotification(m: Row): AppNotification {
     createdAt: new Date(m.created_at as string),
     readAt: dateOrNull(m.read_at),
     bookingId: str(m.booking_id),
+    orderId: str(m.order_id),
   };
 }
 
@@ -412,5 +438,255 @@ export function toHairstyle(m: Row): Hairstyle {
     name: m.name as string,
     imageUrl: str(m.image_url),
     gender: str(m.gender),
+  };
+}
+
+// ============================================================ 3c — analytics ===
+//
+// The dashboard arrives as one jsonb blob rather than a row set, so these read nested
+// objects instead of columns. Every numeric goes through `num`: jsonb makes no distinction
+// between `0` and `0.0`, and a `numeric(12,2)` sum comes back as a *string* once it passes
+// what a JSON number can hold exactly — which is why the Dart reads all of them `as num`
+// and why `numOrNull` is not enough on its own here (an absent key must be 0, not null).
+
+const num = (v: unknown): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+export function toKpiSet(m: Row): KpiSet {
+  return {
+    revenue: num(m.revenue),
+    revenuePrev: num(m.revenue_prev),
+    bookings: num(m.bookings),
+    bookingsPrev: num(m.bookings_prev),
+    avgTicket: num(m.avg_ticket),
+    avgTicketPrev: num(m.avg_ticket_prev),
+    utilization: num(m.utilization),
+    utilizationPrev: num(m.utilization_prev),
+  };
+}
+
+export function toTrendPoint(m: Row): TrendPoint {
+  return {
+    bucketStart: new Date(m.bucket_start as string),
+    revenue: num(m.revenue),
+    bookings: num(m.bookings),
+    appRevenue: num(m.app_revenue),
+    walkInRevenue: num(m.walk_in_revenue),
+  };
+}
+
+export function toStaffStat(m: Row): StaffStat {
+  return {
+    staffId: m.staff_id as string,
+    name: m.name as string,
+    revenue: num(m.revenue),
+    bookings: num(m.bookings),
+    pct: num(m.pct),
+    avgRating: numOrNull(m.avg_rating),
+  };
+}
+
+export function toServiceStat(m: Row): ServiceStat {
+  return {
+    serviceId: m.service_id as string,
+    name: m.name as string,
+    revenue: num(m.revenue),
+    bookings: num(m.bookings),
+    pct: num(m.pct),
+  };
+}
+
+/** The RPC names the count `bookings`; the grid has no other number, so it is `count`. */
+export function toHeatCell(m: Row): HeatCell {
+  return { dow: num(m.dow), hour: num(m.hour), count: num(m.bookings) };
+}
+
+/**
+ * The whole `analytics_dashboard` payload.
+ *
+ * Every list defaults to empty when its key is absent or null, so a salon in its first week
+ * renders the low-data empty states instead of throwing — the same defensiveness
+ * `DashboardData.fromMap` has, and the reason a brand-new salon's Insights tab is blank
+ * rather than broken.
+ */
+export function toDashboardData(m: Row): DashboardData {
+  const list = (v: unknown): Row[] => (Array.isArray(v) ? (v as Row[]) : []);
+  const obj = (v: unknown): Row => (v && typeof v === "object" ? (v as Row) : {});
+  const goal = obj(m.goal);
+  return {
+    kpis: toKpiSet(obj(m.kpis)),
+    revenue: list(m.revenue_series).map(toTrendPoint),
+    retention: {
+      newCustomers: num(obj(m.retention).new_customers),
+      returningCustomers: num(obj(m.retention).returning_customers),
+    },
+    topStaff: list(m.top_staff).map(toStaffStat),
+    topServices: list(m.top_services).map(toServiceStat),
+    ops: {
+      completed: num(obj(m.ops).completed),
+      noShow: num(obj(m.ops).no_show),
+      cancelled: num(obj(m.ops).cancelled),
+    },
+    // `monthly_goal` stays null rather than becoming 0: a goal of nothing and no goal at all
+    // are the same state (the settings form stores 0 as null), and the gauge reads "—" for it.
+    goal: {
+      monthlyGoal: numOrNull(goal.monthly_goal),
+      monthToDateRevenue: num(goal.month_to_date_revenue),
+    },
+  };
+}
+
+// ========================================================== 3c — back office ===
+
+export function toClientSummary(m: Row): ClientSummary {
+  const profileId = str(m.customer_profile_id);
+  const displayName = (str(m.display_name) ?? "Guest") as string;
+  const phone = str(m.phone);
+  return {
+    customerProfileId: profileId,
+    displayName,
+    phone,
+    visits: num(m.visits),
+    totalSpend: num(m.total_spend),
+    lastVisit: dateOrNull(m.last_visit),
+    nextUpcoming: dateOrNull(m.next_upcoming),
+    hasNote: (m.has_note as boolean | null) ?? false,
+    // The RPC groups by `coalesce(customer_profile_id::text, 'walkin:'||name||':'||phone)`
+    // but only returns the id, so the walk-in half is rebuilt here. Two different walk-ins
+    // with the same name and no phone collapse into one row server-side, so this key is as
+    // unique as the row it labels — no more, and that is the RPC's decision, not ours.
+    groupKey: profileId ?? `walkin:${displayName}:${phone ?? ""}`,
+  };
+}
+
+export function toClientHistoryEntry(m: Row): ClientHistoryEntry {
+  return {
+    bookingId: m.booking_id as string,
+    startTs: new Date(m.start_ts as string),
+    status: (str(m.status) ?? "") as string,
+    totalPrice: num(m.total_price),
+    services: str(m.services),
+  };
+}
+
+export function toOrderItem(m: Row): OrderItem {
+  return {
+    id: m.id as string,
+    productId: str(m.product_id),
+    nameSnapshot: m.name_snapshot as string,
+    priceNuSnapshot: num(m.price_nu_snapshot),
+    qty: num(m.qty),
+    lineTotalNu: num(m.line_total_nu),
+  };
+}
+
+/**
+ * An order and its line items.
+ *
+ * Items are sorted by name here for the same reason `toReview` sorts photos: PostgREST makes
+ * no ordering promise about an embedded resource, and a receipt whose lines reshuffle
+ * between two loads of the same page looks like a different order.
+ */
+export function toOrder(m: Row): Order {
+  const biz = (m.businesses ?? null) as Row | null;
+  const items = (Array.isArray(m.order_items) ? (m.order_items as Row[]) : []).map(toOrderItem);
+  items.sort((a, b) => a.nameSnapshot.localeCompare(b.nameSnapshot));
+  return {
+    id: m.id as string,
+    businessId: m.business_id as string,
+    customerProfileId: m.customer_profile_id as string,
+    status: (str(m.status) ?? "new") as OrderStatus,
+    totalNu: num(m.total_nu),
+    note: str(m.note),
+    declineReason: str(m.decline_reason),
+    placedAt: new Date(m.placed_at as string),
+    updatedAt: new Date((str(m.updated_at) ?? m.placed_at) as string),
+    businessName: biz ? str(biz.name) : null,
+    items,
+  };
+}
+
+export function toLoyaltyProgram(m: Row): LoyaltyProgram {
+  return {
+    businessId: m.business_id as string,
+    // Defaults match the column defaults, which matter because a salon with no row at all is
+    // rendered from these: `is_active` false (a program is opt-in), 10 points, Nu 10.
+    isActive: (m.is_active as boolean | null) ?? false,
+    earnMode: (str(m.earn_mode) ?? "per_visit") as LoyaltyEarnMode,
+    pointsPerVisit: num(m.points_per_visit ?? 10),
+    nuPerPoint: num(m.nu_per_point ?? 10),
+  };
+}
+
+export function toLoyaltyReward(m: Row): LoyaltyReward {
+  return {
+    id: m.id as string,
+    businessId: m.business_id as string,
+    name: m.name as string,
+    description: str(m.description),
+    rewardType: (str(m.reward_type) ?? "percent_discount") as LoyaltyRewardType,
+    percentOff: numOrNull(m.percent_off),
+    amountNu: numOrNull(m.amount_nu),
+    serviceRef: str(m.service_ref),
+    productRef: str(m.product_ref),
+    pointCost: num(m.point_cost),
+    isActive: (m.is_active as boolean | null) ?? true,
+    isArchived: (m.is_archived as boolean | null) ?? false,
+    sortOrder: num(m.sort_order),
+  };
+}
+
+export function toLoyaltyBalance(m: Row): LoyaltyBalance {
+  return { balance: num(m.balance), held: num(m.held), available: num(m.available) };
+}
+
+export function toLoyaltyRedemption(m: Row): LoyaltyRedemption {
+  return {
+    id: m.id as string,
+    businessId: m.business_id as string,
+    customerProfileId: m.customer_profile_id as string,
+    rewardId: str(m.reward_id),
+    nameSnapshot: m.name_snapshot as string,
+    typeSnapshot: (str(m.type_snapshot) ?? "percent_discount") as LoyaltyRewardType,
+    pointCost: num(m.point_cost),
+    code: m.code as string,
+    status: (str(m.status) ?? "pending") as LoyaltyRedemptionStatus,
+    requestedAt: new Date(m.requested_at as string),
+  };
+}
+
+export function toPayrollRow(m: Row): PayrollRow {
+  return {
+    staffMemberId: m.staff_member_id as string,
+    displayName: m.display_name as string,
+    completedBookings: num(m.completed_bookings),
+    serviceRevenue: num(m.service_revenue),
+    commissionPct: num(m.commission_pct),
+    commission: num(m.commission),
+    baseSalaryNu: num(m.base_salary_nu),
+    totalPay: num(m.total_pay),
+  };
+}
+
+export function toTaxEstimate(m: Row): TaxEstimate {
+  return {
+    turnover: num(m.turnover),
+    assessable: num(m.assessable),
+    incomeTax: num(m.income_tax),
+    effectiveRate: num(m.effective_rate),
+    gstRequired: (m.gst_required as boolean | null) ?? false,
+    gstEstimate: num(m.gst_estimate),
+    filingDeadline: new Date(m.filing_deadline as string),
+  };
+}
+
+export function toPlanChangeRequest(m: Row): PlanChangeRequest {
+  return {
+    id: m.id as string,
+    businessId: m.business_id as string,
+    requestedBy: m.requested_by as string,
+    requestedPlan: m.requested_plan as "growth" | "pro",
+    note: str(m.note),
+    status: (str(m.status) ?? "pending") as PlanChangeRequest["status"],
+    createdAt: new Date(m.created_at as string),
   };
 }

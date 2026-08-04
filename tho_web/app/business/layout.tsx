@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { OwnerHeader, OwnerTabBar } from "@/components/owner/owner-nav";
+import { unreadNotificationCount } from "@/lib/api/notifications";
+import { fetchOwnerConversations } from "@/lib/api/owner-back-office";
+import { unreadThreadCount } from "@/lib/chat-logic";
 import { getOwnerContext } from "@/lib/owner/context";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: { template: "%s · Tho for salons", default: "Tho for salons" },
@@ -30,15 +34,34 @@ export const metadata: Metadata = {
 export default async function OwnerLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const { businesses, active } = await getOwnerContext();
+  const { businesses, active, userId } = await getOwnerContext();
+
+  // The two badges. Both are counts the shell shows on every owner route, so they are read here
+  // rather than in each page — and both fail to 0 rather than taking the console down: a badge is
+  // the least important thing on any of these screens.
+  //
+  // Notifications are addressed to a *person* (`recipient_profile_id`), so this count spans every
+  // salon the owner runs; messages are scoped to the active salon, because a reply is sent as one
+  // salon and the header names which. Two different scopes, deliberately.
+  const supabase = await createClient();
+  const [unreadNotifications, conversations] = await Promise.all([
+    unreadNotificationCount(supabase).catch(() => 0),
+    active ? fetchOwnerConversations(supabase, active.id).catch(() => []) : Promise.resolve([]),
+  ]);
+  const unreadMessages = unreadThreadCount(conversations, userId);
 
   return (
     <div className="flex min-h-full flex-col">
-      <OwnerHeader active={active} businesses={businesses} />
+      <OwnerHeader
+        active={active}
+        businesses={businesses}
+        unreadNotifications={unreadNotifications}
+        unreadMessages={unreadMessages}
+      />
       <main className="flex-1 pb-[calc(62px+env(safe-area-inset-bottom))] tablet:pb-0">
         {children}
       </main>
-      <OwnerTabBar />
+      <OwnerTabBar unreadMessages={unreadMessages} />
     </div>
   );
 }

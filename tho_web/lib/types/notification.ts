@@ -33,8 +33,16 @@ export type AppNotification = {
   payload: Record<string, unknown>;
   createdAt: Date;
   readAt: Date | null;
-  /** Set for booking-related events, and the only deep link the inbox has. */
+  /** Set for booking-related events — the customer inbox's only deep link. */
   bookingId: string | null;
+  /**
+   * Set for `order_placed` / `order_ready` / `order_declined` / `order_cancelled`.
+   *
+   * Read only by the **owner** inbox, which has somewhere to send it: `/business/orders/[id]`
+   * arrived in 3c. The customer's order pages are 2f, so their rows stay unlinked until then —
+   * a row that navigates nowhere is the dead end `destinations.ts` exists to prevent.
+   */
+  orderId: string | null;
 };
 
 export function isUnread(n: Pick<AppNotification, "readAt">): boolean {

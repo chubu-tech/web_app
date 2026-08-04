@@ -4,6 +4,7 @@ import {
   NOTIFICATION_FILTERS,
   notificationStyle,
   notificationText,
+  ownerNotificationText,
   type NotificationFilter,
 } from "./notification-copy";
 import type { AppNotification } from "./types/notification";
@@ -232,5 +233,68 @@ describe("filters", () => {
       "bookings",
       "offers",
     ]);
+  });
+});
+
+describe("ownerNotificationText", () => {
+  // Exactly what the live rows carry: `start_ts` and nothing else. `private.enqueue_*` never
+  // writes a customer name, so the copy must not reach for one.
+  const payload = { start_ts: "2026-08-07T03:30:00Z", tz: "Asia/Thimphu" };
+
+  it("reads booking_created as news about somebody else, not about you", () => {
+    // The same row, same payload — the customer is told their appointment is set.
+    expect(notificationText("booking_created", payload).title).toBe("Booking confirmed");
+    expect(notificationText("booking_created", payload).body).toMatch(/Your appointment is set/);
+
+    const owner = ownerNotificationText("booking_created", payload);
+    expect(owner.title).toBe("New booking");
+    expect(owner.body).toContain("09:30");
+    expect(owner.body).not.toMatch(/your/i);
+  });
+
+  it("claims nothing the payload cannot supply", () => {
+    // The mistake this pins down is the one the module header criticises the Flutter app for:
+    // rendering a key the server has never written. A name is never in the payload, so the body
+    // points at the booking instead of naming somebody.
+    const owner = ownerNotificationText("booking_created", payload);
+    expect(owner.body).toBe("For Fri 7 Aug, 09:30. Open it to see who.");
+    // Even a payload that *claims* to hold a name is ignored, so a future server change has to be
+    // a deliberate one here rather than silently altering live copy.
+    expect(ownerNotificationText("booking_created", { ...payload, customer_name: "Pema" }).body).toBe(
+      owner.body,
+    );
+  });
+
+  it("covers the two events the customer table cannot", () => {
+    // `order_placed` and `order_cancelled` are addressed to the salon, so
+    // `notificationText` has no case and falls through to a humanised slug with no body.
+    expect(notificationText("order_placed").body).toBe("");
+    expect(ownerNotificationText("order_placed").title).toBe("New product order");
+    expect(ownerNotificationText("order_placed").body).toMatch(/mark it ready/);
+
+    expect(ownerNotificationText("order_cancelled").title).toBe("Order cancelled");
+    expect(ownerNotificationText("order_cancelled").body).toMatch(/before you got to it/);
+  });
+
+  it("uses the time when there is one and a plain sentence when there is not", () => {
+    // `booking_cancelled` and `order_placed` arrive with an empty payload on live data.
+    expect(ownerNotificationText("booking_cancelled", payload).body).toBe(
+      "Fri 7 Aug, 09:30 is free again.",
+    );
+    expect(ownerNotificationText("booking_cancelled", {}).body).toBe("A booking was cancelled.");
+    expect(ownerNotificationText("booking_no_show", {}).body).toBe("A no-show.");
+  });
+
+  it("restates a reminder as a diary entry, since it is somebody else's reminder", () => {
+    const owner = ownerNotificationText("booking_reminder", payload);
+    expect(owner.title).toBe("Coming up");
+    expect(owner.body).toMatch(/^An appointment at /);
+  });
+
+  it("defers to the customer wording for an event it has never met", () => {
+    // More likely a new customer-facing event that also copies the salon than something
+    // wholly new — and the customer wording is at least a sentence.
+    expect(ownerNotificationText("queue_your_turn")).toEqual(notificationText("queue_your_turn"));
+    expect(ownerNotificationText("something_new").title).toBe("Something new");
   });
 });
