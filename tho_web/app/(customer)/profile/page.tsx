@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { readySecondary } from "@/components/customer/destinations";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Avatar } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -93,9 +94,15 @@ export default async function ProfilePage() {
         </div>
       </div>
 
+      {/* Everything in `SECONDARY`, which is where it lives below 744 — the tab bar
+          carries only the five app tabs. Driven off the same list as the nav so the two
+          can never disagree about what exists, and My bookings leads because it is what
+          someone opening Profile most often wants. */}
       <ul className="mt-lg border-hairline-soft divide-hairline-soft divide-y rounded-md border">
         <Row href="/bookings" icon={Icons.booking} label="My bookings" />
-        <Row href="/saved" icon={Icons.favourite} label="Saved salons" />
+        {readySecondary().map((d) => (
+          <Row key={d.href} href={d.href} icon={d.icon} label={d.label} />
+        ))}
       </ul>
 
       <div className="mt-lg max-w-sm">

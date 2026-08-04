@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { FavouriteButton } from "@/components/customer/favourite-button";
+import { MessageSalonButton } from "@/components/customer/message-salon-button";
 import { SalonBooking } from "@/components/customer/salon-booking";
 import { SalonTabs } from "@/components/customer/salon-tabs";
 import { ShareButton } from "@/components/customer/share-button";
@@ -222,6 +223,9 @@ export default async function SalonPage({
           </div>
 
           <div className="gap-base mt-lg flex overflow-x-auto pb-1">
+            {/* Message leads, as it does in the app: it is the one channel that stays
+                inside the product and that the salon sees in its own inbox. */}
+            <MessageSalonButton businessId={id} />
             {wa ? (
               <ActionCircle icon={Icons.send} label="WhatsApp" href={wa} external />
             ) : null}

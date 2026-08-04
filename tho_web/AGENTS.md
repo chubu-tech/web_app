@@ -10,9 +10,15 @@ The Bhutan Salons product in a browser: customers book chairs and join walk-in
 queues, owners run their salon, staff see their day. Next.js 16 (App Router),
 React 19, Tailwind 4, TypeScript.
 
-**Status: Phase 2c (queue).** Browse, sign in, book, reschedule, cancel, review, and
-take a place in a walk-in line all work against the real database. Next: 2d products,
-loyalty, chat, notifications, settings, map. Then owner, then staff.
+**Status: Phase 2d (inbox).** Browse, sign in, book, reschedule, cancel, review, take a
+place in a walk-in line, read notifications and message a salon all work against the real
+database. Next: **2e** the map, `/stylist/<id>` and profile editing → **2f** products,
+orders and loyalty. Then owner, then staff.
+
+The original 2d covered all eight of those surfaces at once — about four times the size of
+2c — so it was split three ways, ordered by value per line rather than by the old sequence:
+the seeded customer has 35 notifications and 3 conversations, while **one** salon sells
+products and **one** runs a loyalty programme.
 
 ## This repo owns no data
 
@@ -237,8 +243,70 @@ Renaming it breaks every QR already on a counter.
 **Nothing promises a notification.** The app's card says "we'll notify you"; every
 `queue_your_turn` row in the outbox is `failed` with "no deliverable channel", and
 `devices` has no rows, so that promise is kept by nothing on any platform. The web card
-says the page updates itself instead. When Web Push lands (2d), `QueuePositionCard` is
-where the copy changes back.
+says the page updates itself instead — and 2d's inbox is now where those events actually
+reach someone.
+
+Web Push stays deferred by decision, not by difficulty: `devices` plus the existing worker
+would accept an FCM **web** token with no change in `../tho`, but delivery needs a Firebase
+web config and an `FCM_SERVICE_ACCOUNT` secret that do not exist. If it lands, the strings
+to change are in `QueuePositionCard` and the join form's projection note.
+
+## The inbox
+
+**Notification copy is composed, not read out of the row.** Two systems in `../tho`
+disagree about it and only one is right:
+
+- The worker's `compose()` (`supabase/functions/process-notifications/index.ts:54`)
+  switches **exactly** on `event_type` and returns a title *and* a body with the payload
+  interpolated.
+- The app's `notificationStyleFor()` matches **loosely** with `contains`, title only — and
+  `booking_no_show` falls through to `['confirm','creat','book']`, because it contains
+  **"book"**, so a missed appointment reads "Appointment confirmed!" over a green tick.
+
+`lib/notification-copy.ts` keeps the loose chain for icon/accent/filter **with that hole
+closed**, and ports `compose()` for the words. **Order in the chain is behaviour** — every
+rearrangement is a change, and the tests pin the sequence.
+
+The app also renders `payload['message']`, a key the server has never written, so its rows
+show a bare title on all 35 live notifications. Compose from the payload's real fields
+(`start_ts`, `points`, `balance`, `reason`) instead. That is also why there is **no
+notification detail route**: the row already holds everything a detail page could show.
+
+- **`lib/` imports nothing from `components/`.** `notificationStyle` returns an icon
+  *name* from a closed union, and the list component maps it exhaustively — so a name with
+  no glyph is a type error, not a blank square.
+- **`fetchMyConversations` filters on `customer_profile_id`.** `conversations_select`
+  OR-matches customer *or* business member, so leaning on RLS alone (as the app does) puts
+  a salon's customer threads in an owner's personal inbox. `/messages/[id]` refuses a
+  member for the same reason. Same correction `fetchMyActiveEntries` needed in 2c.
+- **`conversations` and `messages` are written directly**, the only tables besides
+  `booking_attachments` that are. Their insert policies are the authority and there is no
+  RPC to route through. Both require `private.is_real_user()`, so the guest wall goes in
+  front of starting a thread — never after the refusal.
+- **The thread is marked read once, on open — never on the poll.**
+  `mark_conversation_read` stamps `now()`, so polling it would rewrite the timestamp every
+  3 seconds and the salon's side would never see a stable "last read".
+- **"Now" is handed in from the server page**, not read during a client render: relative
+  ages and the TODAY/YESTERDAY boundary both need it, and two renders must not disagree.
+- Polling cadence lives in `usePollTick` — 3s a thread, 4s a queue place, 10s a wait badge,
+  30s the nav badges. Hidden tabs don't poll; returning to one refreshes at once.
+
+## The nav's rule below 744
+
+`TABS` — the five the app has — are the **only** things in the bottom bar. `SECONDARY`
+joins the top nav at ≥744 and appears as rows on `/profile` below it, which is what the
+app's drawer is. Both come off `destinations.ts`, so the nav and Profile cannot disagree
+about what exists.
+
+The original flattening put `SECONDARY` in the bar too. That was right at four items and
+broke the moment Chats and Notifications landed — nine destinations do not fit on a 390px
+bar at a usable tap size. The **Profile tab carries a dot** when anything under it is
+unread, so nothing arrives unannounced on a phone.
+
+Badge counts come from `useInboxCounts`, client-side and polled: the shell already does
+`getAccount()` and a `queue_entries` read per page, and two more server reads to render a
+small number is the wrong trade. Nothing is fetched for a guest or a visitor — neither can
+hold a thread or receive a notification.
 
 ## Live data is messier than it looks
 
@@ -262,9 +330,18 @@ Check assumptions against it before trusting a column:
   to pick — it says so rather than offering an unsubmittable form. And every salon is
   `queue_join_mode = 'anywhere'`, so `queueLockState`'s `needs_scan` branch has no live
   example either; unit tests are its only coverage.
+- **The inbox is the best-seeded surface in the app.** `customer@bhutansalons.test` has 35
+  notifications across 9 event types with 5 unread, and 3 conversations — one of which was
+  opened and never written in, which is the live example for "an empty thread is never
+  unread". Two of the notifications are `booking_no_show`, the rows the app mislabels.
+- **No `payments`, `offers` or `review_photos` rows exist at all**, so the receipt's
+  payments block, the offers section and the review photo strip have no live example — all
+  three are covered by unit tests instead.
 - Seeded logins exist and are email-confirmed — `customer@bhutansalons.test` and
   friends, password in `../tho/supabase/seed.sql`. Useful for verification; the app's
   dev quick-login chips are deliberately **not** ported to the web.
+  `owner@bhutansalons.test` owns Norzin **and** is the counterparty on the customer's
+  thread, which makes it the right account to check the owner-inbox leak with.
 
 ## Verify
 

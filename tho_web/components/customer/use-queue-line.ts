@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchActiveLine } from "@/lib/api/queue";
 import { createClient } from "@/lib/supabase/client";
 import type { QueueEntry } from "@/lib/types/queue";
+import { usePollTick } from "./use-poll";
 
 /**
  * The shop's active line, kept fresh while the page is open.
@@ -19,10 +20,8 @@ import type { QueueEntry } from "@/lib/types/queue";
  *    permission error renders as "walk straight in". `loaded` is what tells them
  *    apart on the *first* read; after that a failure keeps the last good numbers,
  *    because a poll must never blank figures that are on screen.
- * 2. **A hidden tab does not poll.** Checked inside the interval rather than held in
- *    state, and `visibilitychange` bumps immediately on return — so coming back to
- *    the tab refreshes at once instead of waiting out the interval, without a
- *    `setState` in an effect body for the compiler to object to.
+ * 2. **A hidden tab does not poll**, and returning to it refreshes at once — see
+ *    `usePollTick`, which owns the timing for every polling surface in the app.
  * 3. **It stops for good when there is nothing left to watch.** `watchEntryId` is
  *    the entry the caller cares about; once a *successful* read no longer contains
  *    it, that place is served, given up or marked no-show, and polling ends — a tab
@@ -64,29 +63,8 @@ export function useQueueLine({
     // A server snapshot that already lacks the entry is as good as a poll saying so.
     stopped: initial != null && watchEntryId != null && !hasEntry(initial, watchEntryId),
   }));
-  const [tick, setTick] = useState(0);
-
   const halted = paused || state.stopped;
-
-  useEffect(() => {
-    if (halted) return;
-    const id = setInterval(() => {
-      // A backgrounded tab is nobody watching. Browsers throttle timers here
-      // anyway; skipping the request is the part that matters.
-      if (document.visibilityState === "hidden") return;
-      setTick((n) => n + 1);
-    }, intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs, halted]);
-
-  useEffect(() => {
-    if (halted) return;
-    const bump = () => {
-      if (document.visibilityState !== "hidden") setTick((n) => n + 1);
-    };
-    document.addEventListener("visibilitychange", bump);
-    return () => document.removeEventListener("visibilitychange", bump);
-  }, [halted]);
+  const tick = usePollTick(intervalMs, halted);
 
   useEffect(() => {
     if (halted) return;

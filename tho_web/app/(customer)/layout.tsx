@@ -29,7 +29,7 @@ export default async function CustomerLayout({
       <main className="flex-1 pb-[calc(62px+env(safe-area-inset-bottom))] tablet:pb-0">
         {children}
       </main>
-      <CustomerTabBar />
+      <CustomerTabBar signedIn={account.state === "registered"} />
     </div>
   );
 }

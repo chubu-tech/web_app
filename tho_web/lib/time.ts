@@ -15,6 +15,13 @@
 /** Asia/Thimphu, in minutes east of UTC. */
 export const THIMPHU_OFFSET_MIN = 6 * 60;
 
+/**
+ * The IANA name, for the places that hand a zone to `Intl` rather than doing the
+ * arithmetic — `toLocaleString({ timeZone })` in a formatter, not a comparison.
+ * The offset above stays the source of truth for anything that computes a boundary.
+ */
+export const THIMPHU_TZ = "Asia/Thimphu";
+
 const MS_PER_MIN = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MIN;
 const MS_PER_DAY = 24 * MS_PER_HOUR;

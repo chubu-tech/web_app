@@ -4,7 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { IconSize } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
-import { isCurrent, readySecondary, readyTabs, type Destination } from "./destinations";
+import {
+  isCurrent,
+  readySecondary,
+  readyTabs,
+  secondaryHasUnread,
+  type Destination,
+} from "./destinations";
+import { useInboxCounts } from "./use-inbox-counts";
 
 /**
  * The customer shell's navigation, ported from
@@ -19,12 +26,19 @@ import { isCurrent, readySecondary, readyTabs, type Destination } from "./destin
  * - **≥744** the tabs move to a top nav and the drawer items join them. A bottom tab
  *   bar on a 1400px screen is a phone artefact, not a design.
  *
+ * **The bar carries `TABS` only** — the five the app has. `SECONDARY` joins the top nav
+ * above 744 and lives on `/profile` below it. It used to be in both, which was fine at
+ * four items and stopped being fine the moment Chats and Notifications landed; nine
+ * destinations do not fit on a 390px bar at a usable tap size. The Profile tab carries a
+ * dot instead, so nothing arrives unannounced.
+ *
  * Selection is carried by colour and stroke weight, matching the app — the free
  * stroke icon sets have no filled variant to swap in.
  */
 
 export function CustomerTopNav({ signedIn }: { signedIn: boolean }) {
   const pathname = usePathname();
+  const counts = useInboxCounts(signedIn);
   const items = [...readyTabs(), ...readySecondary()];
 
   return (
@@ -33,13 +47,22 @@ export function CustomerTopNav({ signedIn }: { signedIn: boolean }) {
         aria-label="Main"
         className="px-lg gap-lg mx-auto flex h-16 max-w-[1440px] items-center"
       >
-        <Link href="/" className="text-display-md text-rausch-cta font-bold">
+        <Link href="/" className="text-display-md text-rausch-cta shrink-0 font-bold">
           Tho
         </Link>
-        <ul className="gap-xs flex flex-1 items-center">
+        {/* **Scrolls inside itself.** Six destinations with labels are wider than 744, so
+            without this the whole page scrolled sideways at exactly the tablet breakpoint —
+            which is what adding Chats and Notifications did. Overflow belongs to the strip
+            that has too much in it, never to the body; the same rule the salon page's
+            action row and the inbox filter chips already follow. */}
+        <ul className="gap-xs flex min-w-0 flex-1 items-center overflow-x-auto">
           {items.map((d) => (
-            <li key={d.href}>
-              <TopLink destination={d} current={isCurrent(d.href, pathname)} />
+            <li key={d.href} className="shrink-0">
+              <TopLink
+                destination={d}
+                current={isCurrent(d.href, pathname)}
+                count={d.badge ? counts[d.badge] : 0}
+              />
             </li>
           ))}
         </ul>
@@ -62,9 +85,11 @@ export function CustomerTopNav({ signedIn }: { signedIn: boolean }) {
 function TopLink({
   destination: d,
   current,
+  count,
 }: {
   destination: Destination;
   current: boolean;
+  count: number;
 }) {
   const Icon = d.icon;
   return (
@@ -82,13 +107,34 @@ function TopLink({
         aria-hidden
       />
       {d.label}
+      {count > 0 ? <CountBadge count={count} label={d.label} /> : null}
     </Link>
   );
 }
 
-export function CustomerTabBar() {
+/**
+ * The unread number, capped at "9+" as the app's bell is.
+ *
+ * The count is in the accessible name rather than left as a bare glyph, so a screen reader
+ * hears "Chats, 2 unread" instead of a number floating beside a link.
+ */
+function CountBadge({ count, label }: { count: number; label: string }) {
+  return (
+    <span
+      className="bg-rausch text-on-primary text-badge px-xs min-w-5 rounded-full text-center font-semibold tabular-nums"
+      aria-label={`${count} unread ${label.toLowerCase()}`}
+    >
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
+
+export function CustomerTabBar({ signedIn }: { signedIn: boolean }) {
   const pathname = usePathname();
-  const items = [...readyTabs(), ...readySecondary()];
+  const counts = useInboxCounts(signedIn);
+  // `TABS` only. The secondary items are rows on /profile below 744 — see the file note.
+  const items = readyTabs();
+  const profileDot = secondaryHasUnread(counts);
 
   return (
     <nav
@@ -102,6 +148,10 @@ export function CustomerTabBar() {
         {items.map((d) => {
           const current = isCurrent(d.href, pathname);
           const Icon = d.icon;
+          const count = d.badge ? counts[d.badge] : 0;
+          // Profile is the way to everything in `SECONDARY` on a phone, so it inherits
+          // their unread state as a plain dot — a number would imply it was Profile's own.
+          const dot = d.href === "/profile" && profileDot;
           return (
             <li key={d.href} className="flex-1">
               <Link
@@ -109,15 +159,30 @@ export function CustomerTabBar() {
                 aria-current={current ? "page" : undefined}
                 className="gap-xs flex h-full flex-col items-center justify-center"
               >
-                <Icon
-                  style={{ width: IconSize.md, height: IconSize.md }}
-                  strokeWidth={current ? 2.2 : 1.8}
-                  className={cn(
-                    "transition-transform duration-[--duration-slow]",
-                    current ? "text-rausch scale-105" : "text-muted",
-                  )}
-                  aria-hidden
-                />
+                <span className="relative">
+                  <Icon
+                    style={{ width: IconSize.md, height: IconSize.md }}
+                    strokeWidth={current ? 2.2 : 1.8}
+                    className={cn(
+                      "transition-transform duration-[--duration-slow]",
+                      current ? "text-rausch scale-105" : "text-muted",
+                    )}
+                    aria-hidden
+                  />
+                  {count > 0 ? (
+                    <span
+                      className="bg-rausch text-on-primary text-badge px-1 absolute -top-1 -right-2 min-w-4 rounded-full text-center font-semibold tabular-nums"
+                      aria-label={`${count} unread`}
+                    >
+                      {count > 9 ? "9+" : count}
+                    </span>
+                  ) : dot ? (
+                    <span
+                      className="bg-rausch absolute -top-0.5 -right-1 size-2 rounded-full"
+                      aria-label="Something new"
+                    />
+                  ) : null}
+                </span>
                 <span
                   className={cn(
                     "text-badge",

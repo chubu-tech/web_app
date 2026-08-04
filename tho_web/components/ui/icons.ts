@@ -3,8 +3,10 @@ import {
   ArrowLeft,
   ArrowRight,
   Bell,
+  BellDot,
   CalendarCheck,
   CalendarDays,
+  CalendarSync,
   CalendarX,
   Camera,
   CheckCircle2,
@@ -13,9 +15,11 @@ import {
   ChevronRight,
   Clock,
   Compass,
+  CreditCard,
   Eye,
   EyeOff,
   Filter,
+  FilterX,
   Gift,
   Hand,
   Heart,
@@ -87,6 +91,8 @@ export const Icons = {
   searchEmpty: SearchX,
   /** The funnel. One concept, one name — nothing here sorts. */
   filter: Filter,
+  /** A filter that matched nothing — an empty tab, not an empty inbox. */
+  filterOff: FilterX,
 
   // ------------------------------------------------------------------ status --
   offline: WifiOff,
@@ -126,6 +132,8 @@ export const Icons = {
   booking: CalendarDays,
   bookingConfirmed: CalendarCheck,
   bookingCancelled: CalendarX,
+  /** A booking that moved. The app's `refresh`; a calendar says what moved. */
+  bookingRescheduled: CalendarSync,
   clock: Clock,
   timer: Timer,
 
@@ -138,11 +146,14 @@ export const Icons = {
   qr: QrCode,
   receipt: Receipt,
   ticket: Ticket,
+  payment: CreditCard,
 
   // -------------------------------------------------------------------- talk --
   chat: MessageCircle,
   send: Send,
   notification: Bell,
+  /** The bell with something in it. Paired with `notification`: one concept, two states. */
+  notificationActive: BellDot,
   phone: Phone,
 
   // ------------------------------------------------------------------- media --

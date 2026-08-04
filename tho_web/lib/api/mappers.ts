@@ -22,6 +22,8 @@ import type {
   WorkingHour,
 } from "../types/booking";
 import { queueStatusFromWire, type QueueEntry } from "../types/queue";
+import type { Conversation, Message } from "../types/chat";
+import type { AppNotification } from "../types/notification";
 
 /**
  * Row → model mappers, one per table, ported from the `fromMap` factories in
@@ -310,6 +312,54 @@ export function toQueueEntry(m: Row, fallbackBusinessId?: string): QueueEntry {
     serviceMinutes: embedded ?? numOrNull(m.service_minutes) ?? 20,
     servingRemainingMinutes: numOrNull(m.serving_remaining_min) ?? 0,
     businessName: biz ? str(biz.name) : null,
+  };
+}
+
+/**
+ * A notification row.
+ *
+ * `payload` is the event's own data, not a rendered message — `notificationText` in
+ * `lib/notification-copy.ts` composes the words from it. Deliberately **not** normalised
+ * or narrowed here: a new event type must be able to arrive with new fields and reach the
+ * copy module intact rather than being flattened at this boundary.
+ */
+export function toNotification(m: Row): AppNotification {
+  const payload = m.payload;
+  return {
+    id: m.id as string,
+    eventType: str(m.event_type) ?? "notification",
+    payload:
+      payload != null && typeof payload === "object" && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>)
+        : {},
+    createdAt: new Date(m.created_at as string),
+    readAt: dateOrNull(m.read_at),
+    bookingId: str(m.booking_id),
+  };
+}
+
+export function toConversation(m: Row): Conversation {
+  const biz = (m.businesses ?? null) as Row | null;
+  return {
+    id: m.id as string,
+    businessId: m.business_id as string,
+    customerProfileId: m.customer_profile_id as string,
+    customerName: str(m.customer_name),
+    businessName: biz ? str(biz.name) : null,
+    businessCoverUrl: biz ? str(biz.cover_url) : null,
+    lastMessage: str(m.last_message),
+    lastMessageAt: dateOrNull(m.last_message_at),
+    customerLastReadAt: dateOrNull(m.customer_last_read_at),
+    businessLastReadAt: dateOrNull(m.business_last_read_at),
+  };
+}
+
+export function toMessage(m: Row): Message {
+  return {
+    id: m.id as string,
+    senderProfileId: m.sender_profile_id as string,
+    body: (str(m.body) ?? "") as string,
+    createdAt: new Date(m.created_at as string),
   };
 }
 
