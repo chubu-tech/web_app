@@ -84,12 +84,23 @@ export function SiteFooter() {
           <span>
             © {year} {brand.name}. Built in Bhutan.
           </span>
-          <a
-            href={`mailto:${brand.supportEmail}`}
-            className="transition-colors hover:text-white/80"
-          >
-            {brand.supportEmail}
-          </a>
+          <span className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            {footer.legalLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="transition-colors hover:text-white/80"
+              >
+                {link.label}
+              </a>
+            ))}
+            <a
+              href={`mailto:${brand.supportEmail}`}
+              className="transition-colors hover:text-white/80"
+            >
+              {brand.supportEmail}
+            </a>
+          </span>
         </div>
       </Container>
     </footer>

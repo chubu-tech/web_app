@@ -1,0 +1,22 @@
+# Netlify build config.
+#
+# The site (`tho-app`) is connected to this repo but had never produced a
+# successful deploy — which is why bhutansalons.com answered 404 on every path
+# despite DNS already pointing here.
+#
+# NODE_VERSION is the point of this file. Netlify's default build image Node can
+# lag well behind, and two things here need a recent one: Next.js 16 requires
+# Node >= 20.9, and @supabase/supabase-js warns on 20 and below and will drop it.
+# Pinning 22 satisfies both and makes the build reproducible rather than
+# dependent on whatever the build image defaults to this month.
+#
+# The Next.js runtime (@netlify/plugin-nextjs) is deliberately NOT declared here:
+# Netlify installs it automatically for a detected Next site, and naming it
+# explicitly fails the build when the package is absent from package.json.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
