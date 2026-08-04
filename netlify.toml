@@ -20,3 +20,20 @@
 
 [build.environment]
   NODE_VERSION = "22"
+
+# iOS requires the Associated Domains file to be served as JSON, and it must
+# have no file extension — so nothing infers the type. Netlify guessed
+# `text/plain`, which iOS rejects.
+#
+# The equivalent rule in `next.config.ts` is NOT enough and is kept only for
+# `next start`: files under `public/` are served straight from Netlify's CDN and
+# never reach the Next.js server, so its `headers()` never runs for them. Verify
+# against the deployed domain, not a local server:
+#
+#     curl -sI https://bhutansalons.com/.well-known/apple-app-site-association
+#
+# `assetlinks.json` needs no rule — its `.json` extension is inferred correctly.
+[[headers]]
+  for = "/.well-known/apple-app-site-association"
+  [headers.values]
+    Content-Type = "application/json"
