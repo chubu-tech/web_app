@@ -1,5 +1,6 @@
 import { distanceKm } from "./booking-guards";
-import type { Coords } from "./discover-logic";
+import { kmTo, type Coords } from "./discover-logic";
+import { hasLocation, type Business } from "./types/salon";
 
 /**
  * Resolving where the viewer is, ported from `_resolveLocation` in
@@ -82,4 +83,67 @@ export function resolveLocation(): Promise<Fix> {
     // that waits forever for a section is worse than one that assumes Thimphu.
     setTimeout(() => done(fallback), TIMEOUT_MS + 500);
   });
+}
+
+/**
+ * Where the map opens, and where the "you are here" dot goes.
+ *
+ * **This is the app's second plausibility guard, reconciled into the first.**
+ * `tho` has two 150 km implausibility checks measured from *different reference
+ * points*, and only one of them can be right:
+ *
+ * | | Measured from | Used by |
+ * | --- | --- | --- |
+ * | `_resolveLocation` (`customer_home.dart:335`) → {@link plausibleFix} | the Thimphu centre | recommendations, Nearby, the distance filter, the booking sheet |
+ * | `MapTab.effectiveCenter` (`map_tab.dart:25`) | the **nearest located salon** | the map |
+ *
+ * They disagree in a band. Every located salon is within ~75 km of the Thimphu
+ * centre (Serenity Day Spa in Phuentsholing is the furthest of the 11), so the
+ * salon-relative guard accepts a fix up to ~225 km from Thimphu that the
+ * Thimphu-relative one rejects. Two thresholds measured from two points is the bug,
+ * not the feature: it means the map can believe a fix that Discover has already
+ * decided is nonsense, and then the two screens disagree about where you are while
+ * both claim to be showing "near you".
+ *
+ * So the map takes the same {@link Fix} as everything else — `plausibleFix` has
+ * already run inside {@link resolveLocation} — and this function is the seam where
+ * that decision is written down rather than a second guard.
+ *
+ * **One case diverges from `map_logic_test.dart` deliberately.** The Dart keeps *any*
+ * fix when no salon has a location (`effectiveCenter(cupertino, []) == cupertino`),
+ * which would open the map on the Pacific. That branch is unreachable in the app —
+ * `MapTab` renders the "No mapped salons" empty state and never calls
+ * `effectiveCenter` with an empty list — and it is unreachable here for the same
+ * reason. Preserving it would only mean carrying a rule that can misfire if the
+ * empty state is ever moved.
+ */
+export function mapCenter(fix: Fix): Coords {
+  return fix.coords;
+}
+
+/**
+ * The located salon nearest `center`, or null when none is located. A port of
+ * `SalonMap.nearestTo` (`map_view.dart:37`).
+ *
+ * The map opens with this one selected so a preview card is visible on arrival
+ * rather than after a tap, and re-runs it when a search narrows the list — which is
+ * why it takes the list rather than reading one.
+ *
+ * `<=` on the comparison keeps the Dart's tie-break: the **earlier** salon in the
+ * list wins, so the order the caller passes is the order that decides a draw. Two
+ * live rows are 6 m apart (`Test 01` and `Test 2`), so a tie is not hypothetical.
+ */
+export function nearestTo(center: Coords, located: Business[]): Business | null {
+  let best: Business | null = null;
+  let bestKm = Infinity;
+  for (const b of located) {
+    if (!hasLocation(b)) continue;
+    const km = kmTo(b, center);
+    if (km == null) continue;
+    if (km < bestKm) {
+      best = b;
+      bestKm = km;
+    }
+  }
+  return best;
 }

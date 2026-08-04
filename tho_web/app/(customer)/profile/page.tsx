@@ -1,21 +1,31 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { readySecondary } from "@/components/customer/destinations";
+import { ProfileEditor } from "@/components/customer/profile-editor";
 import { SignOutButton } from "@/components/auth/sign-out-button";
-import { Avatar } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Icons } from "@/components/ui/icons";
+import { Icons, IconSize } from "@/components/ui/icons";
+import { fetchMyProfile } from "@/lib/api/profile";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
+import { THIMPHU_TZ } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Profile" };
 
 /**
- * Profile — who you are and how to stop being it.
+ * Profile — who you are, what is under it, and how to stop being it.
  *
- * Small on purpose in 2b: it exists because auth now does, and signing out needs a
- * home. Editing a profile, notification preferences and the legal pages arrive with
- * 2d. Nothing here is a placeholder — every row does what it says.
+ * 2e made it editable. It is also where the app's **drawer** lives on this platform:
+ * `SECONDARY` renders as rows below 744, where the tab bar carries only the five app
+ * tabs.
+ *
+ * **There is no `/settings`, on purpose.** The app's Settings screen is two switches
+ * writing `notif_reminders` / `notif_promos` to SharedPreferences that *nothing reads
+ * back* — the screen says so itself — plus two read-only facts. `profiles` has no
+ * preference columns, so there is nothing to persist and nothing to honour. The two
+ * facts are the About block at the bottom of this page; the switches are not ported,
+ * because a control that changes nothing is the same dishonesty as promising a
+ * notification nothing sends.
  *
  * `profile_screen.dart:230-241` also links Privacy, Terms and Help, which are MVP
  * stubs in the app. They stay out of a public website until there is real copy.
@@ -39,6 +49,7 @@ export default async function ProfilePage() {
             </Link>
           }
         />
+        <About />
       </Shell>
     );
   }
@@ -49,7 +60,7 @@ export default async function ProfilePage() {
         <EmptyState
           icon={Icons.person}
           title="Browsing as a guest"
-          message="Your saved salons are kept. Create an account and they come with you — booking, queues and messages unlock too."
+          message="Your saved salons and the stylists you follow are kept. Create an account and they come with you — booking, queues and messages unlock too."
           action={
             <Link
               href="/sign-up?next=/profile"
@@ -62,37 +73,37 @@ export default async function ProfilePage() {
         <div className="mt-lg mx-auto max-w-sm">
           <SignOutButton />
         </div>
+        <About />
       </Shell>
     );
   }
 
   const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, phone, avatar_url")
-    .eq("id", account.user.id)
-    .maybeSingle();
-
-  const name = (profile?.full_name as string | null) ?? null;
+  const profile = await fetchMyProfile(supabase, account.user.id);
 
   return (
     <Shell>
-      <div className="gap-base flex items-center">
-        <Avatar
-          name={name ?? account.user.email ?? "You"}
-          photoUrl={profile?.avatar_url as string | null}
-          size={64}
+      {/* A guest has no name anyone will ever read — they cannot book, queue, order or
+          message — so the editor is registered-only. */}
+      <ProfileEditor
+        initial={{
+          fullName: profile?.fullName ?? null,
+          phone: profile?.phone ?? null,
+          avatarUrl: profile?.avatarUrl ?? null,
+        }}
+        email={account.user.email ?? null}
+      />
+
+      <dl className="mt-lg border-hairline-soft divide-hairline-soft divide-y rounded-md border">
+        {account.user.email ? (
+          <Fact icon={Icons.mail} label="Email" value={account.user.email} />
+        ) : null}
+        <Fact
+          icon={Icons.person}
+          label="Account type"
+          value={capitalise(profile?.role ?? "customer")}
         />
-        <div className="min-w-0">
-          <p className="text-display-sm text-ink truncate font-semibold">
-            {name ?? "Your account"}
-          </p>
-          <p className="text-body-sm text-muted truncate">{account.user.email}</p>
-          {profile?.phone ? (
-            <p className="text-body-sm text-muted truncate">{profile.phone as string}</p>
-          ) : null}
-        </div>
-      </div>
+      </dl>
 
       {/* Everything in `SECONDARY`, which is where it lives below 744 — the tab bar
           carries only the five app tabs. Driven off the same list as the nav so the two
@@ -108,6 +119,8 @@ export default async function ProfilePage() {
       <div className="mt-lg max-w-sm">
         <SignOutButton />
       </div>
+
+      <About />
     </Shell>
   );
 }
@@ -117,6 +130,57 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="px-base py-lg mx-auto w-full max-w-[720px] tablet:px-lg">
       <h1 className="text-display-lg text-ink mb-lg font-medium">Profile</h1>
       {children}
+    </div>
+  );
+}
+
+/**
+ * The two things from the app's Settings screen that are true and unchangeable.
+ *
+ * Styled as facts, not rows, and `settings_screen.dart:143` records why that matters:
+ * the previous flat list of `ListTile`s gave a build number the same visual weight as a
+ * preference someone could actually change.
+ *
+ * Shown to a visitor and a guest as well — the time zone is the one thing on this page
+ * that a signed-out reader might genuinely need, because every time in the product is
+ * in it.
+ */
+function About() {
+  return (
+    <section className="mt-xl">
+      <h2 className="text-caption text-muted mb-sm font-semibold tracking-wide uppercase">
+        About
+      </h2>
+      <dl className="border-hairline-soft divide-hairline-soft divide-y rounded-md border">
+        <Fact
+          icon={Icons.clock}
+          label="Time zone"
+          value={`Bhutan time (${THIMPHU_TZ})`}
+        />
+        <Fact icon={Icons.info} label="Version" value="Tho for web 1.0.0" />
+      </dl>
+    </section>
+  );
+}
+
+function Fact({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Icons.info;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="p-base gap-md flex min-h-14 items-center">
+      <Icon
+        className="text-muted shrink-0"
+        style={{ width: IconSize.sm, height: IconSize.sm }}
+        aria-hidden
+      />
+      <dt className="text-body-md text-body flex-1">{label}</dt>
+      <dd className="text-body-sm text-muted min-w-0 truncate text-right">{value}</dd>
     </div>
   );
 }
@@ -142,4 +206,8 @@ function Row({
       </Link>
     </li>
   );
+}
+
+function capitalise(role: string): string {
+  return role.length === 0 ? "—" : role[0]!.toUpperCase() + role.slice(1);
 }

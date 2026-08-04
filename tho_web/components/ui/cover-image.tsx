@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { monogramInitial, paletteFor } from "@/lib/monogram";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,21 +18,6 @@ import { cn } from "@/lib/utils";
  * `remotePatterns`: `next/image` rejects the request, the browser fires `error`,
  * and the viewer gets the monogram instead of a broken-image glyph.
  */
-
-/** Seeded by the first code unit of the label, exactly as the Dart does, so a
- *  given salon always gets the same colours on both platforms. */
-const PALETTES = [
-  "from-[#FFE1E8] to-[#FFB3C4]",
-  "from-[#FFE9D6] to-[#FFC59E]",
-  "from-[#E7E1FF] to-[#C3B3FF]",
-  "from-[#DFF3EA] to-[#A7DCC5]",
-  "from-[#FDE7F3] to-[#F3B3D6]",
-] as const;
-
-function paletteFor(label: string): string {
-  const seed = label.length === 0 ? 0 : label.charCodeAt(0);
-  return PALETTES[seed % PALETTES.length]!;
-}
 
 export type CoverImageProps = {
   label: string;
@@ -60,7 +46,7 @@ export function CoverImage({
         <div
           className={cn(
             "flex h-full w-full items-center justify-center bg-gradient-to-br",
-            paletteFor(label),
+            paletteFor(label).className,
           )}
         >
           {/* Decorative: the salon's name is always in the text beside this. */}
@@ -68,7 +54,7 @@ export function CoverImage({
             aria-hidden
             className="text-ink/55 text-[2.5rem] leading-none font-bold"
           >
-            {(label.trim()[0] ?? "?").toUpperCase()}
+            {monogramInitial(label)}
           </span>
         </div>
       ) : (

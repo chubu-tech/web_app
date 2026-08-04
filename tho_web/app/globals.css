@@ -183,6 +183,72 @@
   background-color: rgb(0 0 0 / 0.5);
 }
 
+/* --- The map ----------------------------------------------------------------
+   The only component CSS in this file, and it is here because it has nowhere
+   else to go: every rule below targets DOM that **leaflet** generates — its tile
+   pane, and the inside of a marker, which is set from an HTML string. A utility
+   class cannot reach either. See `components/customer/salon-map.tsx`. */
+
+/* The grey basemap. `map_view.dart:54` does this with a luminance ColorFilter
+   matrix over the tile layer; one CSS filter is the same result. */
+.salon-map .leaflet-tile-pane {
+  filter: grayscale(1);
+}
+
+/* A salon bubble: a ringed circle holding the seeded gradient and its initial,
+   with the cover photo layered over both. Colours and size come from the inline
+   style, because they depend on the salon and on selection. */
+.salon-bubble {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(34 34 34 / 0.55);
+  font-weight: 700;
+  line-height: 1;
+  box-shadow:
+    rgba(0, 0, 0, 0.02) 0 0 0 1px,
+    rgba(0, 0, 0, 0.04) 0 2px 6px,
+    rgba(0, 0, 0, 0.1) 0 4px 8px;
+  /* The app pops each bubble in with an easeOutBack scale over 350ms plus a
+     per-marker stagger (`_SalonBubble`). Here it is the `slow` token and no
+     stagger: leaflet re-creates a marker's DOM whenever its icon changes, so a
+     staggered delay would replay on every selection instead of only on arrival.
+     The global reduced-motion block above neutralises it for anyone who asks. */
+  animation: salon-pop var(--duration-slow) cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes salon-pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* "You are here". Google's blue rather than a brand colour on purpose: a rausch
+   dot among rausch-ringed salon bubbles reads as another salon. */
+.salon-user-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  background: rgb(66 133 244 / 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.salon-user-dot > span {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #4285f4;
+  border: 2.5px solid var(--color-canvas);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

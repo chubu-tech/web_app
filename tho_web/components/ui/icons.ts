@@ -32,6 +32,7 @@ import {
   Info,
   ListOrdered,
   Lock,
+  Mail,
   MapPin,
   Map as MapIcon,
   MessageCircle,
@@ -155,6 +156,8 @@ export const Icons = {
   /** The bell with something in it. Paired with `notification`: one concept, two states. */
   notificationActive: BellDot,
   phone: Phone,
+  /** `AppIcons.mail` — the email row on Profile, which is a fact and not a channel. */
+  mail: Mail,
 
   // ------------------------------------------------------------------- media --
   imageMissing: ImageIcon,

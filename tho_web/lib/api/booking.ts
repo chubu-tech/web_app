@@ -315,6 +315,17 @@ export async function createReviewWithPhotos(
  * Different bucket from a booking's reference photos, and deliberately so: a review
  * photo is published beside the review for everyone to see, whereas a reference photo
  * is a private instruction to one stylist.
+ *
+ * **This used to pass `upsert: true`, which could not have worked.** Every upload to
+ * `media` was failing for any non-service-role user, because `20260720000001` dropped
+ * the bucket's SELECT policy and an upsert quietly needs it. Nothing caught it here
+ * because there are **0 `review_photos` rows on live data**, so this path had never run;
+ * found while building 2e's avatar upload, which had the same bug.
+ * `20260804000003_media_own_object_select` in `../tho` fixes the root cause —
+ * `uploadAvatar` in `./profile.ts` carries the full note.
+ *
+ * The timestamp is kept regardless: a unique path is its own cache key, so no `?v=` is
+ * needed, and two photos on one review can never race for the same object.
  */
 export async function uploadReviewPhoto(
   supabase: SupabaseClient,
@@ -329,15 +340,14 @@ export async function uploadReviewPhoto(
   if (!user) throw new Error("Sign-in required to add a photo.");
 
   // Storage RLS requires the caller's uid as the first segment.
-  const objectPath = `${user.id}/reviews/${bookingId}-${index}.jpg`;
+  const objectPath = `${user.id}/reviews/${bookingId}-${index}-${Date.now()}.jpg`;
   const { error } = await supabase.storage
     .from("media")
-    .upload(objectPath, blob, { contentType, upsert: true });
+    .upload(objectPath, blob, { contentType });
   if (error) throw error;
 
   const {
     data: { publicUrl },
   } = supabase.storage.from("media").getPublicUrl(objectPath);
-  // Cache-bust so re-uploading to the same path shows immediately.
-  return `${publicUrl}?v=${Date.now()}`;
+  return publicUrl;
 }

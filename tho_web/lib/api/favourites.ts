@@ -3,16 +3,17 @@ import type { Business } from "../types/salon";
 import { toBusiness, withRating } from "./mappers";
 
 /**
- * Favourites and stylist follows, ported from `tho/app/lib/data/api.dart`.
+ * Favourites, ported from `tho/app/lib/data/api.dart`.
  *
- * These are the two writes a **guest** is deliberately allowed. Everything that
- * commits a guest to something — booking, queueing, ordering, messaging — is
- * refused by `private.is_real_user()`, but saving a salon is left open on
- * purpose: it is what makes upgrading worth doing, and because a guest upgrade
- * keeps the same user id, what they saved survives.
+ * Saving a salon is one of the two writes a **guest** is deliberately allowed
+ * (following a stylist is the other — see `./staff.ts`). Everything that commits a
+ * guest to something — booking, queueing, ordering, messaging — is refused by
+ * `private.is_real_user()`, but saving is left open on purpose: it is what makes
+ * upgrading worth doing, and because a guest upgrade keeps the same user id, what
+ * they saved survives.
  *
- * They are also the only direct table writes in the app. Everything else goes
- * through an RPC.
+ * `favorites` and `follows` were also the first direct table writes here. Chat added
+ * two more in 2d and `profiles` a fifth in 2e; everything else goes through an RPC.
  */
 
 export async function fetchMyFavouriteIds(
@@ -93,52 +94,8 @@ export async function setFavourite(
   }
 }
 
-export async function isFollowingStaff(
-  supabase: SupabaseClient,
-  staffId: string,
-): Promise<boolean> {
-  const { data } = await supabase
-    .from("follows")
-    .select("staff_member_id")
-    .eq("staff_member_id", staffId)
-    .maybeSingle();
-  return data != null;
-}
-
-export async function setFollowStaff(
-  supabase: SupabaseClient,
-  staffId: string,
-  follow: boolean,
-): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Sign-in required to follow a stylist.");
-
-  if (follow) {
-    const { error } = await supabase
-      .from("follows")
-      .upsert({ profile_id: user.id, staff_member_id: staffId });
-    if (error) throw error;
-  } else {
-    const { error } = await supabase
-      .from("follows")
-      .delete()
-      .eq("profile_id", user.id)
-      .eq("staff_member_id", staffId);
-    if (error) throw error;
-  }
-}
-
-/** Follower count from the `staff_follow_summary` view. */
-export async function fetchStaffFollowerCount(
-  supabase: SupabaseClient,
-  staffId: string,
-): Promise<number> {
-  const { data } = await supabase
-    .from("staff_follow_summary")
-    .select("follower_count")
-    .eq("staff_member_id", staffId)
-    .maybeSingle();
-  return Number(data?.follower_count ?? 0);
-}
+// The stylist-follow functions used to live here and **could not work** — they sent
+// `profile_id` where `follows` has `follower_profile_id`, and read
+// `follower_count` where the view has `followers`. Nothing called them, so nothing
+// caught it. They now live in `./staff.ts`, corrected, beside the page that uses
+// them.

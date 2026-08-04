@@ -178,9 +178,10 @@ export function HeroCircleButton({
 /**
  * Photo card for the Specialists grid.
  *
- * `href` is optional on purpose: the stylist profile is a later milestone, and a
- * card that links to a route which does not exist yet is worse than one that
- * doesn't link. It becomes a link the moment that page lands.
+ * `href` is optional on purpose: it was written before `/stylist/[id]` existed, because
+ * a card linking to a route that does not exist yet is worse than one that doesn't
+ * link. 2e landed that route, so the salon page now passes one — and the option stays,
+ * because the owner console will show the same grid for staff who have no public page.
  */
 export function SpecialistCard({
   name,

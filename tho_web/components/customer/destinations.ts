@@ -26,7 +26,7 @@ export type Destination = {
 /** The five app tabs. The **only** things in the bottom bar — see `SECONDARY`. */
 export const TABS: Destination[] = [
   { href: "/", label: "Discover", icon: Icons.discover, ready: true },
-  { href: "/map", label: "Map", icon: Icons.map, ready: false },
+  { href: "/map", label: "Map", icon: Icons.map, ready: true },
   { href: "/messages", label: "Chats", icon: Icons.chat, ready: true, badge: "messages" },
   { href: "/bookings", label: "Bookings", icon: Icons.booking, ready: true },
   { href: "/profile", label: "Profile", icon: Icons.person, ready: true },
@@ -55,8 +55,16 @@ export const SECONDARY: Destination[] = [
   { href: "/saved", label: "Saved", icon: Icons.favourite, ready: true },
   { href: "/orders", label: "My orders", icon: Icons.shopBag, ready: false },
   { href: "/rewards", label: "My rewards", icon: Icons.reward, ready: false },
-  { href: "/settings", label: "Settings", icon: Icons.settings, ready: false },
 ];
+
+// **Settings was here and is gone on purpose, not deferred.** The app's screen holds
+// two switches that write `notif_reminders` / `notif_promos` to SharedPreferences and
+// that *nothing reads back* — the screen says so itself — plus two read-only facts.
+// `profiles` has no preference columns at all, so there is nothing to persist and
+// nothing to honour. The two facts (time zone, version) are an About block on
+// `/profile`; a route holding a control that changes nothing would be the same
+// dishonesty as promising a notification nothing sends. It comes back with push, along
+// with the columns it would need.
 
 export const readyTabs = () => TABS.filter((d) => d.ready);
 export const readySecondary = () => SECONDARY.filter((d) => d.ready);

@@ -338,13 +338,18 @@ function Specialists({
   if (staff.length === 0) {
     return <p className="text-body-sm text-muted">No stylists listed yet.</p>;
   }
-  // No `href`: the stylist profile page is a later milestone, so these are cards
-  // rather than links until it exists.
+  // `href` at last — 2e landed `/stylist/[id]`, which is the reason `SpecialistCard`
+  // was written with an optional one rather than being a link from the start.
   return (
     <ul className="gap-md grid grid-cols-2 tablet:grid-cols-3">
       {staff.map((s) => (
         <li key={s.id}>
-          <SpecialistCard name={s.displayName} role={s.role} photoUrl={s.photoUrl} />
+          <SpecialistCard
+            name={s.displayName}
+            role={s.role}
+            photoUrl={s.photoUrl}
+            href={`/stylist/${s.id}`}
+          />
         </li>
       ))}
     </ul>

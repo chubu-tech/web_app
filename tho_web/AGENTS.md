@@ -10,14 +10,14 @@ The Bhutan Salons product in a browser: customers book chairs and join walk-in
 queues, owners run their salon, staff see their day. Next.js 16 (App Router),
 React 19, Tailwind 4, TypeScript.
 
-**Status: Phase 2d (inbox).** Browse, sign in, book, reschedule, cancel, review, take a
-place in a walk-in line, read notifications and message a salon all work against the real
-database. Next: **2e** the map, `/stylist/<id>` and profile editing → **2f** products,
-orders and loyalty. Then owner, then staff.
+**Status: Phase 2e (places and people).** Browse, sign in, book, reschedule, cancel,
+review, take a place in a walk-in line, read notifications, message a salon, find a shop
+on the map, read a stylist's profile and edit your own all work against the real database.
+Next: **2f** products, orders and loyalty. Then owner, then staff.
 
-The original 2d covered all eight of those surfaces at once — about four times the size of
-2c — so it was split three ways, ordered by value per line rather than by the old sequence:
-the seeded customer has 35 notifications and 3 conversations, while **one** salon sells
+The original 2d covered eight surfaces at once — about four times the size of 2c — so it
+was split three ways, ordered by value per line rather than by the old sequence: the
+seeded customer has 35 notifications and 3 conversations, while **one** salon sells
 products and **one** runs a loyalty programme.
 
 ## This repo owns no data
@@ -33,6 +33,11 @@ The database is the **`bsalons` Supabase project**, shared with:
 **Never write SQL here.** Schema changes belong in `../tho/supabase/migrations/`.
 Nothing in Phase 1 needed any: all 40 non-admin `SECURITY DEFINER` RPCs are
 already granted to `authenticated`.
+
+2e is the one milestone that has needed a migration, and it went upstream where it
+belongs — `20260804000001` + `20260804000002` in `../tho`, closing a privilege
+escalation this app's profile editor would otherwise have been built on top of. See
+**Editing a profile** below.
 
 ## Non-negotiables
 
@@ -142,7 +147,7 @@ a deliberate marketing-only layer that the product does not use.
 step**: if either platform changes a rule, both suites should change together. A
 silent off-by-one in Thimphu day bounds would corrupt every calendar view.
 
-Two places diverge from the Dart **on purpose**, both commented at the call site:
+Three places diverge from the Dart **on purpose**, all commented at the call site:
 
 1. **Availability and opening hours are judged in Thimphu time**, not the device's
    (`recommendations.ts`, `salon-copy.ts`). The app reads `DateTime.now()` locally,
@@ -150,6 +155,13 @@ Two places diverge from the Dart **on purpose**, both commented at the call site
 2. **A service with no recorded `gender` counts as "might suit"** (`api/discovery.ts`).
    SQL `IN` never matches NULL, and 24 of 31 live services have no gender — filtering
    strictly dropped 8 of the 10 salons that have any services at all.
+3. **One plausibility guard, measured from one point** (`geo.ts`). The app has two
+   150 km checks with *different* reference points — `_resolveLocation` from the Thimphu
+   centre, `MapTab.effectiveCenter` from the nearest located salon — so the map can
+   believe a fix Discover has already rejected, and the two then disagree about where
+   you are while both say "near you". `mapCenter` takes the same `Fix` as everything
+   else. The one `map_logic_test.dart` case that changes answer is pinned with its
+   reason in `geo.test.ts`.
 
 ## The UI kit
 
@@ -291,6 +303,122 @@ notification detail route**: the row already holds everything a detail page coul
 - Polling cadence lives in `usePollTick` — 3s a thread, 4s a queue place, 10s a wait badge,
   30s the nav badges. Hidden tabs don't poll; returning to one refreshes at once.
 
+## The map
+
+`/map` is one route with **two components and a hard boundary between them**.
+`salon-map.tsx` is the only file that touches leaflet and is the only thing loaded with
+`ssr: false` — `MapContainer` reads `window` while constructing. Everything else (search,
+the desktop rail, the preview card) renders server-side and works while ~150 KB of map is
+still arriving.
+
+- **Leaflet owns the DOM inside a marker**, so a bubble cannot be a React component; it is
+  an HTML string handed to `L.divIcon`. That is why the seeded gradient lives in
+  `lib/monogram.ts` rather than inside `CoverImage` — the bubble and the card sit on the
+  same screen and must agree about which gradient is Norzin.
+- The cover is an `<img alt="">` layered **over** the gradient, not a `background-image`.
+  A background would hide the monogram whenever it loaded; a failed `<img>` with an empty
+  alt renders nothing and reveals the gradient. `CoverImage`'s `onError` behaviour with no
+  JavaScript in an injected string.
+- **`app/globals.css` carries the only component CSS in the project**, at the bottom:
+  greyscale tiles, the bubble, the user dot. All three target DOM leaflet generates, which
+  no utility class can reach.
+- **Attribution is rendered and the app does not render it.** OSM's tile usage policy
+  requires visible credit and rules out bulk use; a public website is exactly what it is
+  written for. Real traffic needs a paid tile host, not a bigger cache.
+- **Selection is derived, never reset in an effect.** `Choice` is `{ query, id }` — the
+  stamp is what lets `id: null` mean "cleared by tapping the map" while still letting a new
+  search fall back to the nearest, which is what `didUpdateWidget` does. Panning is the one
+  effect, because it is a call into an imperative library.
+- The height subtracts chrome directly (`100svh` minus the tab bar or the top nav): a
+  leaflet container needs a definite height, and `main` is a flex child of a `min-h-full`
+  column. While `InLineBar` is up, the map page scrolls by that bar's height — accepted, in
+  writing, rather than measuring chrome at runtime for one route.
+
+## Following a stylist
+
+`/stylist/[id]` is a port of `staff_profile_screen.dart`, and two things about it are not
+obvious from the Dart:
+
+- **The page 404s unless the salon is visible.** `staff_select` lets `anon` read active
+  staff of an `is_active` business and does **not** require `status = 'approved'`, which
+  `businesses_select` does — so a *pending* salon's staff row is public while its own page
+  correctly 404s. There is a live example (`Karma Lhendup` at `Highland Barbers`). Read the
+  staff row, then the business, and refuse what the salon page refuses.
+- **`staff_follow_summary` is a definer view**, created without `security_invoker` and
+  granted to `anon`. That is the only reason a follower count exists: `follows_select` is
+  `follower_profile_id = auth.uid()`, so an RLS-scoped read could only count your own. Do
+  not read its sibling `business_rating_summary` as equivalent — that one *does* set
+  `security_invoker=true`.
+- **A guest may follow.** `follows_insert` requires no `private.is_real_user()`, so
+  following sits with favouriting rather than with booking: nobody is committed, and an
+  upgrade keeps the user id. No wall.
+- Reviews carry **no reviewer name**, as in the app — `profiles_select` will not hand
+  another customer's row over, so it is not available to ask for.
+
+Both follow functions were written in Phase 1 against the wrong column names
+(`profile_id` for `follower_profile_id`, `follower_count` for `followers`) and never
+called, so nothing caught them until the button existed. Press a new write against the
+live database before believing its shape.
+
+## Editing a profile
+
+**`profiles` is written directly, because there is no RPC** — no `update_my_profile`
+exists in any migration, so `profiles_update` (`id = (select auth.uid())`) is the
+authority, exactly as `messages_insert` is for a message. `lib/api/profile.ts` sends a
+**four-column whitelist**: `full_name`, `phone`, `avatar_url`, `updated_at`.
+
+That whitelist used to be the *only* thing standing anywhere. Until
+`20260804000002_profiles_updatable_columns` in `../tho`, `authenticated` held table-wide
+UPDATE on `profiles`, `profiles_update` constrained only the row, there was no trigger,
+and `private.is_admin()` reads `profiles.role` — so **any signed-in user could
+`set role = 'admin'`** and unlock 8 RLS read policies plus all 21 `admin_*` RPCs.
+Demonstrated against the live database, then closed by revoking the table-wide grant and
+handing back only those four columns. Two lessons worth keeping:
+
+- **A column-level `REVOKE` cannot carve an exception out of a table-level `GRANT`.** The
+  first attempt (`20260804000001`) reported success and changed nothing. Only
+  `has_table_privilege` distinguishes the two states; `has_column_privilege` is true either
+  way. `supabase/tests/profiles_privilege_test.sql` pins both.
+- **`phone` is the SMS destination** the outbox worker looks for, and the app has no way to
+  set it. Editing it here is the divergence; the honest limits are in the doc comment — the
+  `auth.users → profiles` sync is one-way, and no gateway exists, so no copy promises a
+  message.
+
+**There is no `/settings`.** The app's screen is two switches nothing reads plus two facts;
+the facts are an About block on `/profile` and the switches are not ported. `destinations.ts`
+says so where the entry used to be.
+
+## Uploading to the `media` bucket
+
+Two rules, both learned by measurement rather than from the schema:
+
+- **The caller's uid is the first path segment.** `media_auth_insert` requires
+  `(storage.foldername(name))[1] = auth.uid()`, so any other layout is refused — including
+  the layout the *seed* used (`avatar/<uid>.jpg`), which only worked because the seed ran
+  as the service role. A path copied from live data is not proof of a legal path.
+- **A fresh path per upload, never `upsert: true`.** Building 2e's avatar upload found
+  that **every** upload to `media` was failing for any non-service-role user, in the
+  Flutter app as well as here — `Api.uploadImage` passes `upsert: true` unconditionally,
+  so avatars, covers, business photos, staff photos, service images and review photos all
+  returned *403 "new row violates row-level security policy"* for paths the INSERT policy
+  plainly allows.
+
+  The cause: `20260720000001` dropped the bucket's broad SELECT policy to stop
+  enumeration, reasoning that the app never calls `storage.list()`. Two write paths list
+  implicitly — an upsert becomes `insert … on conflict do update`, which Postgres permits
+  only when the conflicting row is *selectable*; and `remove()` resolves its prefixes
+  under RLS, so with nothing selectable it deleted nothing and returned **200 with `[]`**.
+  A silent no-op is why replaced photos were orphaning.
+
+  `20260804000003_media_own_object_select` in `../tho` restores a SELECT **scoped to the
+  caller's own folder** — narrower than what was dropped, so enumeration stays closed —
+  and `supabase/tests/media_storage_policies_test.sql` pins both halves. `tho_web` still
+  uses unique paths, because they are better than an upsert anyway: a new path is its own
+  cache key, so nothing needs a `?v=`, and two writes can never race.
+
+Measure a storage write against the live bucket before believing it. Both of these looked
+correct in review, and one of them had been shipping broken for four migrations.
+
 ## The nav's rule below 744
 
 `TABS` — the five the app has — are the **only** things in the bottom bar. `SECONDARY`
@@ -337,6 +465,23 @@ Check assumptions against it before trusting a column:
 - **No `payments`, `offers` or `review_photos` rows exist at all**, so the receipt's
   payments block, the offers section and the review photo strip have no live example — all
   three are covered by unit tests instead.
+- **11 of the 13 approved salons have coordinates.** The two without are on Discover and
+  absent from the map, which is what its "once they add a location" copy is for. `Test 01`
+  and `Test 2` are **6 m apart**, so their bubbles overlap at every zoom and they are the
+  live example of `nearestTo`'s tie-break.
+- **The specialist surfaces are the thinnest data in the product**: 21 visible staff but
+  `staff_photos` has **2 rows platform-wide** and `follows` has **3**, so both empty states
+  are the normal path. `Sonam Dorji` at Norzin is the only full example — 3 reviews, 1
+  follower, 1 photo.
+- **1 of 17 profiles has an avatar and 2 have a phone**, both seeded. The app cannot set a
+  phone at all, which is why every notification fails with "no deliverable channel".
+- **The local `../tho` checkout can be behind the live schema.** Two migrations were
+  applied on 2026-08-03 (`register_device_rpc`, `booking_reminder_mute`) with no file in the
+  local `supabase/migrations/`; they turned out to be on `origin/main`, **8 commits ahead**
+  of the local `main`. Fetch before concluding that something is missing upstream — and
+  note that the same fetch shows FCM push delivery, multi-service bookings and final
+  pricing have landed in the app, all of which this repo mirrors and none of which it has
+  yet.
 - Seeded logins exist and are email-confirmed — `customer@bhutansalons.test` and
   friends, password in `../tho/supabase/seed.sql`. Useful for verification; the app's
   dev quick-login chips are deliberately **not** ported to the web.
