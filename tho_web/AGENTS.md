@@ -10,10 +10,9 @@ The Bhutan Salons product in a browser: customers book chairs and join walk-in
 queues, owners run their salon, staff see their day. Next.js 16 (App Router),
 React 19, Tailwind 4, TypeScript.
 
-**Status: Phase 2b (book).** Browse, sign in, book, reschedule, cancel and review
-all work against the real database. Next: 2c the walk-in queue (`/q/<id>` as the QR
-target, plus the walk-in card and the "I'm here" check-in deferred from 2a/2b) → 2d
-products, loyalty, chat, notifications, settings, map. Then owner, then staff.
+**Status: Phase 2c (queue).** Browse, sign in, book, reschedule, cancel, review, and
+take a place in a walk-in line all work against the real database. Next: 2d products,
+loyalty, chat, notifications, settings, map. Then owner, then staff.
 
 ## This repo owns no data
 
@@ -177,6 +176,11 @@ somewhere unfinished — flip the flag in the milestone that lands the route. Sa
 for links inside pages: `SpecialistCard` takes an optional `href` for exactly this
 reason.
 
+The queue is **not** a destination and should not become one: it is contextual chrome
+(`InLineBar`, shown only while a place is actually held), which is what the app's
+queue FAB is too. A permanent tab for something you are in for twenty minutes a month
+would be a tab that is nearly always a dead end.
+
 ## Booking
 
 - **The idempotency key belongs to the caller.** `create_booking` catches its own
@@ -197,6 +201,45 @@ reason.
   vanished while the screen was being popped. Do not regress it to a toast.
 - Errors are mapped by `errcode`, not message text — see `lib/api/booking-errors.ts`.
 
+## The walk-in queue
+
+**Two routes, two different jobs, and their names are not interchangeable:**
+`/q/<businessId>` **joins**, `/queue/<entryId>` **watches**. `/q/<id>` is the printed
+QR's target and its shape is fixed by `QueueDeepLink.businessIdFrom` in `../tho`, which
+parses both the custom scheme and `https://<host>/q/<id>` — one poster, both clients.
+Renaming it breaks every QR already on a counter.
+
+- **Arriving at `/q/<id>` counts as a scan** (`p_via_qr`); joining from the salon
+  page's card does not. That mirrors the app's deep-link handler. A forwarded URL is
+  the known weakness and the app shares it — `qr_only` is a nudge to be in the shop,
+  not an attestation.
+- **`p_via_qr` is always sent explicitly.** `join_queue` has two overloads and the
+  4-arg one delegates with `false`; the intent belongs at the call site, not in a
+  migration.
+- **`queue_active_line`, never a table read.** A customer's RLS-scoped read of
+  `queue_entries` returns only their own row, which makes position and ETA compute as
+  "#1 · 0 min" against a one-element list. The RPC's projection is PII-free and omits
+  `business_id`, so `toQueueEntry` takes a fallback — without it every row from the one
+  read the live view polls fails to map, and a 200 surfaces as "check your connection".
+- **`line: null` means unknown; `[]` means empty.** Keep them apart all the way to
+  `QueueWaitBadge`. The RPC is revoked from `anon`, so *unknown* is the ordinary state
+  for a signed-out visitor — rendering it as "0 waiting · ~0 min" advertises an instant
+  walk-in on nothing but a permission error.
+- **A service and a stylist ARE independent here** — the opposite of booking.
+  `join_queue` only checks that each belongs to the salon; it never consults
+  `service_staff`. Do not copy the booking picker's narrowing into the join form.
+- **P0004 means two different things.** "Scan the shop's QR" from `join_queue`,
+  "outside the check-in window" from `check_in_booking`. `lib/api/queue-errors.ts` maps
+  by (RPC, code) for that reason; one shared table would be wrong half the time.
+- Nothing here can *call* the next customer — that is the owner board, Phase 3. The
+  salon runs its line in the Flutter app while the customer holds their place here.
+
+**Nothing promises a notification.** The app's card says "we'll notify you"; every
+`queue_your_turn` row in the outbox is `failed` with "no deliverable channel", and
+`devices` has no rows, so that promise is kept by nothing on any platform. The web card
+says the page updates itself instead. When Web Push lands (2d), `QueuePositionCard` is
+where the copy changes back.
+
 ## Live data is messier than it looks
 
 Check assumptions against it before trusting a column:
@@ -214,6 +257,11 @@ Check assumptions against it before trusting a column:
   authority on what is bookable, not `services`.
 - No salon is on **Pro** (10 basic, 3 growth), so the Pro-gated hairstyle picker never
   appears on live data. Its gate is covered by unit tests instead.
+- **Only Norzin can actually run a queue.** Three salons are on Growth, but `Test 01`
+  and `Zhiwaling Spa & Hair` have 0 staff and 0 services, so their join form has nothing
+  to pick — it says so rather than offering an unsubmittable form. And every salon is
+  `queue_join_mode = 'anywhere'`, so `queueLockState`'s `needs_scan` branch has no live
+  example either; unit tests are its only coverage.
 - Seeded logins exist and are email-confirmed — `customer@bhutansalons.test` and
   friends, password in `../tho/supabase/seed.sql`. Useful for verification; the app's
   dev quick-login chips are deliberately **not** ported to the web.

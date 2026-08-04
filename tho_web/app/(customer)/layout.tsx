@@ -1,4 +1,5 @@
 import { CustomerTabBar, CustomerTopNav } from "@/components/customer/customer-nav";
+import { InLineBar } from "@/components/customer/in-line-bar";
 import { getAccount } from "@/lib/session";
 
 /**
@@ -22,6 +23,9 @@ export default async function CustomerLayout({
   return (
     <div className="flex min-h-full flex-col">
       <CustomerTopNav signedIn={account.state === "registered"} />
+      {/* Below the nav rather than above it, so the shop's chrome stays where it is
+          and the bar reads as a notice about *this* session, not part of the site. */}
+      <InLineBar />
       <main className="flex-1 pb-[calc(62px+env(safe-area-inset-bottom))] tablet:pb-0">
         {children}
       </main>

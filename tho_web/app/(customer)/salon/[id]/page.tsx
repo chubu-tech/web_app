@@ -4,6 +4,7 @@ import { FavouriteButton } from "@/components/customer/favourite-button";
 import { SalonBooking } from "@/components/customer/salon-booking";
 import { SalonTabs } from "@/components/customer/salon-tabs";
 import { ShareButton } from "@/components/customer/share-button";
+import { WalkInCard } from "@/components/customer/walk-in-card";
 import { CoverImage } from "@/components/ui/cover-image";
 import {
   ActionCircle,
@@ -31,9 +32,12 @@ import {
   fetchServiceStaff,
   fetchStaff,
 } from "@/lib/api/salon";
+import { fetchActiveLine } from "@/lib/api/queue";
 import { coverageLine, dayName, hhmm, todayHoursLine } from "@/lib/salon-copy";
+import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { hasLocation, offerEndsLabel, travels } from "@/lib/types/salon";
+import type { QueueEntry } from "@/lib/types/queue";
+import { hasLocation, offerEndsLabel, runsQueue, travels } from "@/lib/types/salon";
 import type { Review } from "@/lib/types/salon";
 import { whatsappUrl } from "@/lib/whatsapp";
 
@@ -117,6 +121,20 @@ export default async function SalonPage({
     // Which stylist can do which service. Not decorative: an incompatible pair is
     // refused by `create_booking`, so the picker must not offer one.
     fetchServiceStaff(supabase, id).catch(() => ({}) as Record<string, string[]>),
+  ]);
+
+  /**
+   * The walk-in line, read once for the card's badge — and **only** for a salon that
+   * actually runs a queue, so 10 of the 13 live salons don't pay for an RPC whose card
+   * never renders. `queue_active_line` is revoked from `anon`, so this legitimately
+   * fails for a signed-out visitor; `null` reaches the badge as "Wait unknown" rather
+   * than a fabricated zero.
+   */
+  const [account, queueLine] = await Promise.all([
+    getAccount(),
+    runsQueue(business)
+      ? fetchActiveLine(supabase, id).catch(() => null as QueueEntry[] | null)
+      : Promise.resolve(null),
   ]);
 
   const isTravelling = travels(business);
@@ -226,6 +244,19 @@ export default async function SalonPage({
             ) : null}
             <ShareButton name={business.name} variant="action" />
           </div>
+
+          {/* Straight after the contact actions and before the reading, matching
+              `business_detail_screen.dart:343`. If the shop takes walk-ins and you
+              are standing outside it, that is the faster of the two paths. */}
+          {runsQueue(business) ? (
+            <WalkInCard
+              business={business}
+              services={services}
+              staff={staff}
+              initialLine={queueLine}
+              hasSession={account.user != null}
+            />
+          ) : null}
 
           {offers.length > 0 ? (
             <section className="mt-lg">

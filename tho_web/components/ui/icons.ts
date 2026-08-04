@@ -27,6 +27,7 @@ import {
   Image as ImageIcon,
   Info,
   ListOrdered,
+  Lock,
   MapPin,
   Map as MapIcon,
   MessageCircle,
@@ -95,6 +96,8 @@ export const Icons = {
   /** The password reveal toggle. Paired: one concept, two states. */
   visible: Eye,
   hidden: EyeOff,
+  /** A feature this salon's plan doesn't include — never a security padlock. */
+  locked: Lock,
 
   // --------------------------------------------------------------- the salon --
   salon: Store,

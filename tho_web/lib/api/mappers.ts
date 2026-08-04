@@ -21,6 +21,7 @@ import type {
   Slot,
   WorkingHour,
 } from "../types/booking";
+import { queueStatusFromWire, type QueueEntry } from "../types/queue";
 
 /**
  * Row → model mappers, one per table, ported from the `fromMap` factories in
@@ -267,6 +268,48 @@ export function toPayment(m: Row): Payment {
     kind: str(m.kind) ?? "payment",
     method: str(m.method) ?? "cash",
     createdAt: new Date(m.created_at as string),
+  };
+}
+
+/**
+ * A queue entry, ported from `QueueEntry.fromMap`.
+ *
+ * **Three read paths, three different row shapes**, and the differences are
+ * load-bearing rather than cosmetic:
+ *
+ * 1. The `queue_active_line` RPC returns a flat, deliberately PII-free row —
+ *    `service_minutes` and `serving_remaining_min` as plain columns, no
+ *    `businesses` embed, and **no `business_id` at all**, because the caller named
+ *    the shop in `p_business`. Hence `fallbackBusinessId`: without it every row
+ *    from the one read the live view actually polls fails to map, and a 200
+ *    response surfaces to the customer as "check your connection".
+ * 2. A direct `queue_entries` read embeds `services(duration_minutes)` and
+ *    `businesses(name)`.
+ * 3. `join_queue` / `check_in_booking` return the bare row with no embeds.
+ *
+ * The embed wins over the flat column when both are present, and `serviceMinutes`
+ * defaults to 20 — the same default `queue_active_line` coalesces to server-side,
+ * so a service-less walk-in is costed identically on both sides.
+ */
+export function toQueueEntry(m: Row, fallbackBusinessId?: string): QueueEntry {
+  const service = (m.services ?? null) as Row | null;
+  const biz = (m.businesses ?? null) as Row | null;
+  const embedded = service ? numOrNull(service.duration_minutes) : null;
+
+  return {
+    id: m.id as string,
+    businessId: str(m.business_id) ?? fallbackBusinessId ?? "",
+    staffMemberId: str(m.staff_member_id),
+    serviceId: str(m.service_id),
+    customerProfileId: str(m.customer_profile_id),
+    bookingId: str(m.booking_id),
+    customerName: str(m.customer_name),
+    status: queueStatusFromWire(str(m.status)),
+    priorityAt: dateOrNull(m.priority_at),
+    joinedAt: new Date(m.joined_at as string),
+    serviceMinutes: embedded ?? numOrNull(m.service_minutes) ?? 20,
+    servingRemainingMinutes: numOrNull(m.serving_remaining_min) ?? 0,
+    businessName: biz ? str(biz.name) : null,
   };
 }
 

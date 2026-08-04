@@ -22,7 +22,7 @@ import {
   outstandingNu,
   type Payment,
 } from "@/lib/types/booking";
-import { hasLocation, travels } from "@/lib/types/salon";
+import { hasLocation, runsQueue, travels } from "@/lib/types/salon";
 import { formatNu } from "@/lib/utils";
 import { whatsappUrl } from "@/lib/whatsapp";
 
@@ -94,6 +94,43 @@ export default async function BookingDetailPage({
             minute: "2-digit",
             timeZone: "Asia/Thimphu",
           })}.`,
+    };
+  }
+
+  /**
+   * The check-in window, per `20260731000002_queue_checkin_window_and_locking.sql`:
+   * it opens 2 hours before `start_ts` and closes 1 hour after `end_ts`.
+   *
+   * Computed here so the page can *state* it rather than let the customer discover it
+   * as a P0004 rejection — the same treatment the cancellation window above gets, and
+   * the same narrow `purity` suppression for the same reason: this page reads cookies,
+   * so it is always rendered per request and "now" is genuinely now.
+   *
+   * `null` — no button at all — when the salon runs no queue. `runsQueue` is stricter
+   * than the RPC, which gates on the plan alone; see `BookingActions` for why that
+   * difference matters.
+   */
+  let checkIn: { open: boolean; note: string } | null = null;
+  if (active && business && runsQueue(business)) {
+    const opensAt = new Date(booking.startTs.getTime() - 2 * 3_600_000);
+    const closesAt = new Date(booking.endTs.getTime() + 3_600_000);
+    // eslint-disable-next-line react-hooks/purity
+    const now = Date.now();
+    const open = now >= opensAt.getTime() && now <= closesAt.getTime();
+    checkIn = {
+      open,
+      note: open
+        ? "You can check in now — this adds you to the shop's line ahead of walk-ins."
+        : now < opensAt.getTime()
+          ? `Check-in opens ${opensAt.toLocaleString("en-GB", {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "Asia/Thimphu",
+            })}.`
+          : "This appointment is too old to check in.",
     };
   }
 
@@ -245,6 +282,7 @@ export default async function BookingDetailPage({
           booking={booking}
           alreadyReviewed={reviewedIds.has(booking.id)}
           cancellationNote={cancellationNote}
+          checkIn={checkIn}
         />
       </div>
     </div>

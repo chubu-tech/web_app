@@ -13,23 +13,24 @@ import {
   uploadReviewPhoto,
 } from "@/lib/api/booking";
 import { bookingErrorMessage } from "@/lib/api/booking-errors";
+import { checkInBooking } from "@/lib/api/queue";
+import { checkInErrorMessage } from "@/lib/api/queue-errors";
 import { createClient } from "@/lib/supabase/client";
 import type { Booking } from "@/lib/types/booking";
 import { cn } from "@/lib/utils";
 import { ReviewSheet, type ReviewResult } from "./review-sheet";
 
 /**
- * The actions on a booking: reschedule, cancel, or review it.
+ * The actions on a booking: check in, reschedule, cancel, or review it.
  *
  * Which ones appear is decided by the booking's own state, exactly as in
- * `booking_detail_screen.dart:417`. **"I'm here — check in" is not here**: it hands the
- * booking to the shop's walk-in queue and lands on the live position view, so it
- * arrives with the queue rather than as a button leading nowhere.
+ * `booking_detail_screen.dart:417`.
  */
 export function BookingActions({
   booking,
   alreadyReviewed,
   cancellationNote,
+  checkIn,
 }: {
   booking: Booking;
   alreadyReviewed: boolean;
@@ -38,6 +39,19 @@ export function BookingActions({
    * discovered as an RPC rejection. Computed on the server — see the page.
    */
   cancellationNote: { text: string; closed: boolean } | null;
+  /**
+   * Whether this salon runs a walk-in line at all, and what its check-in window
+   * allows — both resolved on the server, since only the page knows the salon.
+   *
+   * `null` means no queue here, and the button is **absent** rather than present and
+   * doomed. That is a deliberate departure from the app, which offers it on every
+   * active booking and lets the RPC explain: on live data that fails at 10 of 13
+   * salons, and worse, `check_in_booking` gates on the *plan* alone — so at a Growth
+   * salon whose owner switched the queue off, the app's button **succeeds** and drops
+   * the customer into a line whose board nobody opens. Waiting for a turn that will
+   * never be called is not an error the customer can read.
+   */
+  checkIn: { open: boolean; note: string } | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -60,6 +74,23 @@ export function BookingActions({
     } catch (caught) {
       toast.error(bookingErrorMessage(caught, "Couldn't cancel."));
     } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Hand this booking to the shop's line.
+   *
+   * Idempotent server-side: an already-checked-in booking returns its existing entry,
+   * so a second press lands on the same place rather than creating a second one.
+   */
+  async function doCheckIn() {
+    setBusy(true);
+    try {
+      const entry = await checkInBooking(createClient(), booking.id);
+      router.push(`/queue/${entry.id}`);
+    } catch (caught) {
+      toast.error(checkInErrorMessage(caught));
       setBusy(false);
     }
   }
@@ -122,6 +153,35 @@ export function BookingActions({
           )}
           {cancellationNote.text}
         </p>
+      ) : null}
+
+      {/* The window, stated before the button — the same courtesy the cancellation
+          note above already extends, and for the same reason: "check-in opens 2 hours
+          before your appointment" is more use as a fact than as a rejection. */}
+      {active && checkIn ? (
+        <>
+          <p
+            className={cn(
+              "text-body-sm text-ink p-md gap-sm flex items-start rounded-sm",
+              checkIn.open ? "bg-success-soft" : "bg-surface-soft",
+            )}
+          >
+            <Icons.queue
+              className={cn("mt-0.5 shrink-0", checkIn.open ? "text-success-text" : "text-muted")}
+              style={{ width: IconSize.xs, height: IconSize.xs }}
+              aria-hidden
+            />
+            {checkIn.note}
+          </p>
+          <Button
+            variant="outlined"
+            fullWidth
+            disabled={!checkIn.open || busy}
+            onClick={doCheckIn}
+          >
+            I&apos;m here — check in
+          </Button>
+        </>
       ) : null}
 
       {active ? (
