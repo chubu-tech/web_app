@@ -74,6 +74,9 @@ function salon(id: string, lat: number, lng: number): Business {
     queueEnabled: false,
     queueJoinMode: "anywhere",
     reminderChannel: "push",
+    monthlyRevenueGoal: null,
+    rebookingEnabled: false,
+    rebookingDays: 30,
   };
 }
 

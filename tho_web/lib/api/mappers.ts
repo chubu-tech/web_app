@@ -3,6 +3,7 @@ import type {
   Business,
   BusinessPhoto,
   BusinessType,
+  CatalogService,
   Category,
   Hairstyle,
   Offer,
@@ -74,6 +75,12 @@ export function toBusiness(m: Row): Business {
     queueEnabled: (m.queue_enabled as boolean | null) ?? true,
     queueJoinMode: ((str(m.queue_join_mode) ?? "anywhere") as QueueJoinMode),
     reminderChannel: str(m.reminder_channel) ?? "push",
+    // The owner console's settings form is the only reader of these three, added in 3b so a
+    // field can show what is stored rather than an empty box over a real value. `null` is a
+    // meaningful goal — the dashboard gauge reads it as "no target".
+    monthlyRevenueGoal: numOrNull(m.monthly_revenue_goal),
+    rebookingEnabled: (m.rebooking_enabled as boolean | null) ?? false,
+    rebookingDays: numOrNull(m.rebooking_days) ?? 30,
   };
 }
 
@@ -125,6 +132,24 @@ export function toStaffMember(m: Row): StaffMember {
     profileId: str(m.profile_id),
     photoUrl: str(m.photo_url),
     businessId: str(m.business_id),
+    // Both NOT NULL DEFAULT 0 in the table, so the fallback only covers a select that
+    // named neither column — `fetchStaffById`'s narrow public projection does exactly
+    // that, and 0 is the honest answer there rather than a missing field.
+    commissionPct: numOrNull(m.commission_pct) ?? 0,
+    baseSalaryNu: numOrNull(m.base_salary_nu) ?? 0,
+  };
+}
+
+export function toCatalogService(m: Row): CatalogService {
+  return {
+    id: m.id as string,
+    slug: m.slug as string,
+    name: m.name as string,
+    gender: m.gender as string,
+    category: m.category as string,
+    defaultImageUrl: str(m.default_image_url),
+    defaultDurationMinutes: numOrNull(m.default_duration_minutes) ?? 30,
+    defaultPrice: numOrNull(m.default_price) ?? 0,
   };
 }
 

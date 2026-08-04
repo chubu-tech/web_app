@@ -47,6 +47,9 @@ function biz(id: string, at?: { lat: number; lng: number }): Business {
     queueEnabled: true,
     queueJoinMode: "anywhere",
     reminderChannel: "push",
+    monthlyRevenueGoal: null,
+    rebookingEnabled: false,
+    rebookingDays: 30,
   };
 }
 

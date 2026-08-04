@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { CoverImage } from "@/components/ui/cover-image";
 import { Icons, IconSize } from "@/components/ui/icons";
@@ -11,10 +12,12 @@ import { cn } from "@/lib/utils";
  * Which salon the console is showing, and how to change it — a port of
  * `business_home.dart`'s `_SalonTitle` and `_showSalonPicker`.
  *
- * **Plain text with one salon, a button with more.** The app makes the title tappable
- * only when `allBusinesses.length > 1`, and that restraint is worth keeping: a control
- * that opens a list of one is a control that lies about having a choice. The seeded owner
- * runs **nine**, so both states are live.
+ * **The title always opens the sheet.** 3a kept the app's rule — tappable only when
+ * `allBusinesses.length > 1`, because a control that opens a list of one lies about having
+ * a choice. 3b changes it, because the sheet now ends in **Add a salon** and so is never a
+ * list of one: an owner with a single shop opening a second one has to be able to reach the
+ * form, and this is the one place in the console that is *about* which salon you are in.
+ * The seeded owner runs **nine**, so the crowded case is live too.
  *
  * Each row is a real form `POST` to `/business/active-salon`, not an `onClick`. That is
  * what lets the switch set an `httpOnly` cookie the server layout can read on the very
@@ -34,10 +37,11 @@ export function SalonSwitcher({
   businesses: Business[];
 }) {
   const [open, setOpen] = useState(false);
-  const canSwitch = businesses.length > 1;
 
   // An owner with no salon at all: an operator created the account before the shop. The
-  // header still has to say something, and "no salon yet" is the honest thing.
+  // header still has to say something, and "no salon yet" is the honest thing. No sheet
+  // here — `NoSalonYet` fills the page below with the same link, and a header control
+  // duplicating the page's only call to action would just be two of them.
   if (!active) {
     return (
       <div className="min-w-0">
@@ -55,8 +59,6 @@ export function SalonSwitcher({
       </span>
     </span>
   );
-
-  if (!canSwitch) return <div className="min-w-0 flex-1 tablet:flex-none">{label}</div>;
 
   return (
     <>
@@ -113,6 +115,23 @@ export function SalonSwitcher({
               </li>
             );
           })}
+          <li>
+            <Link
+              href="/business/new"
+              onClick={() => setOpen(false)}
+              className="gap-base py-md hover:bg-surface-soft flex w-full items-center text-left"
+            >
+              <span className="bg-surface-strong text-muted grid size-11 shrink-0 place-items-center rounded-sm">
+                <Icons.add style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="text-title text-ink block font-medium">Add a salon</span>
+                <span className="text-caption-sm text-muted block">
+                  A second shop, on its own plan
+                </span>
+              </span>
+            </Link>
+          </li>
         </ul>
       </Sheet>
     </>

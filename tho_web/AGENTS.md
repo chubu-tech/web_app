@@ -10,15 +10,17 @@ The Bhutan Salons product in a browser: customers book chairs and join walk-in
 queues, owners run their salon, staff see their day. Next.js 16 (App Router),
 React 19, Tailwind 4, TypeScript.
 
-**Status: Phase 3a (the owner's day).** The customer role works end to end — browse, sign
-in, book, reschedule, cancel, review, take a place in a walk-in line, read notifications,
-message a salon, find a shop on the map, read a stylist's profile and edit your own. And now
-**an owner signs in to their own console**: today's book, the whole lifecycle of a booking,
-the live walk-in board, and booking someone in at the counter.
+**Status: Phase 3b (owner setup).** The customer role works end to end — browse, sign in,
+book, reschedule, cancel, review, take a place in a walk-in line, read notifications, message a
+salon, find a shop on the map, read a stylist's profile and edit your own. An owner signs in to
+their own console: today's book, the whole lifecycle of a booking, the live walk-in board, and
+booking someone in at the counter (3a) — and now **everything their salon is made of**:
+services and the common-services catalogue, the team and what each of them does, stylist working
+hours, the salon's own opening hours, the salon profile with its map pin, and creating a salon.
 
-3a is the first of three owner slices. Next: **3b** setup (services, staff, hours, the salon
-profile) and **3c** the back office (insights, client book, orders, loyalty, plan). **2f** —
-the customer shop — is still outstanding and now sits behind them.
+Two of three owner slices are in. Next: **3c** the back office (insights, client book, orders,
+offers, loyalty, the owner inbox, plan & billing with the upgrade request put back). **2f** —
+the customer shop — is still outstanding and sits behind it.
 
 The original 2d covered eight surfaces at once — about four times the size of 2c — so it
 was split three ways, ordered by value per line rather than by the old sequence: the
@@ -40,17 +42,20 @@ The database is the **`bsalons` Supabase project**, shared with:
 Nothing in Phase 1 needed any: all 40 non-admin `SECURITY DEFINER` RPCs are
 already granted to `authenticated`.
 
-Two milestones have needed a migration, and both went upstream where they belong — and both
-were the same class of bug, found the same way: by being the first client to put an editor on
+Three milestones have needed a migration, all went upstream where they belong, and all three
+were the **same class of bug**, found the same way: by being the first client to put an editor on
 a table.
 
 - `20260804000001` + `20260804000002` — **any signed-in user could make themselves an
   admin.** See **Editing a profile**.
 - `20260804000004` — **any owner could put their own salon on Pro and approve it past
   review.** See **The owner console** below.
+- `20260805000001` — **any owner could set payroll their plan does not include, and attach any
+  account as staff of their salon.** See **`staff_members` had it too**.
 
-Both are worth reading before adding a write anywhere: the pattern is that RLS constrains the
-*row* and says nothing about the *columns*, so a table-wide `GRANT` is the whole gate.
+Read one of them before adding a write anywhere: RLS constrains the *row* and says nothing about
+the *columns*, so a table-wide `GRANT` is the whole gate. And check `has_table_privilege`, not
+`has_column_privilege` — the latter answers true either way while the table grant is held.
 
 ## Non-negotiables
 
@@ -168,13 +173,13 @@ a deliberate marketing-only layer that the product does not use.
 ## Ported logic
 
 `lib/time.ts`, `lib/calendar-logic.ts`, `lib/booking-guards.ts`,
-`lib/discover-logic.ts`, `lib/recommendations.ts`, `lib/salon-filters.ts` and
+`lib/discover-logic.ts`, `lib/recommendations.ts`, `lib/salon-filters.ts`, `lib/hours.ts` and
 `lib/whatsapp.ts` are ports of the Dart originals, and their tests are ports of
 `../tho/app/test/*_test.dart` with the same cases and expectations. **Keep them in
 step**: if either platform changes a rule, both suites should change together. A
 silent off-by-one in Thimphu day bounds would corrupt every calendar view.
 
-Three places diverge from the Dart **on purpose**, all commented at the call site:
+Four places diverge from the Dart **on purpose**, all commented at the call site:
 
 1. **Availability and opening hours are judged in Thimphu time**, not the device's
    (`recommendations.ts`, `salon-copy.ts`). The app reads `DateTime.now()` locally,
@@ -182,7 +187,12 @@ Three places diverge from the Dart **on purpose**, all commented at the call sit
 2. **A service with no recorded `gender` counts as "might suit"** (`api/discovery.ts`).
    SQL `IN` never matches NULL, and 24 of 31 live services have no gender — filtering
    strictly dropped 8 of the 10 salons that have any services at all.
-3. **One plausibility guard, measured from one point** (`geo.ts`). The app has two
+3. **`lib/hours.ts` is 24-hour**, where `hours_model.dart` has `formatMinutes12` ("8:30 am")
+   for the design mock. Every time in `tho_web` is `HH:MM`, and `<input type="time">` — which
+   replaces Flutter's `showTimePicker` — reads and writes 24-hour, so a gap pill saying "1:00 pm"
+   beside an input saying "13:00" would be worse than diverging from the mock. The three
+   affected test cases port as 24-hour equivalents, including the 1440 boundary.
+4. **One plausibility guard, measured from one point** (`geo.ts`). The app has two
    150 km checks with *different* reference points — `_resolveLocation` from the Thimphu
    centre, `MapTab.effectiveCenter` from the nearest located salon — so the map can
    believe a fix Discover has already rejected, and the two then disagree about where
@@ -225,6 +235,13 @@ The queue is **not** a destination and should not become one: it is contextual c
 (`InLineBar`, shown only while a place is actually held), which is what the app's
 queue FAB is too. A permanent tab for something you are in for twenty minutes a month
 would be a tab that is nearly always a dead end.
+
+`components/owner/destinations.ts` is the same idea for the console, and 3b turned on the third
+of its five tabs: **Calendar · Queue · Settings**, with Insights and Messages still `ready:
+false`. Settings is a **hub** — `SETUP_DESTINATIONS` lists Salon details, Opening hours, Services
+and Staff, each a real route, which is where the app's drawer items went. `alsoMatches` keeps the
+tab lit on all of them. Adding a walk-in is deliberately not a destination in either client: it
+is something you do *to* a day, and it is reached from the calendar.
 
 ## Booking
 
@@ -402,6 +419,94 @@ Plan gating is `lib/entitlements.ts` — **gate on a `Feature`, never a plan str
 is informational and ends in `Close`, which is upstream's shape after App Store Guideline 3.1.1
 took its CTA out. **3c puts the request back**, because a website is the channel that rule
 leaves open and `plan_change_requests` still has an owner-insert policy and no writer.
+
+### `staff_members` had it too — the third instance
+
+Same shape a third time (3b): table-wide INSERT and UPDATE on all 12 columns, gated only by
+`is_business_owner`. Two RPCs exist to control two of those columns and both were bypassable —
+`set_staff_pay` refuses any salon that is not `pro` ("payroll requires Pro"), and
+`link_staff_member` requires an email that resolves to a real `auth.users` row and sets
+`profiles.role = 'staff'`. Demonstrated live on a **growth** salon: the direct writes landed
+while the RPC refused the same pay in the same session. `profile_id` is the worse of the two —
+`is_business_member` admits an active `staff_members.profile_id`, so writing it hands a third
+party read access to every booking and phone number in the salon.
+
+Closed by `20260805000001_staff_owner_updatable_columns`: UPDATE is `display_name`, `is_active`,
+`photo_url`, `updated_at` and nothing else; INSERT adds `business_id` and `role` because
+`Api.createStaff` names them. 35 assertions in `supabase/tests/staff_privilege_test.sql`.
+
+**Three tables, one lesson: RLS constrains the row, never the column.** Before putting a form
+on a table, check `has_table_privilege` — not `has_column_privilege`, which answers true either
+way while the table-level grant is held.
+
+## Owner setup — services, staff, hours, the salon
+
+### The two hours tables do different jobs
+
+`private.is_bookable_window` reads `businesses.timezone`, then **`staff_working_hours`** and
+`staff_time_off` — and never `business_hours`. So:
+
+- **A stylist's hours gate bookings.** `compute_availability` and `create_booking` both refuse
+  anything that does not fit inside one interval row. Measured: adding a 12:00–13:00 break to a
+  stylist made the customer's slot list jump from 11:30 straight to 13:00.
+- **A salon's opening hours gate nothing.** They drive the salon page's hours line, the owner
+  calendar's closed days and `% booked`, and `availabilityScoreFromHours` in the ranking.
+  Measured the other way too: opening Norzin on a Sunday changed the calendar and changed
+  nothing about what could be booked.
+
+`/business/hours` says so on the page, and links to a stylist. Both editors share
+`components/owner/hours-editor.tsx` over `lib/hours.ts` (ported with all 32 cases of
+`working_hours_model_test.dart`). **A break is the gap between two segments**, never a row.
+
+**`business_hours` has no RPC**, unlike staff hours, so `setBusinessHours` is two ordered
+writes: upsert on `(business_id, day_of_week, open_time)`, then delete what is gone. The order
+is the safety — a half-failed save leaves the salon *too open*, which is visible, rather than
+with no hours at all, which every customer surface renders as closed all week. The upsert needs
+the conflicting row to be selectable, and `business_hours_select` admits a member, so it is.
+Verified in place: all six of Norzin's original row ids survived a save.
+
+### Always `set_staff_services`
+
+`service_staff_insert` checks `is_business_owner(services.business_id)` and **never that the
+staff member belongs to the same salon**, so a direct insert can map your service to another
+salon's stylist. Proved live. The RPC derives the business from the staff row and filters
+services to it — both sides checked. Never write that table directly.
+
+### Creating a salon cannot use `INSERT … RETURNING`
+
+The live `businesses_select` requires `status = 'approved'` on its public branch, and
+`private.is_business_member` is `STABLE`, so its subquery cannot see the row the same statement
+is inserting. `INSERT … RETURNING` therefore fails with *"new row violates row-level security
+policy"* — a message that reads like the INSERT check when the INSERT check passed. So
+`createBusiness` inserts with no RETURNING and reads the row back in a second statement.
+
+Two things follow, both worth reporting upstream. **`Api.createBusiness` does
+`.insert(…).select().single()`, so the Flutter app cannot create a salon at all** — consistent
+with there being none in the database. And **no migration in `../tho` adds `status = 'approved'`
+to that policy**: it exists only on the live database, applied out of band, so a rebuild from
+`supabase/migrations` would both publish unreviewed salons and make this problem vanish.
+
+### The Basic stylist cap is client-side only
+
+`maxActiveStylists` is a `Feature`-derived gate in both clients and `staff_insert` has no count
+check — so the seed itself is over it: **all eight Basic salons have two active stylists.** The
+roster names the cap rather than saying "upgrade", and the paywall stops a *new* stylist rather
+than undoing an existing one.
+
+### No salon is on Pro
+
+`set_staff_pay` refuses anything else in SQL, so the staff editor's pay block renders its locked
+card on every live salon. The editable branch is reachable and correct — proved by flipping the
+plan inside a rolled-back transaction — and has no live example.
+
+### Owner photo paths differ from the app's, deliberately
+
+`media_auth_insert` requires the caller's uid as the first path segment, so the app's
+`business/<id>/cover.jpg`, `service/<businessId>/<ts>.jpg` and `staff/<staffId>.jpg` are all
+refused for anyone but the service role. `uploadOwnerImage` writes `<uid>/<label>-<ts>.jpg`,
+which means a salon's photos live under its **owner's** folder — a real consequence, and the
+layout the policy allows. Reordering is not offered anywhere: both photo tables have a `sort`
+column with no UPDATE policy.
 
 ## The inbox
 

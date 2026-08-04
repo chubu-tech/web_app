@@ -67,6 +67,9 @@ function biz(
     queueEnabled: true,
     queueJoinMode: "anywhere",
     reminderChannel: "push",
+    monthlyRevenueGoal: null,
+    rebookingEnabled: false,
+    rebookingDays: 30,
   };
 }
 

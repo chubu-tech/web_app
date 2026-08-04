@@ -2,6 +2,7 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  BadgeCheck,
   Bell,
   BellDot,
   CalendarCheck,
@@ -16,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Coffee,
   Compass,
   CreditCard,
   Eye,
@@ -27,6 +29,8 @@ import {
   Hand,
   Heart,
   ImagePlus,
+  Images,
+  Link2,
   LogOut,
   Plus,
   Receipt,
@@ -47,6 +51,7 @@ import {
   Scissors,
   Search,
   SearchX,
+  SquarePen,
   Send,
   Settings,
   Share2,
@@ -56,8 +61,10 @@ import {
   Store,
   Tag,
   Timer,
+  Trash2,
   Trophy,
   User,
+  UserPlus,
   Users,
   WifiOff,
   X,
@@ -92,6 +99,14 @@ export const Icons = {
   logout: LogOut,
   /** Copy a link to the clipboard — the owner's queue QR sheet. */
   copy: Copy,
+  /** `AppIcons.edit` — open the row you tapped for editing. A pencil on paper. */
+  edit: SquarePen,
+  /**
+   * Remove a photo. `close` is for dismissing a sheet and `filterOff` for clearing a
+   * filter — this is the only glyph that means the thing itself is going away, which is
+   * why it is a bin rather than a third X.
+   */
+  trash: Trash2,
 
   // ------------------------------------------------------------------ search --
   search: Search,
@@ -117,12 +132,34 @@ export const Icons = {
    * that *sends* you there is shut, the sheet that explains it is open.
    */
   unlocked: LockOpen,
+  /**
+   * `AppIcons.verified` — a badge, used for one thing only: a staff row whose login is
+   * linked. Distinct from `success`, which is a transient "that worked"; this is a
+   * standing state of the row.
+   */
+  verified: BadgeCheck,
+  /** Attach a login to a staff member, or copy a link's idea of itself. */
+  link: Link2,
 
   // --------------------------------------------------------------- the salon --
   salon: Store,
   haircut: Scissors,
   person: User,
   people: Users,
+  /** Add someone to the roster. Paired with `people`: the list, and adding to it. */
+  personAdd: UserPlus,
+  /**
+   * `AppIcons.sparkle` — the "Browse common services" action. An explicit alias of the
+   * glyph `serviceBarber` and `serviceMakeup` already use, not a second spelling: what it
+   * means here is "from the catalogue", and no other icon in the set says that.
+   */
+  sparkle: Sparkles,
+  /**
+   * A break in the working day — the gap between two segments of a shift. The app's
+   * `Restaurant02`; lucide has `UtensilsCrossed`, but a coffee cup reads as a break rather
+   * than as a meal being served, and this pill sits in a hours grid, not a menu.
+   */
+  lunch: Coffee,
   queue: ListOrdered,
   /**
    * `AppIcons.walkIn` — someone who arrived without an appointment. Footprints, not a
@@ -189,6 +226,8 @@ export const Icons = {
   imageMissing: ImageIcon,
   camera: Camera,
   addPhoto: ImagePlus,
+  /** `AppIcons.photos` — a set of them, for the gallery section header. */
+  photos: Images,
 
   // ------------------------------------------------------------- the places --
   location: MapPin,

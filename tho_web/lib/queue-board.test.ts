@@ -61,6 +61,8 @@ function barber(id: string, displayName: string): StaffMember {
     profileId: null,
     photoUrl: null,
     businessId: "biz",
+    commissionPct: 0,
+    baseSalaryNu: 0,
   };
 }
 

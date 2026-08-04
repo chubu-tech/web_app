@@ -13,12 +13,18 @@ import { cn } from "@/lib/utils";
  * colour should belong to the rows that still need something doing. `pending` and
  * `confirmed` are both live and share the rausch tint — the label carries the difference,
  * and it is the label that decides which buttons the owner sees.
+ *
+ * **`inactive` is not a booking status**, and it is here for the same reason the app passes
+ * it to the same widget: a switched-off service and a stood-down stylist need to read as
+ * *not currently in play*, which is exactly the muted tone. Without the case it would fall
+ * through to the rausch tint and a disabled row would look like the liveliest thing on the
+ * page.
  */
 export function StatusPill({ status }: { status: BookingStatus | string }) {
   const tone =
     status === "completed"
       ? "bg-success-soft text-success-text"
-      : status === "cancelled" || status === "no_show"
+      : status === "cancelled" || status === "no_show" || status === "inactive"
         ? "bg-surface-strong text-muted"
         : "bg-rausch/10 text-rausch-cta";
   const label = status === "no_show" ? "No show" : status[0]!.toUpperCase() + status.slice(1);

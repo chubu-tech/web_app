@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/ui/avatar";
@@ -279,7 +280,18 @@ function QueueLocked({ business }: { business: Business }) {
     <EmptyState
       icon={Icons.locked}
       title="The walk-in queue is switched off"
-      message="Your plan includes it, but this salon is set to appointments only. Turn it back on in the app's Settings and the board starts here."
+      // 3a had to say "in the app's Settings", because the web had none. 3b does, so this
+      // points at it — a message telling someone to go and find another client for a switch
+      // that is two clicks away is worse than no message.
+      message="Your plan includes it, but this salon is set to appointments only. Turn it back on and the board starts here."
+      action={
+        <Link
+          href="/business/settings/salon"
+          className="border-hairline text-title text-ink hover:bg-surface-soft inline-flex min-h-12 items-center rounded-sm border px-4 font-medium"
+        >
+          Open salon settings
+        </Link>
+      }
     />
   ) : (
     <EmptyState

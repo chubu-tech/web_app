@@ -6,14 +6,16 @@ as the Flutter app.
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4.
 
-> **Phase 3a.** The **customer** app is complete — discover, book, reschedule, cancel,
+> **Phase 3b.** The **customer** app is complete — discover, book, reschedule, cancel,
 > review, join a walk-in line, map, stylist profiles, inbox, messages, profile editing.
-> The **owner** console now covers the daily job: today's book, the booking lifecycle,
-> the live walk-in board and booking someone in at the counter.
+> The **owner** console covers the daily job — today's book, the booking lifecycle, the
+> live walk-in board, booking someone in at the counter — and now the whole of setup:
+> services and the common-services catalogue, staff and what each of them performs,
+> stylist working hours, **the salon's own opening hours** (which neither client has ever
+> been able to edit), the salon profile with a draggable map pin, and creating a salon.
 >
-> Next: **3b** owner setup (services, staff, hours, salon profile) · **3c** the owner
-> back office (insights, client book, orders, loyalty, plan) · **2f** the customer shop ·
-> then **staff**.
+> Next: **3c** the owner back office (insights, client book, orders, offers, loyalty,
+> plan) · **2f** the customer shop · then **staff**.
 
 ## Related repos
 
@@ -52,7 +54,9 @@ authorises the caller itself.
 ```
 app/
   (customer)/   the customer shell — 19 routes
-  business/     the owner console — calendar, queue, booking detail, walk-in
+  business/     the owner console — 11 routes: calendar, queue, booking detail,
+                walk-in, settings hub, salon profile, opening hours, services,
+                the catalogue, staff, staff detail, create-salon
                 (staff/ arrives with Phase 4)
 lib/
   supabase/     server.ts (cookie-bound) · client.ts (browser)
@@ -63,6 +67,7 @@ lib/
   time.ts       Asia/Thimphu, UTC+6, no DST
   calendar-logic.ts   ported from tho, with ported tests
   booking-guards.ts   ported from tho, with ported tests
+  hours.ts            ported from tho, with ported tests — both hours editors
   types/        TypeScript mirrors of tho's models.dart
 proxy.ts        session refresh only — this site is public
 app/globals.css design tokens, ported from tho's tokens.dart

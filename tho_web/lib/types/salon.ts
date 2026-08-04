@@ -38,6 +38,14 @@ export type Business = {
   queueEnabled: boolean;
   queueJoinMode: QueueJoinMode;
   reminderChannel: string;
+  /**
+   * The dashboard gauge's target. **Null means "no goal"** and the gauge shows an em dash —
+   * which is why the settings form stores a typed 0 as null rather than as a literal zero.
+   */
+  monthlyRevenueGoal: number | null;
+  /** Nudge lapsed customers to book again, after this many days since their last visit. */
+  rebookingEnabled: boolean;
+  rebookingDays: number;
 };
 
 export function hasLocation(
@@ -99,7 +107,68 @@ export type StaffMember = {
   profileId: string | null;
   photoUrl: string | null;
   businessId: string | null;
+  /**
+   * Pro-plan payroll inputs, both defaulting to 0.
+   *
+   * Only `set_staff_pay` can write them — it refuses any salon that is not on `pro`, and
+   * since `20260805000001` the columns are not in the owner's UPDATE grant either, so the
+   * paywall holds on both paths. Read here so the staff editor can show what is set
+   * rather than an empty field over a stored value.
+   */
+  commissionPct: number;
+  baseSalaryNu: number;
 };
+
+/**
+ * A template from the global common-services catalogue (`service_catalog`).
+ *
+ * Read-only for everyone — `service_catalog_read` is `using (true)` and there is no write
+ * policy at all. Turning one on for a salon **materialises a `services` row** from it
+ * (`enableCatalogService`), which is why `ServiceItem.catalogId` exists: it is what makes
+ * the switch in the catalogue know it is already on.
+ */
+export type CatalogService = {
+  id: string;
+  slug: string;
+  name: string;
+  /** `'male' | 'female' | 'unisex'` — NOT NULL here, unlike `ServiceItem.gender`. */
+  gender: string;
+  /** One of `ServiceItem`'s categories. NOT NULL here. */
+  category: string;
+  defaultImageUrl: string | null;
+  defaultDurationMinutes: number;
+  defaultPrice: number;
+};
+
+/**
+ * Every category a service may be filed under, in menu order — `ServiceItem.categories`
+ * in `models.dart`, and exactly the values `services_category_check` allows. A service may
+ * also be filed under none, which is why the chip row clears on a second tap.
+ */
+export const SERVICE_CATEGORIES = [
+  "Hair",
+  "Grooming",
+  "Skin",
+  "Spa",
+  "Nails",
+  "Makeup",
+  "Other",
+] as const;
+
+/** `businesses.business_type`, with the label each one shows. */
+export const BUSINESS_TYPES: { value: BusinessType; label: string }[] = [
+  { value: "salon", label: "Salon" },
+  { value: "barber", label: "Barber shop" },
+  { value: "home_based", label: "Home-based" },
+  { value: "mobile", label: "Mobile / I travel" },
+];
+
+/** `services.gender` and `service_catalog.gender`, with the label each one shows. */
+export const SERVICE_GENDERS: { value: string; label: string }[] = [
+  { value: "female", label: "Women" },
+  { value: "male", label: "Men" },
+  { value: "unisex", label: "Unisex" },
+];
 
 export function isLinked(s: Pick<StaffMember, "profileId">): boolean {
   return s.profileId != null;
