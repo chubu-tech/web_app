@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "bt.tho.app",
+      "sha256_cert_fingerprints": [
+        "94:12:9D:30:57:BD:54:22:EB:F1:B1:F0:72:A4:09:34:21:4F:F1:54:EC:BA:94:35:87:FC:0F:A9:0E:A1:C7:C0"
+      ]
+    }
+  }
+]
