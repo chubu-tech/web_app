@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { Discover } from "@/components/customer/discover";
 import {
   fetchAllBusinessCategories,
@@ -7,7 +8,9 @@ import {
 } from "@/lib/api/discovery";
 import { fetchMyFavouriteIds } from "@/lib/api/favourites";
 import { fetchLiveOffers } from "@/lib/api/salon";
+import { homeForRole } from "@/lib/auth";
 import { fromParams, hasPrice, serviceGenders } from "@/lib/salon-filters";
+import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -22,12 +25,27 @@ import { createClient } from "@/lib/supabase/server";
  * Everything here is anon-readable: `businesses_select` lets `anon` see approved,
  * active salons, so this whole page renders for a visitor with no session — which
  * is what arriving from a search result or a QR scan looks like.
+ *
+ * **This is the one customer route that turns an owner away**, and only because it is
+ * the one an owner is *sent* to: `/` is where a bare sign-in, a bookmark and the root
+ * of the site all land. Every other customer route stays open to them on purpose — an
+ * owner's own `/salon/<id>` page and their own printed `/q/<id>` QR are pages any
+ * anonymous visitor can already read, and bouncing them off those would be a
+ * regression with no security value. The nav simply never offers the way in.
  */
 export default async function DiscoverPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // Cheap for the common case: `getAccount` returns `anonymous` without touching
+  // `profiles` when there is no session, which is most Discover traffic.
+  const account = await getAccount();
+  if (account.state === "registered") {
+    const home = homeForRole(account.role);
+    if (home !== "/") redirect(home);
+  }
+
   const raw = await searchParams;
   const one = (key: string) => {
     const value = raw[key];

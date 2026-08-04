@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Booking, Payment, Slot } from "../types/booking";
+import type { Booking, BookingSource, Payment, Slot } from "../types/booking";
 import type { Hairstyle } from "../types/salon";
 import { toBooking, toHairstyle, toPayment, toSlot } from "./mappers";
 
@@ -13,8 +13,15 @@ import { toBooking, toHairstyle, toPayment, toSlot } from "./mappers";
  * directly and whose RLS policy allows exactly the booking's own customer.
  */
 
-/** The embeds every booking read shares, so a list and a single row map identically. */
-const BOOKING_SELECT =
+/**
+ * The embeds every booking read shares, so a list and a single row map identically.
+ *
+ * Exported because the owner console's day read (`./owner.ts`) joined that set in 3a:
+ * one string means the customer's booking and the salon's view of the same booking can
+ * never render from different columns. It already embeds the **customer's** name, phone
+ * and avatar — present since Phase 1 and rendered nowhere until the owner needed them.
+ */
+export const BOOKING_SELECT =
   "*, businesses(name, address_text, cover_url), staff_members(display_name), " +
   "customer:profiles!bookings_customer_profile_id_fkey(full_name, avatar_url, phone), " +
   "booking_items(service_id, service_name, duration_minutes, price), " +
@@ -63,6 +70,9 @@ export async function createBooking(
     serviceIds,
     start,
     customerNote,
+    source = "app",
+    customerName,
+    customerPhone,
   }: {
     idempotencyKey: string;
     businessId: string;
@@ -70,6 +80,21 @@ export async function createBooking(
     serviceIds: string[];
     start: Date;
     customerNote?: string | null;
+    /**
+     * `"app"` is a customer booking themselves. `"walk_in"` is a salon member booking
+     * someone at the counter, and the server refuses it from anyone who is not one:
+     * *"only business staff can create walk-in/admin bookings"*.
+     *
+     * It changes more than a label. For a non-`app` source the RPC **skips
+     * `is_bookable_window`**, so a salon can book outside its own opening hours for
+     * someone standing in front of them; and the one-per-day and overlap guards
+     * (`P0011`/`P0012`) do not apply to a member. The `bookings_no_overlap` exclusion
+     * constraint still does, so a double-booked stylist is still refused with `23P01`.
+     */
+    source?: BookingSource;
+    /** Who they are, when there is no account to link — walk-ins only. */
+    customerName?: string | null;
+    customerPhone?: string | null;
   },
 ): Promise<Booking> {
   const { data, error } = await supabase.rpc("create_booking", {
@@ -78,11 +103,14 @@ export async function createBooking(
     p_staff_member_id: staffId,
     p_service_ids: serviceIds,
     p_start_ts: start.toISOString(),
-    p_source: "app",
+    p_source: source,
+    // Always null: a customer books themselves, and the owner's walk-in has no account to
+    // book on behalf of. `create_booking` does allow a member to name a customer profile —
+    // that is a "book this regular in" feature, and it belongs with the client book in 3c.
     p_customer_profile_id: null,
     p_customer_note: customerNote ?? null,
-    p_customer_name: null,
-    p_customer_phone: null,
+    p_customer_name: customerName ?? null,
+    p_customer_phone: customerPhone ?? null,
   });
   if (error) throw error;
   return toBooking(data as Record<string, unknown>);
@@ -121,11 +149,30 @@ export async function rescheduleBooking(
   return toBooking(data as Record<string, unknown>);
 }
 
-/** The caller's own bookings, newest first. RLS scopes the rows. */
-export async function fetchMyBookings(supabase: SupabaseClient): Promise<Booking[]> {
+/**
+ * The caller's own bookings as a **customer**, newest first.
+ *
+ * **The `customer_profile_id` filter is not redundant, and leaving it to RLS was a
+ * bug.** `bookings_select` is
+ * `customer_profile_id = auth.uid() OR private.is_business_member(business_id)`, so for
+ * a salon owner or staff member an unfiltered read returns *their salon's* bookings —
+ * every customer's name and phone — under a heading that says "My bookings". On live
+ * data the seeded owner saw 78 rows that were not theirs. It went unnoticed because
+ * nothing routed an owner here until 3a.
+ *
+ * Third time this correction has been needed: `fetchMyConversations` and
+ * `fetchMyActiveEntries` both carry the same explicit filter for the same reason.
+ * **An OR-matched policy is never a scope.** The owner's own view of the salon's
+ * bookings is `fetchBusinessBookings` in `./owner.ts`, which asks for it deliberately.
+ */
+export async function fetchMyBookings(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<Booking[]> {
   const { data, error } = await supabase
     .from("bookings")
     .select(BOOKING_SELECT)
+    .eq("customer_profile_id", userId)
     .order("start_ts", { ascending: false });
   if (error) throw error;
   return ((data ?? []) as unknown as Record<string, unknown>[]).map(toBooking);

@@ -9,7 +9,9 @@ import {
   CalendarSync,
   CalendarX,
   Camera,
+  ChartColumn,
   CheckCircle2,
+  Copy,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -20,6 +22,7 @@ import {
   EyeOff,
   Filter,
   FilterX,
+  Footprints,
   Gift,
   Hand,
   Heart,
@@ -32,6 +35,7 @@ import {
   Info,
   ListOrdered,
   Lock,
+  LockOpen,
   Mail,
   MapPin,
   Map as MapIcon,
@@ -86,6 +90,8 @@ export const Icons = {
   settings: Settings,
   add: Plus,
   logout: LogOut,
+  /** Copy a link to the clipboard — the owner's queue QR sheet. */
+  copy: Copy,
 
   // ------------------------------------------------------------------ search --
   search: Search,
@@ -105,6 +111,12 @@ export const Icons = {
   hidden: EyeOff,
   /** A feature this salon's plan doesn't include — never a security padlock. */
   locked: Lock,
+  /**
+   * The same idea, aspirational rather than closed — the paywall's own glyph, which the
+   * app draws in coral at the top of the sheet. Paired with `locked`: the empty state
+   * that *sends* you there is shut, the sheet that explains it is open.
+   */
+  unlocked: LockOpen,
 
   // --------------------------------------------------------------- the salon --
   salon: Store,
@@ -112,6 +124,20 @@ export const Icons = {
   person: User,
   people: Users,
   queue: ListOrdered,
+  /**
+   * `AppIcons.walkIn` — someone who arrived without an appointment. Footprints, not a
+   * person: `person` and `people` are already taken by who somebody *is*, and this is
+   * about how they got here. Used for both owner walk-in paths, which are different
+   * actions on the same idea — adding someone to the live line, and booking a slot for
+   * someone standing at the counter.
+   */
+  walkIn: Footprints,
+  /**
+   * `AppIcons.insights` — the owner's numbers. A column chart, matching the app's
+   * `analytics01`, and deliberately not `TrendingUp`: the tab shows takings and
+   * utilisation whether they went up or down, and an arrow would editorialise.
+   */
+  insights: ChartColumn,
 
   // Service categories, matched by name in `categoryIcon` below.
   //

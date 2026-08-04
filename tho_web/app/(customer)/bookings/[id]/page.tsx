@@ -14,6 +14,7 @@ import {
   signedBookingMediaUrls,
 } from "@/lib/api/booking";
 import { fetchBusinessById } from "@/lib/api/discovery";
+import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import {
   bookingCode,
@@ -43,10 +44,21 @@ export default async function BookingDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  // RLS scopes this to the caller's own bookings, so a stranger's id is simply not
-  // found — no separate ownership check needed here.
-  const booking = await fetchBookingById(supabase, id);
+  // **RLS is not a scope here, and assuming it was is the same mistake
+  // `fetchMyBookings` made.** `bookings_select` OR-matches the customer *or* a
+  // business member, so a salon owner or staff member reaching this URL would be
+  // handed one of their own salon's bookings — a customer's name, phone and note —
+  // rendered as if it were their own appointment, with a Cancel button that
+  // `cancel_booking` would honour. The owner's view of the same row is
+  // `/business/bookings/[id]`, which says whose side you are on.
+  //
+  // Same refusal, and the same reason, as `/messages/[id]`.
+  const [account, booking] = await Promise.all([
+    getAccount(),
+    fetchBookingById(supabase, id),
+  ]);
   if (!booking) notFound();
+  if (booking.customerProfileId !== account.user?.id) notFound();
 
   const [business, payments, photoUrls, reviewedIds] = await Promise.all([
     booking.businessId

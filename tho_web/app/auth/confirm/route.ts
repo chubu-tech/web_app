@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { safeNext } from "@/lib/next-path";
+import { homeForRole, type Role } from "@/lib/auth";
+import { DEFAULT_NEXT, safeNext } from "@/lib/next-path";
 
 /**
  * Where the confirmation email lands.
@@ -25,14 +26,31 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+  const { data, error } = await supabase.auth.verifyOtp({
+    type,
+    token_hash: tokenHash,
+  });
 
   if (error) {
     return NextResponse.redirect(new URL("/sign-in?confirm=failed", url.origin));
   }
 
+  // Same rule as `landAfterAuth`: an explicit `?next=` wins, and the role only picks
+  // the default. Without this an owner confirming their email arrived on the customer
+  // side — the one sign-in path that used to skip the role check entirely, because a
+  // mail client's link carries no memory of who is behind it.
+  let destination = next;
+  if (destination === DEFAULT_NEXT && data.user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    destination = homeForRole((profile?.role as Role | undefined) ?? "customer");
+  }
+
   // `next` is already reduced to a same-origin path by `safeNext`; resolving it
   // against our own origin means a crafted link cannot turn the confirmation
   // endpoint into a redirector.
-  return NextResponse.redirect(new URL(next, url.origin));
+  return NextResponse.redirect(new URL(destination, url.origin));
 }

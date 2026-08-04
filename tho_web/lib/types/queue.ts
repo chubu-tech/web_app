@@ -61,6 +61,18 @@ export type QueueEntry = {
   servingRemainingMinutes: number;
   /** Only when the read joined `businesses(name)`. */
   businessName: string | null;
+  /**
+   * The customer's phone and avatar — **only on the owner board's read.**
+   *
+   * `queue_active_line`, which is what a customer polls, returns a deliberately
+   * PII-free projection, so both are null on that path. The owner board reads
+   * `queue_entries` directly and joins `profiles`, which `profiles_select` permits
+   * because a business member may read a customer who is *in their queue*. Null here
+   * therefore means two different things depending on the read, and neither is an
+   * error: unknown for a customer, absent for a walk-in the shop typed in by hand.
+   */
+  customerPhone: string | null;
+  customerAvatarUrl: string | null;
 };
 
 /**

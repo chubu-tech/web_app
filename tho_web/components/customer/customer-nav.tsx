@@ -60,7 +60,7 @@ export function CustomerTopNav({ signedIn }: { signedIn: boolean }) {
             <li key={d.href} className="shrink-0">
               <TopLink
                 destination={d}
-                current={isCurrent(d.href, pathname)}
+                current={isCurrent(d, pathname)}
                 count={d.badge ? counts[d.badge] : 0}
               />
             </li>
@@ -146,7 +146,7 @@ export function CustomerTabBar({ signedIn }: { signedIn: boolean }) {
     >
       <ul className="flex h-[62px] items-stretch">
         {items.map((d) => {
-          const current = isCurrent(d.href, pathname);
+          const current = isCurrent(d, pathname);
           const Icon = d.icon;
           const count = d.badge ? counts[d.badge] : 0;
           // Profile is the way to everything in `SECONDARY` on a phone, so it inherits

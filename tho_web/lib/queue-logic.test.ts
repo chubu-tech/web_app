@@ -62,6 +62,10 @@ function entry(
     serviceMinutes: mins,
     servingRemainingMinutes: servingLeft,
     businessName: null,
+    // Owner-board-only fields. Nothing in this file's arithmetic reads them — the
+    // ordering and ETA rules are the same whether or not a name is attached.
+    customerPhone: null,
+    customerAvatarUrl: null,
   };
 }
 

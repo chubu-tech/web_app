@@ -1,4 +1,5 @@
 import { Icons } from "@/components/ui/icons";
+import type { NavMatch } from "@/lib/nav";
 
 /**
  * The customer navigation, in one place.
@@ -21,11 +22,14 @@ export type Destination = {
   ready: boolean;
   /** Which unread count, if any, badges this destination. */
   badge?: "messages" | "notifications";
-};
+} & NavMatch;
 
 /** The five app tabs. The **only** things in the bottom bar — see `SECONDARY`. */
 export const TABS: Destination[] = [
-  { href: "/", label: "Discover", icon: Icons.discover, ready: true },
+  // `alsoMatches` keeps Discover lit on a salon page, which is reached from here and
+  // has no tab of its own. It used to be a `/salon` literal inside `isCurrent`; the
+  // owner console needed the same helper without inheriting a customer path.
+  { href: "/", label: "Discover", icon: Icons.discover, ready: true, alsoMatches: ["/salon"] },
   { href: "/map", label: "Map", icon: Icons.map, ready: true },
   { href: "/messages", label: "Chats", icon: Icons.chat, ready: true, badge: "messages" },
   { href: "/bookings", label: "Bookings", icon: Icons.booking, ready: true },
@@ -69,15 +73,11 @@ export const SECONDARY: Destination[] = [
 export const readyTabs = () => TABS.filter((d) => d.ready);
 export const readySecondary = () => SECONDARY.filter((d) => d.ready);
 
-/**
- * True when `href` is the destination the given path belongs to. Exact for "/",
- * prefix otherwise, so `/salon/123` still highlights Discover — it is reached from
- * there and has no tab of its own.
- */
-export function isCurrent(href: string, pathname: string): boolean {
-  if (href === "/") return pathname === "/" || pathname.startsWith("/salon");
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
+// `isCurrent` moved to `lib/nav.ts` in 3a and is re-exported here so the nav components
+// keep one import. It is shared with the owner console, and its cases are pinned by
+// `lib/nav.test.ts` — the `/salon` exception that used to be a literal in its body is now
+// `alsoMatches` on Discover above.
+export { isCurrent } from "@/lib/nav";
 
 /**
  * True when something under `/profile` has unread items, so the Profile tab can carry a dot

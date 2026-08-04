@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { Icons, IconSize } from "@/components/ui/icons";
+import { StatusPill } from "@/components/ui/status-pill";
 import { bookingCode, isActive, type Booking } from "@/lib/types/booking";
 import { cn, formatNu } from "@/lib/utils";
 
@@ -193,18 +194,8 @@ function MetaLine({
   );
 }
 
-/** The lifecycle pill, ported from `ui/widgets/status_pill.dart`. */
-export function StatusPill({ status }: { status: string }) {
-  const tone =
-    status === "completed"
-      ? "bg-success-soft text-success-text"
-      : status === "cancelled" || status === "no_show"
-        ? "bg-surface-strong text-muted"
-        : "bg-rausch/10 text-rausch-cta";
-  const label = status === "no_show" ? "No show" : status[0]!.toUpperCase() + status.slice(1);
-  return (
-    <span className={cn("text-badge px-sm py-xxs rounded-full font-semibold", tone)}>
-      {label}
-    </span>
-  );
-}
+// `StatusPill` moved to `components/ui/status-pill.tsx` in 3a — it is a port of
+// `ui/widgets/status_pill.dart`, so it always belonged in the kit, and the owner console
+// needed it without importing from `components/customer/`. Re-exported here so existing
+// importers keep working.
+export { StatusPill } from "@/components/ui/status-pill";

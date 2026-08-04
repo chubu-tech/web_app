@@ -6,10 +6,14 @@ as the Flutter app.
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4.
 
-> **Phase 1 of 4.** Foundations only: design tokens, the Supabase layer, the
-> account model and the ported pure logic. `app/page.tsx` is a proof page that
-> reads live salons — not the real Discover screen. Next: the customer app, then
-> owner, then staff.
+> **Phase 3a.** The **customer** app is complete — discover, book, reschedule, cancel,
+> review, join a walk-in line, map, stylist profiles, inbox, messages, profile editing.
+> The **owner** console now covers the daily job: today's book, the booking lifecycle,
+> the live walk-in board and booking someone in at the counter.
+>
+> Next: **3b** owner setup (services, staff, hours, salon profile) · **3c** the owner
+> back office (insights, client book, orders, loyalty, plan) · **2f** the customer shop ·
+> then **staff**.
 
 ## Related repos
 
@@ -46,11 +50,16 @@ authorises the caller itself.
 ## How it fits together
 
 ```
-app/            routes. Phase 2+ adds (customer)/, business/, staff/ shells.
+app/
+  (customer)/   the customer shell — 19 routes
+  business/     the owner console — calendar, queue, booking detail, walk-in
+                (staff/ arrives with Phase 4)
 lib/
   supabase/     server.ts (cookie-bound) · client.ts (browser)
   auth.ts       the three account states, guest upgrade, friendly errors
   session.ts    server-side "who is asking" — role from profiles.role
+  owner/        the console's gate + which salon is active (cookie-backed)
+  nav.ts        which destination a path belongs to, shared by both shells
   time.ts       Asia/Thimphu, UTC+6, no DST
   calendar-logic.ts   ported from tho, with ported tests
   booking-guards.ts   ported from tho, with ported tests

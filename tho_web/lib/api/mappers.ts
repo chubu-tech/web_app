@@ -298,6 +298,15 @@ export function toQueueEntry(m: Row, fallbackBusinessId?: string): QueueEntry {
   const biz = (m.businesses ?? null) as Row | null;
   const embedded = service ? numOrNull(service.duration_minutes) : null;
 
+  // The customer's profile, present only on the owner board's read — the customer's own
+  // `queue_active_line` projection is deliberately PII-free, so these stay null there.
+  // PostgREST returns an embed as an object or, on some shapes, a one-element array.
+  const profileEmbed = m["profiles"];
+  const profile = (Array.isArray(profileEmbed) ? profileEmbed[0] : profileEmbed) as
+    | Row
+    | null
+    | undefined;
+
   return {
     id: m.id as string,
     businessId: str(m.business_id) ?? fallbackBusinessId ?? "",
@@ -305,13 +314,22 @@ export function toQueueEntry(m: Row, fallbackBusinessId?: string): QueueEntry {
     serviceId: str(m.service_id),
     customerProfileId: str(m.customer_profile_id),
     bookingId: str(m.booking_id),
-    customerName: str(m.customer_name),
+    // The linked profile's name first, then the one typed at the counter.
+    //
+    // `queue_entries.customer_name` is populated **only** for a walk-in a staff member
+    // added by hand, so reading it alone labels every customer who joined the line
+    // themselves as "Walk-in" — which is exactly what the Flutter board does, avatar and
+    // phone showing beside the wrong name. Null on the customer's own PII-free RPC path,
+    // where no name is wanted anyway.
+    customerName: (profile ? str(profile.full_name) : null) ?? str(m.customer_name),
     status: queueStatusFromWire(str(m.status)),
     priorityAt: dateOrNull(m.priority_at),
     joinedAt: new Date(m.joined_at as string),
     serviceMinutes: embedded ?? numOrNull(m.service_minutes) ?? 20,
     servingRemainingMinutes: numOrNull(m.serving_remaining_min) ?? 0,
     businessName: biz ? str(biz.name) : null,
+    customerPhone: profile ? str(profile.phone) : null,
+    customerAvatarUrl: profile ? str(profile.avatar_url) : null,
   };
 }
 

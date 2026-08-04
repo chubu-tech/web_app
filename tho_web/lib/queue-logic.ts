@@ -215,6 +215,9 @@ export function queuePreview({
     serviceMinutes,
     servingRemainingMinutes: 0,
     businessName: null,
+    // Nobody yet — this entry does not exist, so there is no profile to have joined.
+    customerPhone: null,
+    customerAvatarUrl: null,
   };
 
   const withGhost = [...line, ghost];

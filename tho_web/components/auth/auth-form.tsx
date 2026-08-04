@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { friendlyAuthError, homeForRole, type Role } from "@/lib/auth";
-import { safeNext } from "@/lib/next-path";
+import { DEFAULT_NEXT, safeNext } from "@/lib/next-path";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -25,9 +25,12 @@ import { cn } from "@/lib/utils";
  * - **The dev quick-login chips** (`email_sign_in_screen.dart:396`). They are
  *   `kDebugMode`-gated in Flutter; a bundled seed password has no safe equivalent on
  *   a public website.
- * - **The Customer/Business role toggle.** The owner console is a later phase, so an
- *   owner account created here would have nowhere to go. Sign-up is customer-only
- *   until it exists.
+ * - **The Customer/Business role toggle.** Sign-up stays customer-only even now that
+ *   `/business` exists, and for a better reason than "it isn't built": an owner is
+ *   onboarded by an operator, who creates the account *and* the salon together in the
+ *   admin console. A self-served owner would land on a console with no salon in it,
+ *   and `businesses.status` defaults to `pending` review anyway — so the toggle would
+ *   promise a shop that nobody has agreed to list.
  */
 export function AuthForm({
   mode,
@@ -184,11 +187,15 @@ export function AuthForm({
 /**
  * Where a freshly signed-in user belongs.
  *
- * `homeForRole` points owners at `/business` and staff at `/staff`, neither of which
- * exists yet — so those roles land on the customer side with a note instead of a
- * 404. `router.refresh()` is required either way: role resolution happens in a
- * server component (`lib/session.ts`), so the shell has to re-render against the new
- * cookie before the navigation.
+ * **An explicit `?next=` wins; the role decides the default.** Someone who signed in
+ * halfway through a booking gets their booking back, whatever their role — that is the
+ * whole reason `next` exists, and an owner who followed a link to a salon page meant to
+ * go there. Only when `next` is the bare default does the role choose, which is what
+ * makes a plain sign-in land an owner on `/business` instead of Discover.
+ *
+ * `router.refresh()` is required either way: role resolution happens in a server
+ * component (`lib/session.ts`), so the shell has to re-render against the new cookie
+ * before the navigation, or the owner nav renders for the previous session.
  */
 async function landAfterAuth(
   router: ReturnType<typeof useRouter>,
@@ -200,18 +207,13 @@ async function landAfterAuth(
   } = await supabase.auth.getUser();
 
   let destination = target;
-  if (user) {
+  if (user && target === DEFAULT_NEXT) {
     const { data } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .maybeSingle();
-    const role = (data?.role as Role | undefined) ?? "customer";
-    const home = homeForRole(role);
-    if (home !== "/") {
-      // The owner and staff areas are later phases. Send them somewhere real.
-      destination = "/?tools=app";
-    }
+    destination = homeForRole((data?.role as Role | undefined) ?? "customer");
   }
 
   router.refresh();

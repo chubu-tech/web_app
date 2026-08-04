@@ -29,6 +29,22 @@ import { BookingExtrasSheet, type BookingExtras } from "./booking-extras-sheet";
 import { SlotPicker } from "./slot-picker";
 
 /**
+ * The signed-in person's own bookings, or an empty list when nobody is signed in.
+ *
+ * `fetchMyBookings` needs the id explicitly, because `bookings_select` OR-matches
+ * business membership and would otherwise hand a salon owner their whole book. Resolving
+ * the user here also means an anonymous visitor makes no query at all — they have no
+ * history for the overlap guard to consider.
+ */
+async function myBookingsFor(supabase: ReturnType<typeof createClient>) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  return fetchMyBookings(supabase, user.id);
+}
+
+/**
  * Pick a time and book it, ported from `tho/app/lib/customer/booking_screen.dart`.
  *
  * The confirm order matters and is the app's (`booking_screen.dart:122`): re-check the
@@ -79,7 +95,7 @@ export function BookingFlow({
     let live = true;
     // Best-effort: the server enforces the same rules, so a failure here just means
     // it does the rejecting instead of us warning first.
-    fetchMyBookings(createClient())
+    myBookingsFor(createClient())
       .then((list) => {
         if (live) setMyBookings(list);
       })
@@ -262,7 +278,7 @@ export function BookingFlow({
         onUpgraded={async () => {
           // The guard needs the *new* user's history before we let them continue.
           try {
-            setMyBookings(await fetchMyBookings(createClient()));
+            setMyBookings(await myBookingsFor(createClient()));
           } catch {
             // The server still enforces it.
           }

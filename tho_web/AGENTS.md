@@ -10,15 +10,21 @@ The Bhutan Salons product in a browser: customers book chairs and join walk-in
 queues, owners run their salon, staff see their day. Next.js 16 (App Router),
 React 19, Tailwind 4, TypeScript.
 
-**Status: Phase 2e (places and people).** Browse, sign in, book, reschedule, cancel,
-review, take a place in a walk-in line, read notifications, message a salon, find a shop
-on the map, read a stylist's profile and edit your own all work against the real database.
-Next: **2f** products, orders and loyalty. Then owner, then staff.
+**Status: Phase 3a (the owner's day).** The customer role works end to end — browse, sign
+in, book, reschedule, cancel, review, take a place in a walk-in line, read notifications,
+message a salon, find a shop on the map, read a stylist's profile and edit your own. And now
+**an owner signs in to their own console**: today's book, the whole lifecycle of a booking,
+the live walk-in board, and booking someone in at the counter.
+
+3a is the first of three owner slices. Next: **3b** setup (services, staff, hours, the salon
+profile) and **3c** the back office (insights, client book, orders, loyalty, plan). **2f** —
+the customer shop — is still outstanding and now sits behind them.
 
 The original 2d covered eight surfaces at once — about four times the size of 2c — so it
 was split three ways, ordered by value per line rather than by the old sequence: the
 seeded customer has 35 notifications and 3 conversations, while **one** salon sells
-products and **one** runs a loyalty programme.
+products and **one** runs a loyalty programme. The owner side was split the same way and for
+the same reason: **16 surfaces**, so 3a took only the ones an owner touches every day.
 
 ## This repo owns no data
 
@@ -34,10 +40,17 @@ The database is the **`bsalons` Supabase project**, shared with:
 Nothing in Phase 1 needed any: all 40 non-admin `SECURITY DEFINER` RPCs are
 already granted to `authenticated`.
 
-2e is the one milestone that has needed a migration, and it went upstream where it
-belongs — `20260804000001` + `20260804000002` in `../tho`, closing a privilege
-escalation this app's profile editor would otherwise have been built on top of. See
-**Editing a profile** below.
+Two milestones have needed a migration, and both went upstream where they belong — and both
+were the same class of bug, found the same way: by being the first client to put an editor on
+a table.
+
+- `20260804000001` + `20260804000002` — **any signed-in user could make themselves an
+  admin.** See **Editing a profile**.
+- `20260804000004` — **any owner could put their own salon on Pro and approve it past
+  review.** See **The owner console** below.
+
+Both are worth reading before adding a write anywhere: the pattern is that RLS constrains the
+*row* and says nothing about the *columns*, so a table-wide `GRANT` is the whole gate.
 
 ## Non-negotiables
 
@@ -72,8 +85,22 @@ different jobs and both are needed:
 and is reduced to a same-origin path or dropped. **Never follow it raw** — a sign-in
 page that forwards anywhere is a phishing tool. Its tests are the spec.
 
-Sign-up is customer-only until the owner console exists; an owner or staff member who
-signs in lands on Discover rather than a route that isn't built.
+**An explicit `?next=` wins; the role picks the default.** Someone who signed in halfway
+through a booking gets their booking back whatever their role — that is what `next` is for.
+Only a bare `/` lets `homeForRole` decide, which is what lands an owner on `/business`. The
+rule is in `landAfterAuth` *and* in `app/auth/confirm/route.ts`, because a confirmation email
+is the one sign-in path that used to skip the role check entirely.
+
+`homeForRole` now returns only routes that exist. It used to name `/business` and `/staff`
+before either was built, so its one caller second-guessed it with `/?tools=app` — a parameter
+nothing read, which is why the "note instead of a 404" that comment promised never rendered
+and an owner silently landed on Discover. `staff` still resolves to `/` until Phase 4, and
+that single line is what changes when it lands.
+
+Sign-up stays customer-only, and now for a better reason than "it isn't built": an owner is
+onboarded by an operator who creates the account *and* the salon together, and
+`businesses.status` defaults to `pending` review. A self-served owner would land on a console
+with no salon in it.
 
 ## The account model
 
@@ -249,8 +276,9 @@ Renaming it breaks every QR already on a counter.
 - **P0004 means two different things.** "Scan the shop's QR" from `join_queue`,
   "outside the check-in window" from `check_in_booking`. `lib/api/queue-errors.ts` maps
   by (RPC, code) for that reason; one shared table would be wrong half the time.
-- Nothing here can *call* the next customer — that is the owner board, Phase 3. The
-  salon runs its line in the Flutter app while the customer holds their place here.
+- **The owner board can now call the next customer** — `/business/queue`, added in 3a. Until
+  then the salon had to run its line in the Flutter app while the customer held their place
+  here, which is the hole 3a closed.
 
 **Nothing promises a notification.** The app's card says "we'll notify you"; every
 `queue_your_turn` row in the outbox is `failed` with "no deliverable channel", and
@@ -262,6 +290,118 @@ Web Push stays deferred by decision, not by difficulty: `devices` plus the exist
 would accept an FCM **web** token with no change in `../tho`, but delivery needs a Firebase
 web config and an `FCM_SERVICE_ACCOUNT` secret that do not exist. If it lands, the strings
 to change are in `QueuePositionCard` and the join form's projection note.
+
+## The owner console
+
+`/business` is a **second role-scoped shell**, not a section of the customer app.
+`lib/owner/context.ts` is the one gate and the one read it shares — wrapped in React's
+`cache`, so the layout's salon switcher and the page inside it resolve the same salon from a
+single query.
+
+**Role decides where you land; `owner_id` decides what you can touch.** Nothing in the console
+treats `profiles.role` as permission: `private.is_business_owner(b)` is
+`businesses.owner_id = auth.uid()`, every read filters on `owner_id`, and every write is an RPC
+that checks `private.is_business_member` itself. `role = 'owner'` with no salon gets an honest
+empty state, never a crash.
+
+**An owner lands here; public pages stay public.** The Flutter app is a hard role switch
+(`auth_gate.dart` → one shell per role, no way across) but it has no URLs. So `/` redirects an
+owner to `/business` and the nav offers owner destinations only — while `/salon/<id>`,
+`/q/<id>` and `/stylist/<id>` still render for them, because those are pages any anonymous
+visitor can already read and an owner's own printed QR is one of them. `/` is the **only**
+customer route that turns an owner away, because it is the only one they are *sent* to.
+
+### An OR-matched policy is never a scope
+
+The single most repeated bug in this repo, and 3a found the third and fourth instances:
+
+| Read | Policy | What an unfiltered read returns to an owner |
+| --- | --- | --- |
+| `fetchMyBookings` | `customer_profile_id = auth.uid() OR is_business_member(...)` | **their salons' 78 bookings** under "My bookings" |
+| `/bookings/[id]` | same | a customer's name, phone and note as if it were the owner's own appointment, with a Cancel that works |
+| `fetchMyConversations` | `conversations_select` OR-matches | (fixed in 2d) |
+| `fetchMyActiveEntries` | `queue_select_*` | (fixed in 2c) |
+
+Both new ones are fixed the same way — an explicit `.eq()` and, on the detail page, the same
+`notFound()` refusal `/messages/[id]` already had. **Check the policy before trusting a
+`fetchMy…` name**, and pass the id in rather than leaning on RLS.
+
+### `businesses` had the same hole `profiles` did
+
+`authenticated` held table-wide INSERT and UPDATE on **all 35 columns** of `businesses`, no
+trigger, gated only by `private.is_business_owner(id)` — which is true for your own salon. So
+an owner could run `set plan = 'pro'` (every paid feature, unpaid) or `set status = 'approved'`
+(listed publicly, past operator review), and `businesses_insert` checks only `owner_id`, so a
+create-salon form could mint an already-approved Pro salon. Demonstrated live, then closed by
+`20260804000004_business_owner_updatable_columns` in `../tho`: revoke both verbs, grant back the
+21 columns an owner legitimately edits. `plan`, `status`, `is_active`, `suspended_at`, the four
+review columns, `timezone` and `late_fee_amount` are out of reach; `owner_id` is insertable and
+not updatable. The withheld columns' **defaults are the safe values** (`basic`, `pending`),
+which is what makes an INSERT grant sufficient. 50 assertions in
+`supabase/tests/business_privilege_test.sql`.
+
+### The owner queue board
+
+- **A direct table read, not `queue_active_line`.** That RPC is what a *customer* polls and its
+  projection is PII-free by design — no name, no phone, no avatar, no `called_at` — so a board
+  whose whole job is to say who is in the chair cannot be built on it. `fetchBusinessQueue`
+  reads `queue_entries` and joins `profiles`, which `profiles_select` permits because a member
+  may read a customer **in their queue**, not merely one who has booked.
+- **`full_name` is in that join and is not in the app's.** Both clients label a row
+  `customerName ?? 'Walk-in'`, but `queue_entries.customer_name` is populated *only* for a
+  walk-in typed in at the counter — so the Flutter board shows **"Walk-in"** for every customer
+  who joined the line themselves, avatar and phone beside the wrong name. Found by putting a
+  real customer in the line and looking at the board.
+- **Always send a name when adding a walk-in.** `join_queue` files an entry as anonymous only
+  when the caller is a member **and** `p_name` is non-blank; with a blank name it sets
+  `customer_profile_id` to the *caller*. The app's Name field is optional, so an owner who
+  leaves it empty puts **themselves** in their own queue, and a second blank add raises `P0003`
+  "you are already in this queue". Proved both shapes against the live RPC.
+- **The board gates on `runsQueue`, not the plan.** `queueEnabled && hasFeature(plan,
+  'walkInQueue')` — the app checks only the plan, so a Growth salon that switched the queue off
+  still gets a live polling board with a working Call next while `join_queue` refuses its
+  customers. Every live salon has `queue_enabled = true`, so the switched-off case has **no live
+  example** and `lib/types/salon.test.ts` is its only coverage.
+- **Polling is forced, not chosen.** The `supabase_realtime` publication contains **zero
+  tables**, so a Postgres-Changes subscription would connect, succeed, and deliver nothing for
+  ever. 4s, matching the app. A locked board polls nothing at all.
+- Optimistic Call-next is safe **only** because `orderedFor` reproduces
+  `private.queue_claim_front`'s ordering exactly — priority-then-FIFO. It is not a guess about
+  which row is next; it is the same rule.
+- **There is no "close the line" and no un-call.** No bulk RPC exists, `serving` can only go to
+  `done`/`no_show`, and closing means `queue_enabled = false` (which blocks only *new* joins)
+  plus one `set_queue_status` per row. Real gaps, not omissions.
+
+### The booking lifecycle
+
+`set_booking_status` accepts **only** `confirmed`, `completed` and `no_show`, and refuses any
+booking already outside `pending`/`confirmed`. So a finished booking gets no buttons rather than
+buttons that raise. Cancelling is its own RPC, and Undo is a third — `reconcile_booking` is the
+only call with **no transition validation**, which is exactly why it can put a terminal booking
+back and why nothing else uses it.
+
+**`pending` is unreachable on this platform.** `create_booking` hard-codes `'confirmed'` and
+there are zero `pending` rows, so the Confirm button is ported because the app has it and the
+enum allows it — but the only way to reach it is `reconcile_booking`. Do not go looking for the
+bug that "Confirm never shows".
+
+**Completing a booking is not a display change.** `handle_booking_status_event` awards loyalty
+points (growth/pro, deduped by a unique index) and queues a review request; `no_show` and
+`cancelled` cancel pending reminders. Verified by reading the ledger, not the pill.
+
+### Two divergences worth knowing
+
+- **`/business` is the Calendar, not Insights.** The app's tab 0 is Insights because a phone
+  shell needs a landing tab; an owner opening a browser at nine wants the day. Insights takes
+  `/business/insights` in 3c and this stays the calendar.
+- **The selected day, view and list segment live in the URL.** The app loses all three on a tab
+  switch; here `?d=&view=&seg=` is reloadable, shareable and back-button-correct.
+  `salon-filters.ts`'s `fromParams`/`toParams` is the pattern.
+
+Plan gating is `lib/entitlements.ts` — **gate on a `Feature`, never a plan string.** The paywall
+is informational and ends in `Close`, which is upstream's shape after App Store Guideline 3.1.1
+took its CTA out. **3c puts the request back**, because a website is the channel that rule
+leaves open and `plan_change_requests` still has an owner-insert policy and no writer.
 
 ## The inbox
 
@@ -419,7 +559,7 @@ Two rules, both learned by measurement rather than from the schema:
 Measure a storage write against the live bucket before believing it. Both of these looked
 correct in review, and one of them had been shipping broken for four migrations.
 
-## The nav's rule below 744
+## The nav's rule below 744, for both roles
 
 `TABS` — the five the app has — are the **only** things in the bottom bar. `SECONDARY`
 joins the top nav at ≥744 and appears as rows on `/profile` below it, which is what the
@@ -435,6 +575,27 @@ Badge counts come from `useInboxCounts`, client-side and polled: the shell alrea
 `getAccount()` and a `queue_entries` read per page, and two more server reads to render a
 small number is the wrong trade. Nothing is fetched for a guest or a visitor — neither can
 hold a thread or receive a notification.
+
+**The owner shell mirrors this with two deliberate differences.**
+`components/owner/destinations.ts` is a parallel module rather than one parameterised list,
+because the two navs differ in more than their items: the owner header carries a salon switcher
+instead of a wordmark, has no "Sign in" CTA and shows no `InLineBar`. And **the owner header
+never hides** — the customer's is `hidden tablet:block`, but this one holds the switcher and the
+seeded owner runs **nine** salons, so switching has to work on a phone at the till.
+
+What they genuinely share is `lib/nav.ts`. `isCurrent` moved there in 3a with tests, because the
+owner console is the first place a destination is the **prefix of a sibling** — `/business` is
+the calendar and `/business/queue` is its own tab, so plain prefix matching lights both. That is
+what `exact` is for, and `alsoMatches` is what keeps a parent lit on the pages it opens
+(`/salon/*` for Discover, `/business/bookings/*` for the calendar) without a shared helper
+hard-coding one role's paths.
+
+**The active salon is a cookie, not `localStorage`.** The app uses
+`SharedPreferences['active_business_<uid>']`, but the owner shell is a *server* component that
+must know the salon before it renders a row. `tho_active_business` is `httpOnly`, and
+`resolveActiveBusinessId` (ported, tested) is what stops it being trusted: a forged value naming
+someone else's salon falls back to their first. RLS would refuse the rows anyway; the point is
+that the console must not *appear* to have switched.
 
 ## Live data is messier than it looks
 
@@ -482,11 +643,39 @@ Check assumptions against it before trusting a column:
   note that the same fetch shows FCM push delivery, multi-service bookings and final
   pricing have landed in the app, all of which this repo mirrors and none of which it has
   yet.
+- **`owner@bhutansalons.test` owns NINE salons**, not one — Norzin Salon & Spa on **growth**
+  and eight on **basic**. That is a live example on both sides of every plan gate, and it is
+  what makes the salon switcher load-bearing rather than theoretical.
+- **The growth salon has no present, only a past.** Norzin: 2 staff, 5 services, 6
+  `business_hours` rows, and **52 bookings that are all terminal** (completed 42 · cancelled 5 ·
+  no_show 5) — **0 confirmed**. All four of the owner's `confirmed` bookings sit on *basic*
+  salons, and only one is in the future. So the owner calendar has to be checked across two
+  salons: week view unlocked on Norzin against May–June history, and a live day on a basic salon
+  where week is locked.
+- **Sunday is how "closed" is spelled.** `business_hours` has no `is_closed` flag and no row for
+  Norzin's Sunday, so `openMinutesForWeekday` returns null and `% booked` is *omitted* rather
+  than shown as 0.
+- **Norzin has 5 active services and only 3 are mapped to any staff.** `Blow Dry & Style` and
+  `Hair Coloring` are mapped to nobody, so `compute_availability` rejects them — the live
+  negative case for "the walk-in picker is deliberately not narrowed by `service_staff`".
+- **The queue's live default is empty.** All 9 `queue_entries` on the platform are terminal
+  (done 7 · left 1 · no_show 1) and belong to Norzin, and **not one has ever had a
+  `booking_id`** — so check-in has never been exercised by anything.
+- **`staff_time_off` has 0 rows platform-wide and no Dart file references it**, though
+  `compute_availability` honours it. An owner cannot mark a holiday on any platform.
+- **No salon is on Pro**, so `record_payment`, `payroll_report`, `tax_estimate` and
+  `set_staff_pay` raise `P0001` for every account that exists. With **0 `payments` rows**, the
+  whole money surface is unverifiable without an admin flipping a plan first.
+- **The database has other people on it.** During 3a's verification someone else created and
+  cancelled a booking through another client, adding rows to `bookings`,
+  `booking_status_events`, `booking_items` and `notifications` mid-run. Capture a `now()` marker
+  before writing and scope every cleanup by it **and** by id — a count-based baseline will read
+  as drift that is not yours.
 - Seeded logins exist and are email-confirmed — `customer@bhutansalons.test` and
   friends, password in `../tho/supabase/seed.sql`. Useful for verification; the app's
   dev quick-login chips are deliberately **not** ported to the web.
-  `owner@bhutansalons.test` owns Norzin **and** is the counterparty on the customer's
-  thread, which makes it the right account to check the owner-inbox leak with.
+  `owner@bhutansalons.test` is also the counterparty on the customer's thread, which makes it
+  the right account to check the owner-inbox leak with in 3c.
 
 ## Verify
 

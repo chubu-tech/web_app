@@ -36,7 +36,9 @@ export default async function BookingsPage() {
   }
 
   const supabase = await createClient();
-  const bookings = await fetchMyBookings(supabase).catch(() => []);
+  // The id is passed rather than left to RLS: `bookings_select` OR-matches business
+  // membership, so an owner would otherwise see their salon's whole book here.
+  const bookings = await fetchMyBookings(supabase, account.user.id).catch(() => []);
 
   return (
     <Shell>

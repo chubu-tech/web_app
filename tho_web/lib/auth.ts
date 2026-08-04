@@ -134,13 +134,25 @@ export const GUEST_ACTIONS = {
 
 export type GuestAction = keyof typeof GUEST_ACTIONS;
 
-/** Where each role belongs after signing in. */
+/**
+ * Where each role belongs after signing in.
+ *
+ * **Every branch returns a route that exists.** It used to point `staff` at `/staff`
+ * and `owner` at `/business` before either was built, which meant the one caller had
+ * to second-guess it — and the fallback it used (`/?tools=app`) was read by nothing,
+ * so the "note instead of a 404" it promised never rendered and an owner silently
+ * landed on Discover. 3a builds `/business`, so that branch is now true; `staff`
+ * stays on the customer side until Phase 4 builds its console, and this is the single
+ * line that changes when it does.
+ *
+ * This is a **landing** decision, not an authorisation one. Scoping is
+ * `businesses.owner_id` and RLS; `profiles.role` only decides where someone is sent.
+ */
 export function homeForRole(role: Role): string {
   switch (role) {
     case "owner":
       return "/business";
     case "staff":
-      return "/staff";
     case "admin":
     case "customer":
       // Admins use the separate operator console; there is nothing for them

@@ -42,6 +42,7 @@ export function SlotPicker({
   onSelect,
   disabled = false,
   reloadKey = 0,
+  initialDay,
 }: {
   staffId: string;
   serviceIds: string[];
@@ -50,9 +51,16 @@ export function SlotPicker({
   disabled?: boolean;
   /** Bump to re-fetch — after a failed write, so a taken slot disappears. */
   reloadKey?: number;
+  /**
+   * Which day to open on. Added in 3a so the owner's walk-in form can inherit the day the
+   * calendar was showing; a customer always starts on today, which stays the default.
+   * Clamped into the strip's own window, so a stale `?date=` from last month cannot select
+   * a day the strip does not contain.
+   */
+  initialDay?: Date;
 }) {
   const today = thimphuToday();
-  const [day, setDay] = useState<Date>(today);
+  const [day, setDay] = useState<Date>(() => clampToWindow(initialDay, today));
   const [retryTick, setRetryTick] = useState(0);
 
   /**
@@ -206,4 +214,18 @@ export function SlotPicker({
       </div>
     </div>
   );
+}
+
+/**
+ * `initialDay` snapped into the strip's window — today through `DAYS_AHEAD`.
+ *
+ * A bookmarked or hand-edited `?date=` can name any day at all, and a day outside the strip
+ * would leave the form on a date with no cell highlighted and no obvious way back.
+ */
+function clampToWindow(requested: Date | undefined, today: Date): Date {
+  if (!requested) return today;
+  const last = addDays(today, DAYS_AHEAD - 1);
+  if (requested.getTime() < today.getTime()) return today;
+  if (requested.getTime() > last.getTime()) return last;
+  return requested;
 }
