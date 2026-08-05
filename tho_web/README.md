@@ -6,9 +6,12 @@ as the Flutter app.
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4.
 
-> **Phase 3c — the owner console is complete.** The **customer** app covers discover, book,
-> reschedule, cancel, review, join a walk-in line, map, stylist profiles, inbox, messages and
-> profile editing. The **owner** console now covers everything the phone app's owner side does:
+> **Phase 2f — Phase 2 is complete, and both roles are done.** The **customer** app covers
+> discover, book, reschedule, cancel, review, join a walk-in line, map, stylist profiles, inbox,
+> messages, profile editing and now **the shop**: a cross-salon products browse, a salon's Shop
+> tab, a cart that survives a closed tab, cash-on-collection orders with tracking and cancel, and
+> loyalty — points, rewards, and a redemption code to show at the counter. The **owner** console
+> covers everything the phone app's owner side does:
 > the daily job (today's book, the booking lifecycle, the live walk-in board, the counter
 > walk-in), the whole of setup (services and the catalogue, staff, stylist hours, **the salon's
 > own opening hours** — which neither client had ever been able to edit — the profile with a
@@ -16,11 +19,13 @@ Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4.
 > orders, the storefront, offers, loyalty and its redemption counter, the salon's messages and
 > notifications, payroll, the tax estimate, and plan & billing.
 >
-> Four things here are ahead of the app: **five analytics cards** it has parked, **the upgrade
+> Six things here are ahead of the app: **five analytics cards** it has parked, **the upgrade
 > request** it removed for App Store rule 3.1.1, **an owner notification feed** it has no
-> equivalent of, and **locked states** four of its screens draw as network errors.
+> equivalent of, **locked states** four of its screens draw as network errors, a **cart that
+> outlives the tab** and re-prices itself against the shelf, and a **redemption code that updates
+> itself** instead of asking you to press Refresh at the till.
 >
-> Next: **2f** the customer shop (products, cart, orders, loyalty) · then **staff**.
+> Next: **Phase 4 — staff**, the last role.
 
 ## Related repos
 
@@ -58,7 +63,10 @@ authorises the caller itself.
 
 ```
 app/
-  (customer)/   the customer shell — 19 routes
+  (customer)/   the customer shell — 24 routes. Discover (salons and products),
+                salon, book, queue, map, stylist, bookings, messages,
+                notifications, saved, profile, and the shop: cart, orders +
+                detail, rewards + the redemption code.
   business/     the owner console — 26 routes. The day: calendar, queue, booking
                 detail, walk-in. Setup: the settings hub, salon profile, opening
                 hours, services, the catalogue, staff, staff detail, create-salon.
@@ -79,6 +87,10 @@ lib/
   analytics.ts        ported from tho, with ported tests — the dashboard's
                       derivations, the client book's rules, the order state
                       machine and the 2026 Bhutan PIT bands
+  cart.ts             ported from tho, with ported tests — pure functions over
+                      an immutable cart, plus the re-price a stored one needs
+  product-filter.ts   ported from tho, with ported tests — sort and price range
+  use-cart.ts   the cart in localStorage, via useSyncExternalStore
   plans.ts      the three tiers and their prices — the only place pricing lives
   types/        TypeScript mirrors of tho's models.dart
 proxy.ts        session refresh only — this site is public

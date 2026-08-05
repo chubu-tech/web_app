@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { FavouriteButton } from "@/components/customer/favourite-button";
 import { MessageSalonButton } from "@/components/customer/message-salon-button";
 import { SalonBooking } from "@/components/customer/salon-booking";
+import { LoyaltyCard } from "@/components/customer/loyalty-card";
+import { SalonShop } from "@/components/customer/salon-shop";
 import { SalonTabs } from "@/components/customer/salon-tabs";
 import { ShareButton } from "@/components/customer/share-button";
 import { WalkInCard } from "@/components/customer/walk-in-card";
@@ -33,6 +35,8 @@ import {
   fetchServiceStaff,
   fetchStaff,
 } from "@/lib/api/salon";
+import { fetchLoyaltyBalance } from "@/lib/api/owner-back-office";
+import { fetchPublicLoyaltyProgram, fetchPublicRewards } from "@/lib/api/shop";
 import { fetchActiveLine } from "@/lib/api/queue";
 import { coverageLine, dayName, hhmm, todayHoursLine } from "@/lib/salon-copy";
 import { getAccount } from "@/lib/session";
@@ -131,12 +135,32 @@ export default async function SalonPage({
    * fails for a signed-out visitor; `null` reaches the badge as "Wait unknown" rather
    * than a fabricated zero.
    */
-  const [account, queueLine] = await Promise.all([
+  const [account, queueLine, loyaltyProgram] = await Promise.all([
     getAccount(),
     runsQueue(business)
       ? fetchActiveLine(supabase, id).catch(() => null as QueueEntry[] | null)
       : Promise.resolve(null),
+    // Null for a salon with no programme *or* a switched-off one, since
+    // `loyalty_programs_select_public` admits only `is_active` — so the card can be included
+    // unconditionally and simply renders nothing. Decorative: loyalty must not take the page down.
+    fetchPublicLoyaltyProgram(supabase, id).catch(() => null),
   ]);
+
+  /**
+   * The rewards menu and the caller's balance, read only when there is a programme to read them for.
+   *
+   * The menu is public (`loyalty_rewards_select_public`) and the balance is not — `loyalty_balance`
+   * raises `28000` without a session — so a visitor sees what is on offer and no number. That split
+   * is the point: the rewards are the advertisement.
+   */
+  const [loyaltyRewards, loyaltyBalance] = loyaltyProgram
+    ? await Promise.all([
+        fetchPublicRewards(supabase, id).catch(() => []),
+        account.state === "registered"
+          ? fetchLoyaltyBalance(supabase, id, account.user.id).catch(() => null)
+          : Promise.resolve(null),
+      ])
+    : [[], null];
 
   const isTravelling = travels(business);
   const wa = whatsappUrl(
@@ -152,11 +176,19 @@ export default async function SalonPage({
   // behind a tab on a wide screen is a phone constraint. The remaining tabs keep the
   // app's order.
   //
-  // Shop is deliberately absent: browsing products and ordering them arrive
-  // together in 2d, and a tab that only announced a shop it can't open would be a
-  // dead end. Keyed by label rather than index precisely so adding it back then
-  // cannot mis-select About.
+  // **Shop arrives with 2f**, and only when there is something on the shelf — the condition
+  // `SalonTabs` was written for ("Shop only exists when the salon has in-stock products", which is
+  // why it keys on the label and never on an index). A tab announcing an empty shop would be the
+  // dead end the earlier note refused to ship.
   const tabs = [
+    ...(products.length > 0
+      ? [
+          {
+            label: "Shop",
+            content: <SalonShop products={products} salonName={business.name} />,
+          },
+        ]
+      : []),
     { label: "Specialists", content: <Specialists staff={staff} /> },
     { label: "Reviews", content: <Reviews reviews={reviews} /> },
     {
@@ -324,6 +356,19 @@ export default async function SalonPage({
 
         <div className="row-start-3 min-w-0 desktop:col-start-1 desktop:row-start-2">
           <SalonTabs tabs={tabs} initial={initialTab} />
+
+          {/* Below the tabs, not inside one: the app puts it on the salon body for the same
+              reason — points are a fact about your relationship with the salon, not a category of
+              its content, and burying them in a tab would hide the one thing that brings a
+              customer back. Renders nothing without an active programme. */}
+          <LoyaltyCard
+            businessId={id}
+            program={loyaltyProgram}
+            rewards={loyaltyRewards}
+            balance={loyaltyBalance}
+            signedIn={account.state === "registered"}
+            isGuest={account.state === "guest"}
+          />
         </div>
       </div>
     </div>

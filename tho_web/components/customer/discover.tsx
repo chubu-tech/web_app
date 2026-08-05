@@ -19,11 +19,21 @@ import {
   toParams,
   type SalonFilters,
 } from "@/lib/salon-filters";
-import type { Business, Category, Offer } from "@/lib/types/salon";
+import {
+  EMPTY_PRODUCT_FILTER,
+  priceBounds,
+  productFilterCount,
+  productFilterIsActive,
+  productFilterToParams,
+  type ProductFilter,
+} from "@/lib/product-filter";
+import type { Business, Category, Offer, Product } from "@/lib/types/salon";
 import type { WorkingHour } from "@/lib/types/booking";
 import { cn } from "@/lib/utils";
 import { FavouriteButton } from "./favourite-button";
 import { FilterPanel } from "./filter-panel";
+import { ProductFilterSheet } from "./product-filter-sheet";
+import { ProductsBrowse } from "./products-browse";
 import {
   NearbyRow,
   OffersRow,
@@ -50,6 +60,9 @@ export function Discover({
   offers,
   favouriteIds,
   filters,
+  products,
+  productFilter,
+  tab,
 }: {
   businesses: Business[];
   categories: Category[];
@@ -58,11 +71,18 @@ export function Discover({
   offers: Offer[];
   favouriteIds: string[];
   filters: SalonFilters;
+  /** Every buyable product, across every salon — the Products segment's whole catalogue. */
+  products: Product[];
+  /** From `?sort=&min=&max=`, already reconciled against the loaded bounds by the page. */
+  productFilter: ProductFilter;
+  /** From `?tab=`. Anything but `products` is the salon list. */
+  tab: "salons" | "products";
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [productFilterOpen, setProductFilterOpen] = useState(false);
   const [fix, setFix] = useState<Fix | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const location = fix?.coords ?? null;
@@ -89,6 +109,33 @@ export function Discover({
     const qs = params.toString();
     router.push(qs ? `/?${qs}` : "/", { scroll: false });
   }
+
+  /**
+   * Switch segment, and the product filter, through the URL.
+   *
+   * **The salon filters and the product filter are separate parameter sets and never mix.** A
+   * customer who narrows salons by price and then switches to Products should not find the products
+   * narrowed by a salon-side facet — so switching drops the other segment's params rather than
+   * carrying them, which is also what keeps a shared link unambiguous about what it is showing.
+   */
+  function goToTab(next: "salons" | "products") {
+    if (next === "salons") {
+      router.push("/", { scroll: false });
+      return;
+    }
+    const params = new URLSearchParams({ tab: "products", ...productFilterToParams(productFilter) });
+    router.push(`/?${params.toString()}`, { scroll: false });
+  }
+
+  function applyProducts(next: ProductFilter) {
+    const params = new URLSearchParams({ tab: "products", ...productFilterToParams(next) });
+    router.push(`/?${params.toString()}`, { scroll: false });
+  }
+
+  const onProducts = tab === "products";
+  // The range control spans what is actually loaded, so the bounds come from the catalogue rather
+  // than from a constant nobody maintains.
+  const bounds = useMemo(() => priceBounds(products), [products]);
 
   // Distance is applied here rather than server-side: there is no PostGIS, and the
   // coordinates are already in hand. Both thumbs, not just the far one — the control
@@ -144,11 +191,44 @@ export function Discover({
     <div className="px-base mx-auto w-full max-w-[1440px] tablet:px-lg">
       <LocationHeader source={fix?.source ?? null} />
 
+      {/*
+        The two segments, as links in the URL rather than local state — so a Products view is
+        shareable and the back button steps between them. The app's own IA: Products is a segment of
+        home sharing this row's search and filter, not a destination of its own.
+      */}
       <div className="gap-sm mt-md flex items-center">
-        <h1 className="text-display-lg text-ink flex-1 font-medium">Salons</h1>
+        <h1 className="sr-only">{onProducts ? "Products" : "Salons"}</h1>
+        <div
+          className="bg-surface-soft p-xxs flex flex-1 rounded-full tablet:max-w-[280px]"
+          role="tablist"
+          aria-label="Browse salons or products"
+        >
+          {(
+            [
+              ["salons", "Salons"],
+              ["products", "Products"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={(value === "products") === onProducts}
+              onClick={() => goToTab(value)}
+              className={cn(
+                "text-title min-h-10 flex-1 rounded-full font-medium transition-colors duration-[--duration-fast]",
+                (value === "products") === onProducts
+                  ? "bg-canvas text-ink shadow-sm"
+                  : "text-muted hover:text-ink",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <IconToggle
           icon={Icons.search}
-          label="Search salons"
+          label={onProducts ? "Search products" : "Search salons"}
           pressed={searchOpen}
           onClick={() => {
             setSearchOpen((open) => {
@@ -159,14 +239,28 @@ export function Discover({
             requestAnimationFrame(() => searchInput.current?.focus());
           }}
         />
-        <IconToggle
-          icon={Icons.filter}
-          label={active ? "Filters (active)" : "Filters"}
-          pressed={filterOpen}
-          dot={active}
-          onClick={() => setFilterOpen(true)}
-          className="desktop:hidden"
-        />
+        {onProducts ? (
+          <IconToggle
+            icon={Icons.filter}
+            label={
+              productFilterIsActive(productFilter)
+                ? `Filters (${productFilterCount(productFilter)} active)`
+                : "Filters"
+            }
+            pressed={productFilterOpen}
+            dot={productFilterIsActive(productFilter)}
+            onClick={() => setProductFilterOpen(true)}
+          />
+        ) : (
+          <IconToggle
+            icon={Icons.filter}
+            label={active ? "Filters (active)" : "Filters"}
+            pressed={filterOpen}
+            dot={active}
+            onClick={() => setFilterOpen(true)}
+            className="desktop:hidden"
+          />
+        )}
       </div>
 
       {searchOpen ? (
@@ -188,6 +282,16 @@ export function Discover({
         </div>
       ) : null}
 
+      {onProducts ? (
+        <div className="mt-lg">
+          <ProductsBrowse
+            products={products}
+            query={query}
+            filter={productFilter}
+            onClearFilter={() => applyProducts(EMPTY_PRODUCT_FILTER)}
+          />
+        </div>
+      ) : (
       <div className="gap-xl mt-lg flex items-start">
         {/* The filter rail, from 1128 up. Below that the same panel lives in a
             sheet — DESIGN.md's collapsing strategy, not two different forms. */}
@@ -275,6 +379,7 @@ export function Discover({
           )}
         </div>
       </div>
+      )}
 
       <Sheet
         open={filterOpen}
@@ -288,6 +393,14 @@ export function Discover({
           onClose={() => setFilterOpen(false)}
         />
       </Sheet>
+
+      <ProductFilterSheet
+        open={productFilterOpen}
+        onClose={() => setProductFilterOpen(false)}
+        filter={productFilter}
+        bounds={bounds}
+        onApply={applyProducts}
+      />
     </div>
   );
 }

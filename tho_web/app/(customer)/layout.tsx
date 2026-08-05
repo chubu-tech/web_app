@@ -1,3 +1,4 @@
+import { CartBar } from "@/components/customer/cart-bar";
 import { CustomerTabBar, CustomerTopNav } from "@/components/customer/customer-nav";
 import { InLineBar } from "@/components/customer/in-line-bar";
 import { getAccount } from "@/lib/session";
@@ -29,6 +30,13 @@ export default async function CustomerLayout({
       <main className="flex-1 pb-[calc(62px+env(safe-area-inset-bottom))] tablet:pb-0">
         {children}
       </main>
+      {/*
+        In the shell rather than on the two pages that fill the cart, because a customer who adds
+        something and then wanders to `/bookings` should still be able to find it. The app has to
+        render it per-screen; a persistent shell is a thing only the web gets for free. It hides
+        itself when the cart is empty and on `/cart` — see `CartBar`.
+      */}
+      <CartBar />
       <CustomerTabBar signedIn={account.state === "registered"} />
     </div>
   );

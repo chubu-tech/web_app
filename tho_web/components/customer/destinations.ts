@@ -9,10 +9,16 @@ import type { NavMatch } from "@/lib/nav";
  * (`customer_home.dart:166`).
  *
  * **`ready` is the gate.** A destination only appears once its route exists, so no
- * tab ever leads somewhere unfinished. Each later milestone flips one flag on as it
- * lands: Bookings with 2b, Chats and Notifications with 2d, Map and Settings with 2e,
- * Orders and Rewards with 2f. The list stays here so "what does the nav show" has
- * exactly one answer.
+ * tab ever leads somewhere unfinished. Each milestone flipped one flag as it landed:
+ * Bookings with 2b, Chats and Notifications with 2d, Map with 2e, **Orders and Rewards
+ * with 2f** — which is the last of them. The list stays here so "what does the nav show"
+ * has exactly one answer.
+ *
+ * **The cart is deliberately not a destination**, and neither is Products. The cart is
+ * contextual chrome — `CartBar`, shown only while something is in it, the same argument
+ * the walk-in `InLineBar` makes below — and Products is a segment of Discover sharing its
+ * search box, which is the app's own IA (`customer_home.dart`'s `_segment`). Adding either
+ * would put a permanent tab on something that is usually empty.
  */
 
 export type Destination = {
@@ -57,8 +63,8 @@ export const SECONDARY: Destination[] = [
     badge: "notifications",
   },
   { href: "/saved", label: "Saved", icon: Icons.favourite, ready: true },
-  { href: "/orders", label: "My orders", icon: Icons.shopBag, ready: false },
-  { href: "/rewards", label: "My rewards", icon: Icons.reward, ready: false },
+  { href: "/orders", label: "My orders", icon: Icons.shopBag, ready: true },
+  { href: "/rewards", label: "My rewards", icon: Icons.reward, ready: true },
 ];
 
 // **Settings was here and is gone on purpose, not deferred.** The app's screen holds

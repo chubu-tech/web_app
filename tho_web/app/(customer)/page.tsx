@@ -8,7 +8,9 @@ import {
 } from "@/lib/api/discovery";
 import { fetchMyFavouriteIds } from "@/lib/api/favourites";
 import { fetchLiveOffers } from "@/lib/api/salon";
+import { fetchProducts } from "@/lib/api/shop";
 import { homeForRole } from "@/lib/auth";
+import { priceBounds, productFilterFromParams } from "@/lib/product-filter";
 import { fromParams, hasPrice, serviceGenders } from "@/lib/salon-filters";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -25,6 +27,13 @@ import { createClient } from "@/lib/supabase/server";
  * Everything here is anon-readable: `businesses_select` lets `anon` see approved,
  * active salons, so this whole page renders for a visitor with no session — which
  * is what arriving from a search result or a QR scan looks like.
+ *
+ * **Products are a segment of this page, not a route.** `?tab=products` swaps the salon list for
+ * the cross-salon catalogue and the two share this page's search box — the app's own arrangement
+ * (THO-51), and `components/customer/destinations.ts` deliberately declares no Products destination.
+ * The catalogue is fetched here on every visit rather than behind the segment: it is one small query
+ * against an RLS-filtered table, and paying for it up front means switching segments is instant and
+ * needs no loading state.
  *
  * **This is the one customer route that turns an owner away**, and only because it is
  * the one an owner is *sent* to: `/` is where a bare sign-in, a bookmark and the root
@@ -52,6 +61,8 @@ export default async function DiscoverPage({
     return Array.isArray(value) ? value[0] : value;
   };
 
+  const tab = one("tab") === "products" ? "products" : "salons";
+
   const filters = fromParams({
     gender: one("gender"),
     category: one("category"),
@@ -64,8 +75,15 @@ export default async function DiscoverPage({
 
   const supabase = await createClient();
 
-  const [businesses, categories, hoursByBusiness, categoriesByBusiness, offers, favouriteIds] =
-    await Promise.all([
+  const [
+    businesses,
+    categories,
+    hoursByBusiness,
+    categoriesByBusiness,
+    offers,
+    favouriteIds,
+    products,
+  ] = await Promise.all([
       fetchBusinesses(supabase, {
         categoryId: filters.categoryId,
         // Sort by rating when a Reviews filter is active, so top-rated salons lead
@@ -84,7 +102,19 @@ export default async function DiscoverPage({
       fetchLiveOffers(supabase).catch(() => []),
       // Empty for a visitor with no session, which is the common case.
       fetchMyFavouriteIds(supabase).catch(() => new Set<string>()),
+      // `products_select_public` requires the salon to be on growth or pro, so RLS already limits
+      // this to salons that actually sell — nothing here filters by plan. Decorative in the sense
+      // that the salon list must survive it failing.
+      fetchProducts(supabase).catch(() => []),
     ]);
+
+  // Reconciled against the loaded bounds here rather than in the component: a bound that does not
+  // narrow the catalogue is stored as cleared, so a stale or hand-edited URL cannot show an active
+  // filter badge over an unfiltered list.
+  const productFilter = productFilterFromParams(
+    { sort: one("sort"), min: one("min"), max: one("max") },
+    priceBounds(products),
+  );
 
   return (
     <Discover
@@ -95,6 +125,9 @@ export default async function DiscoverPage({
       offers={offers}
       favouriteIds={[...favouriteIds]}
       filters={filters}
+      products={products}
+      productFilter={productFilter}
+      tab={tab}
     />
   );
 }

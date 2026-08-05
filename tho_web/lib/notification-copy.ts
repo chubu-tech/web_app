@@ -325,11 +325,23 @@ export function ownerNotificationText(
         title: "Order cancelled",
         body: "A customer cancelled their order before you got to it.",
       };
-    case "loyalty_redemption_requested":
+    /**
+     * The one owner event with a payload worth reading. `private.enqueue_*` writes `{}` for
+     * `order_placed` and `order_cancelled`, but a redemption request carries **`reward` and
+     * `code`** — measured on live rows, once 2f made it possible to create one at all. The code is
+     * the thing the customer is holding up at the counter, so quoting it turns the notification
+     * into the whole job rather than a pointer at the page that does it.
+     */
+    case "loyalty_redemption_requested": {
+      const reward = stringOf(payload.reward) ?? "a reward";
+      const code = stringOf(payload.code);
       return {
         title: "Reward claimed",
-        body: `Someone wants to redeem ${stringOf(payload.reward) ?? "a reward"} — confirm it at the counter.`,
+        body: code
+          ? `Someone wants to redeem ${reward}. Their code is ${code}.`
+          : `Someone wants to redeem ${reward} — confirm it at the counter.`,
       };
+    }
 
     default:
       return notificationText(eventType, payload);

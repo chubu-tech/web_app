@@ -285,6 +285,23 @@ describe("ownerNotificationText", () => {
     expect(ownerNotificationText("booking_no_show", {}).body).toBe("A no-show.");
   });
 
+  it("quotes the redemption code, which is the one owner payload that carries something", () => {
+    // Exactly the shape a live row holds — read off `notifications` after a real claim, which only
+    // became possible in 2f. `code` is what the customer is holding up, so the body says it.
+    const live = { code: "RWD-AC446F", reward: "5 Visits for free Haircut" };
+    const owner = ownerNotificationText("loyalty_redemption_requested", live);
+    expect(owner.title).toBe("Reward claimed");
+    expect(owner.body).toBe("Someone wants to redeem 5 Visits for free Haircut. Their code is RWD-AC446F.");
+
+    // And it degrades rather than printing "undefined" if the server ever stops sending one.
+    expect(ownerNotificationText("loyalty_redemption_requested", { reward: "A free trim" }).body).toBe(
+      "Someone wants to redeem A free trim — confirm it at the counter.",
+    );
+    expect(ownerNotificationText("loyalty_redemption_requested", {}).body).toBe(
+      "Someone wants to redeem a reward — confirm it at the counter.",
+    );
+  });
+
   it("restates a reminder as a diary entry, since it is somebody else's reminder", () => {
     const owner = ownerNotificationText("booking_reminder", payload);
     expect(owner.title).toBe("Coming up");

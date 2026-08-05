@@ -49,6 +49,7 @@ import {
   Lock,
   LockOpen,
   Mail,
+  Minus,
   MapPin,
   Map as MapIcon,
   MessageCircle,
@@ -64,6 +65,7 @@ import {
   Settings,
   Share2,
   ShoppingBag,
+  ShoppingCart,
   Sparkles,
   Star,
   Store,
@@ -107,6 +109,12 @@ export const Icons = {
   share: Share2,
   settings: Settings,
   add: Plus,
+  /**
+   * Paired with `add`, and used for exactly one thing: one fewer of something in a cart. Never a
+   * "remove" — `trash` is that, and the difference matters on a quantity stepper where the minus at
+   * a count of 1 *does* remove the line but still reads as counting down.
+   */
+  minus: Minus,
   logout: LogOut,
   /** Copy a link to the clipboard — the owner's queue QR sheet. */
   copy: Copy,
@@ -241,6 +249,11 @@ export const Icons = {
   offer: Tag,
   reward: Trophy,
   shopBag: ShoppingBag,
+  /**
+   * The cart itself, as distinct from `shopBag` — which is the *shop*, and already means "orders"
+   * on both sides of the app. A trolley is the thing you are filling; a bag is what you leave with.
+   */
+  cart: ShoppingCart,
   product: Package,
   qr: QrCode,
   receipt: Receipt,
