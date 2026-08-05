@@ -35,6 +35,21 @@ export const brand = {
   appName: "Tho",
   tagline: "Book the chair. Skip the wait.",
   domain: "bhutansalons.com",
+  /**
+   * Where the product lives — the web app in `../tho_web`, a different origin
+   * from this site. Set `NEXT_PUBLIC_APP_URL` per environment; the fallback is a
+   * local `next dev`, which is where this is usually read.
+   *
+   * `||`, not `??`: a declared-but-blank `NEXT_PUBLIC_APP_URL=` is a common CI
+   * accident, and `??` would let it through as "", making the href the
+   * same-origin `/sign-in` — a 404 on *this* site, with a green build.
+   *
+   * Must stay a direct `process.env.X` access. Next inlines only that form; a
+   * destructure or a `getEnv()` indirection becomes `undefined` in the browser
+   * bundle. Being inlined also means the value is frozen at `next build` — a
+   * change needs a rebuild, not a redeploy of the same bundle.
+   */
+  appUrl: (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, ""),
   supportEmail: "hello@bhutansalons.com",
   whatsapp: "+975 17 00 00 00",
   /** Dzongkha greeting, romanised so it renders on every device. */
@@ -54,6 +69,29 @@ export const nav = [
   { label: "For salons", href: "#for-salons" },
   { label: "Pricing", href: "#pricing" },
 ] as const;
+
+/**
+ * The one link off this site and into the product (`../tho_web`). The header
+ * renders it twice — the quiet pill in the bar and the sheet's footer — and both
+ * read from here, so the label and the destination cannot drift apart.
+ *
+ * Deliberately not a row in `nav` above: that array feeds the underline-animation
+ * links and the 2rem sheet list, so a sign-in row would land in the wrong visual
+ * group and lose its own treatment.
+ *
+ * It replaced "Salon sign in", which pointed at `#salon-plans` and signed nobody
+ * in — there was nothing to sign in to when it was written. One label serves both
+ * audiences because tho_web's `/sign-in` does: it picks the landing route from the
+ * account's role (owner → `/business`, customer → `/`).
+ *
+ * No `?next=` on purpose. tho_web's `safeNext` reduces the parameter to a
+ * same-origin path and drops absolute URLs, so one pointing back at this site
+ * could not work.
+ */
+export const signIn = {
+  label: "Sign in",
+  href: `${brand.appUrl}/sign-in`,
+} as const;
 
 /**
  * The search band. Plain words on purpose — a salon owner or a customer in
@@ -308,11 +346,69 @@ export const faq = [
 ] as const;
 
 export const download = {
-  eyebrow: "Get the app",
+  eyebrow: "Coming soon",
   title: "The chair is ready when you are",
-  body: "Look for Tho on the App Store and Google Play. Free to download, free to book — for iPhone and Android. Customers never pay a fee.",
+  /**
+   * Written for the pre-launch state. The app is not on either store yet, so
+   * this may not tell anyone to "look for Tho on the App Store" — that is a
+   * promise the stores cannot currently keep. When `brand.stores` is filled in,
+   * revert this to the download wording and the badges become real links again
+   * on their own (see `StoreBadges`).
+   */
+  body: "Tho is nearly here. Join the waitlist and we'll email you the moment it's on the App Store and Google Play — free to download, free to book.",
   image: u("photo-1503951914875-452162b0f3f1", 1800, 1000),
   alt: "Barber giving a client a close shave",
+} as const;
+
+/**
+ * The waitlist — what the download call to action does until the app ships.
+ *
+ * Every string a visitor can see while joining lives here, including the error
+ * messages, because a form is mostly copy. The three outcomes are deliberately
+ * distinct: **joined** is new, **already** is a repeat address, and an error is
+ * neither. Collapsing "already" into "joined" would be a small lie told to
+ * somebody who is trying to check whether their first attempt worked.
+ */
+export const waitlist = {
+  /** The label every download CTA carries while the stores are empty. */
+  cta: "Join the waitlist",
+  eyebrow: "Coming soon",
+  title: "Our mobile app is _coming soon_",
+  body: "Enter your email address to join the waitlist. We'll notify you as soon as the app is available on the App Store and Google Play.",
+  emailLabel: "Email address",
+  emailPlaceholder: "you@example.com",
+  submit: "Join the waitlist",
+  submitting: "Joining…",
+  /** Nothing on this page asks for more than an address, and it should say so. */
+  reassurance: "One email when we launch. Nothing else, and no charge — ever.",
+  success: {
+    joined: {
+      title: "You're on the list",
+      body: "We'll email you the moment Tho is on the App Store and Google Play.",
+    },
+    already: {
+      title: "You're already on the list",
+      body: "That address is signed up. We'll be in touch the day we launch.",
+    },
+  },
+  errors: {
+    empty: "Enter your email address.",
+    invalid: "That does not look like an email address.",
+    /** The catch-all. Says what to do, not what broke. */
+    failed: "We couldn't save that just now. Please try again in a moment.",
+    offline: "You appear to be offline. Check your connection and try again.",
+  },
+  qr: {
+    caption: "Scan to join",
+    sub: "Point your camera here",
+  },
+  /** The standalone page a scanned QR lands on. */
+  page: {
+    title: "Join the waitlist",
+    description:
+      "Tho is nearly here. Leave your email and we'll tell you the day it lands on the App Store and Google Play.",
+    back: "Back to Bhutan Salons",
+  },
 } as const;
 
 export const footer = {

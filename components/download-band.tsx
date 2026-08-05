@@ -1,15 +1,32 @@
-import { download } from "@/lib/content";
+import { brand, download, waitlist } from "@/lib/content";
 import { parseHeading } from "@/lib/heading";
 import { MountainRule } from "./ui/bhutan";
 import { ParallaxImage } from "./ui/parallax-image";
+import { QrCode } from "./ui/qr-code";
 import { Reveal } from "./ui/reveal";
 import { Container } from "./ui/section";
 import { StoreBadges } from "./ui/store-badges";
 import { TextReveal } from "./ui/text-reveal";
+import { WaitlistCta } from "./waitlist-cta";
+
+/**
+ * Where the QR points. An absolute URL because the whole point is that it is
+ * read by a camera on a different device, which has no origin to resolve
+ * against — and `?src=qr` is what makes a scan distinguishable from a click in
+ * `app_waitlist.source`.
+ */
+const QR_TARGET = `https://${brand.domain}/waitlist?src=qr`;
 
 /**
  * Closing download band. The page's primary action appears twice — here and in
  * the hero — because everything between them is the argument for tapping it.
+ *
+ * Pre-launch that action is the waitlist, and this band is the one place that
+ * gets a **scannable** QR beside it. It is here rather than in the hero for the
+ * same reason the band exists at all: somebody at the bottom of the page has
+ * read the argument, and they are the ones who will pick up a phone. It
+ * resolves to `/waitlist` — a real route — because a camera cannot open a
+ * modal.
  */
 export function DownloadBand() {
   return (
@@ -53,8 +70,35 @@ export function DownloadBand() {
               </p>
             </Reveal>
 
-            <Reveal delay={0.2}>
-              <StoreBadges tone="light" className="mt-8 justify-center" />
+            <Reveal delay={0.16}>
+              <div className="mt-8 flex flex-col items-center gap-6 sm:flex-row sm:items-stretch sm:justify-center">
+                <WaitlistCta source="download_button" size="lg" />
+
+                {/* The scan route, offered beside the tap route rather than
+                    instead of it — a laptop reader taps, a phone reader scans,
+                    and neither should have to switch device. */}
+                <div className="flex items-center gap-4 rounded-2xl bg-white/10 p-3 ring-1 ring-white/20 ring-inset backdrop-blur-md">
+                  <div className="rounded-xl bg-white p-2">
+                    <QrCode
+                      value={QR_TARGET}
+                      label={`QR code — scan to ${waitlist.cta.toLowerCase()} for ${brand.appName}`}
+                      className="size-16"
+                    />
+                  </div>
+                  <span className="pr-2 text-left">
+                    <span className="block text-[0.9375rem] font-semibold text-white">
+                      {waitlist.qr.caption}
+                    </span>
+                    <span className="block text-[0.8125rem] text-white/65">
+                      {waitlist.qr.sub}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </Reveal>
+
+            <Reveal delay={0.24}>
+              <StoreBadges tone="light" className="mt-7 justify-center" />
             </Reveal>
           </div>
 

@@ -8,14 +8,17 @@ import {
   useScroll,
   useSpring,
 } from "motion/react";
-import { Menu, Scissors, X } from "lucide-react";
-import { brand, nav } from "@/lib/content";
+import Image from "next/image";
+import { Menu, X } from "lucide-react";
+import { brand, nav, signIn, waitlist } from "@/lib/content";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
+import { useWaitlist } from "./waitlist-provider";
 
 export function SiteHeader() {
   const [condensed, setCondensed] = useState(false);
   const [open, setOpen] = useState(false);
+  const { open: openWaitlist } = useWaitlist();
   const { scrollY, scrollYProgress } = useScroll();
 
   // Thin brand-coloured read-progress line pinned above the nav.
@@ -65,13 +68,30 @@ export function SiteHeader() {
             className="flex shrink-0 items-center gap-2.5"
             aria-label={`${brand.name} home`}
           >
+            {/*
+              The brand mark: the Dzongkha syllable "Tho" in gold on crimson. It replaced a
+              lucide `Scissors` glyph on a rausch tile, and the tile geometry is deliberately
+              unchanged — same 36px box, same `rounded-xl`, same hover rotate — so only what
+              sits inside it is new.
+
+              `bg-rausch` and `text-white` are gone because the artwork carries its own ground,
+              and `overflow-hidden` is what clips a square JPEG to those corners. The crimson is
+              NOT rausch and is not meant to be; see the note in `app/globals.css`.
+            */}
             <span
               className={cn(
-                "bg-rausch grid size-9 place-items-center rounded-xl text-white",
+                "grid size-9 shrink-0 place-items-center overflow-hidden rounded-xl",
                 "transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:rotate-12",
               )}
             >
-              <Scissors className="size-[1.1rem]" strokeWidth={2.2} />
+              <Image
+                src="/tho-logo.jpg"
+                alt=""
+                width={36}
+                height={36}
+                priority
+                className="size-full object-cover"
+              />
             </span>
             <span
               className={cn(
@@ -110,17 +130,23 @@ export function SiteHeader() {
           </nav>
 
           <div className="flex items-center gap-2">
+            {/* Deliberately a bare `<a>` and not `Button`: this is the quiet
+                action beside the brand pill, and the height difference (42.5px
+                against the Button's 48px) is what reads as hierarchy. A
+                `variant="ghost"` Button would match its height, add a ring, and
+                need the wrapper below. The `sm:` gate is why the sheet carries
+                its own copy — below 640px this is not in the bar at all. */}
             <a
-              href="#salon-plans"
+              href={signIn.href}
               className="text-ink hover:bg-ink/5 hidden rounded-full px-4 py-2.5 text-[0.9375rem] font-medium transition-colors sm:inline-flex"
             >
-              Salon sign in
+              {signIn.label}
             </a>
             {/* The wrapper carries the breakpoint: a `hidden` passed into
                 Button would lose to its own `inline-flex` in the cascade. */}
             <span className="hidden sm:inline-flex">
-              <Button href="#download" arrow={false}>
-                Get the app
+              <Button arrow={false} onClick={() => openWaitlist("header")}>
+                {waitlist.cta}
               </Button>
             </span>
             <button
@@ -147,8 +173,17 @@ export function SiteHeader() {
             <div className="flex h-full flex-col px-6 py-6">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2.5">
-                  <span className="bg-rausch grid size-9 place-items-center rounded-xl text-white">
-                    <Scissors className="size-[1.1rem]" strokeWidth={2.2} />
+                  {/* The sheet's lockup is the bar's, minus the hover rotate — it opens from
+                      the bar and must not look like a different brand for the 600ms the
+                      reveal takes. */}
+                  <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-xl">
+                    <Image
+                      src="/tho-logo.jpg"
+                      alt=""
+                      width={36}
+                      height={36}
+                      className="size-full object-cover"
+                    />
                   </span>
                   <span className="text-[1.0625rem] font-semibold">
                     {brand.name}
@@ -194,17 +229,33 @@ export function SiteHeader() {
               </motion.nav>
 
               <div className="mt-auto flex flex-col gap-3 pt-8">
-                <Button href="#download" size="lg" className="w-full justify-center">
-                  Get the app
-                </Button>
+                {/* Close the sheet first: two overlays at once would leave the
+                    nav's scroll lock fighting the modal's, and the nav would
+                    still be under the dialog when it closes. */}
                 <Button
-                  href="#salon-plans"
+                  size="lg"
+                  className="w-full justify-center"
+                  onClick={() => {
+                    setOpen(false);
+                    openWaitlist("header");
+                  }}
+                >
+                  {waitlist.cta}
+                </Button>
+                {/* No `onClick` to close the sheet first, unlike the nav links
+                    above: `Button`'s link branch types `onClick` as `never`. It
+                    does not matter here and did when this jumped to an anchor —
+                    a cross-document navigation takes the whole overlay with it,
+                    where scrolling to `#salon-plans` left the page moving behind
+                    an opaque sheet. */}
+                <Button
+                  href={signIn.href}
                   variant="ghost"
                   size="lg"
                   arrow={false}
                   className="w-full justify-center"
                 >
-                  Salon sign in
+                  {signIn.label}
                 </Button>
               </div>
             </div>

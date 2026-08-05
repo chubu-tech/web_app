@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Reveal, RevealGroup } from "./ui/reveal";
 import { Container, Section, SectionHeading } from "./ui/section";
+import { WaitlistCta } from "./waitlist-cta";
 
 /**
  * Who pays what. The customer panel comes first and is visually separate from
@@ -67,19 +68,19 @@ export function Pricing() {
                 </ul>
               </div>
 
-              <Button
-                href={pricing.customer.cta.href}
-                size="lg"
-                className="shrink-0"
-              >
-                {pricing.customer.cta.label}
-              </Button>
+              {/* Pre-launch this is the waitlist, not a jump to the download
+                  band — the band no longer has anything to download either. */}
+              <WaitlistCta source="pricing" size="lg" className="shrink-0" />
             </div>
           </div>
         </Reveal>
 
-        {/* 2. Salons — the three plans. This is what "Salon sign in" jumps to,
-            so the anchor sits on the heading, not the section. */}
+        {/* 2. Salons — the three plans. `#salon-plans` is still reached from the
+            footer's "List your shop" (`lib/content.ts`), the `for-salons.tsx`
+            CTA and the JSON-LD in `app/page.tsx` — the header used to jump here
+            too, but its button now goes to the app's sign-in. The anchor sits on
+            the heading, not the section, so the scroll-margin below lands the
+            heading clear of the fixed header. */}
         <div id="salon-plans" style={{ scrollMarginTop: "7rem" }}>
           <Reveal className="mt-16 flex items-center gap-4 sm:mt-20">
             <h3 className="text-ink inline-flex shrink-0 items-center gap-2.5 text-[1.125rem] font-semibold">

@@ -7,8 +7,46 @@ This version has breaking changes — APIs, conventions, and file structure may 
 # Bhutan Salons — landing page
 
 The public marketing site for a Bhutan-first salon & barber booking marketplace.
-One route (`/`), **statically served** — no API routes, no auth, no runtime
-network calls. Next.js 16 (App Router), React 19, Tailwind 4, `motion`.
+Two routes (`/` and `/waitlist`), both **statically served** — no API routes and
+no auth. Next.js 16 (App Router), React 19, Tailwind 4, `motion`.
+
+## The one runtime network call
+
+"No runtime network calls" was true until the waitlist, and the exception is
+bounded on purpose: **nothing happens until somebody presses Join.** No fetch on
+load, on scroll or on navigation.
+
+The app is not on either store yet, so a button reading "Download on the App
+Store" cannot keep its promise. Every download call to action therefore opens a
+waitlist modal — the header CTA, both store badges, the pricing panel and the
+closing band — and the download band also carries a **real, scannable QR** that
+resolves to `/waitlist`, because a camera cannot open a modal.
+
+Four things about it are decisions, not implementation detail:
+
+- **It goes straight to Supabase from the browser**, not through a Route
+  Handler. A handler would mean a server, and the page would stop being a static
+  file. `lib/waitlist.ts` is the only place that talks to the network.
+- **The publishable key can join the list and cannot read it.** `app_waitlist`
+  has RLS on with no policies and no table grants, so the one reachable thing is
+  `join_app_waitlist()` — a definer function returning `joined` or `already`.
+  A visitor cannot enumerate the list they just joined.
+- **"Already on the list" is a success, not an error.** Someone checking whether
+  their first attempt worked deserves an answer.
+- **The badges become real links again on their own.** Paste the store URLs into
+  `brand.stores` and `StoreBadges` switches back to anchors with no other edit.
+  That is the switch — not a flag anybody has to remember. `download.body` and
+  `download.eyebrow` in `lib/content.ts` are the copy to revert at the same time.
+
+The **decorative** QR in `queue-live.tsx` (`QrTile`) is a different thing and was
+left alone: it illustrates scanning at a salon door to join a queue, which is a
+real product feature that has nothing to do with downloading the app. Do not
+repoint it at the waitlist.
+
+Signups land in the `bsalons` project and are read by the operator console at
+`../admin/app/(console)/waitlist`, which is also where the launch announcement
+is sent from. Schema:
+`tho/supabase/migrations/20260805000002_app_waitlist.sql`.
 
 **One data dependency.** The "Find a salon" band lists real salons. `lib/salons.ts`
 reads them from the `tho` Supabase project **at build time** with the publishable
@@ -58,7 +96,8 @@ It is not part of this app.
 ## Rules
 
 - **All copy lives in `lib/content.ts`.** One place to edit. Components read
-  from it; don't inline strings that make a claim.
+  from it; don't inline strings that make a claim. That includes the waitlist's
+  error messages — a form is mostly copy.
 - **Plain words only.** No "dashboard", "admin", "analytics", "CRM", "roster",
   "storefront". Say "one screen", "your customer list", "how the week went". A
   salon owner in Thimphu should not have to decode anything.

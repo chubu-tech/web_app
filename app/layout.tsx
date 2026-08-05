@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, DM_Sans, Instrument_Serif } from "next/font/google";
 import "./globals.css";
+import { WaitlistProvider } from "@/components/waitlist-provider";
 import { brand, hero } from "@/lib/content";
 
 /* DM Sans carries the whole marketing site: geometric, open, low contrast —
@@ -90,7 +91,13 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        {children}
+        {/*
+          The waitlist modal's host. In the root layout rather than on `/`
+          because every download call to action can open it and they are spread
+          across the header, the hero, the pricing panel and the closing band —
+          and because `/waitlist` renders the same form without it.
+        */}
+        <WaitlistProvider>{children}</WaitlistProvider>
       </body>
     </html>
   );

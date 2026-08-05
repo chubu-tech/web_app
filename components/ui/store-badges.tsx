@@ -1,5 +1,9 @@
-import { brand } from "@/lib/content";
+"use client";
+
+import { brand, waitlist } from "@/lib/content";
+import type { WaitlistSource } from "@/lib/waitlist";
 import { cn } from "@/lib/utils";
+import { useWaitlist } from "../waitlist-provider";
 
 /** Apple's logo mark. */
 function AppleMark({ className }: { className?: string }) {
@@ -32,9 +36,19 @@ function PlayMark({ className }: { className?: string }) {
 }
 
 /**
- * App Store + Google Play buttons. Each badge is a real link once the store
- * URLs land in `brand.stores`; until then it falls back to the page's download
- * section so nothing is a dead link.
+ * App Store + Google Play buttons.
+ *
+ * **The badge is a link once the app exists, and the waitlist until then.**
+ * `brand.stores` is empty pre-launch, and a badge that says "Download on the
+ * App Store" and then scrolls you down the page is the thing this replaces:
+ * the promise is the download, so failing to deliver one has to be answered
+ * with something, and "we'll email you when it lands" is that something.
+ *
+ * The switch is the data, not a flag anybody has to remember to flip. Paste the
+ * real URLs into `brand.stores` and every badge on the site becomes an anchor
+ * again — same markup, same styling — with no other edit. That is also why the
+ * two branches render one shared `inner`: they must not drift apart while one
+ * of them is the only one anyone ever sees.
  */
 export function StoreBadges({
   className,
@@ -44,50 +58,71 @@ export function StoreBadges({
   /** `ink` on light backgrounds, `light` over photography. */
   tone?: "ink" | "light";
 }) {
+  const { open } = useWaitlist();
+
   const badges = [
     {
-      mark: <AppleMark className={tone === "ink" ? "text-white" : "text-white"} />,
+      mark: <AppleMark className="text-white" />,
       top: "Download on the",
       store: "App Store",
-      href: brand.stores.ios || "#download",
+      href: brand.stores.ios,
+      source: "app_store" as WaitlistSource,
       label: `Download ${brand.appName} on the App Store`,
+      waitingLabel: `${brand.appName} is coming to the App Store — ${waitlist.cta.toLowerCase()}`,
     },
     {
       mark: <PlayMark />,
       top: "Get it on",
       store: "Google Play",
-      href: brand.stores.android || "#download",
+      href: brand.stores.android,
+      source: "google_play" as WaitlistSource,
       label: `Get ${brand.appName} on Google Play`,
+      waitingLabel: `${brand.appName} is coming to Google Play — ${waitlist.cta.toLowerCase()}`,
     },
   ];
 
+  const shell = cn(
+    // The min-width keeps both badges the same size when they stack.
+    "group/badge flex min-w-[11rem] items-center gap-3 rounded-2xl px-4 py-2.5 text-left",
+    "transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5",
+    tone === "ink"
+      ? "bg-ink text-white hover:bg-obsidian"
+      : "bg-white/12 text-white ring-1 ring-white/25 ring-inset backdrop-blur-md hover:bg-white/20",
+  );
+
   return (
     <div className={cn("flex flex-wrap items-center gap-3", className)}>
-      {badges.map((badge) => (
-        <a
-          key={badge.store}
-          href={badge.href}
-          aria-label={badge.label}
-          className={cn(
-            // The min-width keeps both badges the same size when they stack.
-            "group/badge flex min-w-[11rem] items-center gap-3 rounded-2xl px-4 py-2.5",
-            "transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5",
-            tone === "ink"
-              ? "bg-ink text-white hover:bg-obsidian"
-              : "bg-white/12 text-white ring-1 ring-white/25 ring-inset backdrop-blur-md hover:bg-white/20",
-          )}
-        >
-          {badge.mark}
-          <span className="text-left">
-            <span className="block text-[0.625rem] tracking-[0.08em] text-white/65 uppercase">
-              {badge.top}
+      {badges.map((badge) => {
+        const inner = (
+          <>
+            {badge.mark}
+            <span className="text-left">
+              <span className="block text-[0.625rem] tracking-[0.08em] text-white/65 uppercase">
+                {badge.href ? badge.top : "Coming soon to"}
+              </span>
+              <span className="block text-[0.9375rem] leading-tight font-semibold">
+                {badge.store}
+              </span>
             </span>
-            <span className="block text-[0.9375rem] leading-tight font-semibold">
-              {badge.store}
-            </span>
-          </span>
-        </a>
-      ))}
+          </>
+        );
+
+        return badge.href ? (
+          <a key={badge.store} href={badge.href} aria-label={badge.label} className={shell}>
+            {inner}
+          </a>
+        ) : (
+          <button
+            key={badge.store}
+            type="button"
+            onClick={() => open(badge.source)}
+            aria-label={badge.waitingLabel}
+            className={shell}
+          >
+            {inner}
+          </button>
+        );
+      })}
     </div>
   );
 }

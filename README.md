@@ -56,6 +56,26 @@ Two behaviours worth knowing before changing them:
 - **"When" filters on opening hours, not free slots** — there is no public
   availability lookup, so the copy must not imply one.
 
+## The link into the app
+
+The header's "Sign in" button is the only link off this site and into the
+product (`../tho_web`, a separate origin).
+
+| Variable | Notes |
+| --- | --- |
+| `NEXT_PUBLIC_APP_URL` | Origin of the web app. Defaults to `http://localhost:3000` |
+
+`brand.appUrl` in `lib/content.ts` holds it and `signIn.href` builds
+`${appUrl}/sign-in`; both header controls — the bar's pill and the mobile
+sheet's footer — read from `signIn`, so the label and the destination cannot
+drift apart. Being `NEXT_PUBLIC_`, it is inlined at `next build`, so changing it
+needs a rebuild. Locally both apps run `next dev` on 3000, so whichever starts
+second gets 3001; if that is tho_web, put
+`NEXT_PUBLIC_APP_URL=http://localhost:3001` in `.env.local`.
+
+No `?next=` is sent: tho_web routes by role after sign-in, and its `safeNext`
+helper drops absolute URLs anyway.
+
 ## Page architecture
 
 Seven blocks, in the order a first-time visitor needs them:
