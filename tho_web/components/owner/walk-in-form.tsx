@@ -212,7 +212,10 @@ export function WalkInForm({
       </section>
 
       {slot ? (
-        <div className="border-hairline bg-canvas sticky bottom-0 -mx-4 border-t px-4 py-3 tablet:static tablet:mx-0 tablet:border-0 tablet:px-0">
+        /* The safe-area padding is load-bearing below 744, for the same reason as the chat
+           composer: this sticky bar used to clear the bottom edge only because `main`
+           reserved 62px for the tab bar. That reservation is gone. */
+        <div className="border-hairline bg-canvas sticky bottom-0 -mx-4 border-t px-4 py-3 pb-[calc(var(--spacing-md)+env(safe-area-inset-bottom))] tablet:static tablet:mx-0 tablet:border-0 tablet:px-0 tablet:pb-0">
           <Button fullWidth busy={busy} onClick={() => void submit()}>
             Book walk-in ·{" "}
             {formatMinutesOfDay(thimphuMinutesOfDay(slot.start))}

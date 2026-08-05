@@ -28,7 +28,8 @@ export default async function ReschedulePage({
   const movable = isActive(booking) && booking.staffMemberId != null && services.length > 0;
 
   return (
-    <div className="px-base py-lg mx-auto w-full max-w-[720px] pb-40 tablet:px-lg">
+    // Clears `RescheduleFlow`'s fixed "Move to HH:MM" bar. See the note on `/salon/[id]/book`.
+    <div className="px-base py-lg mx-auto w-full max-w-[720px] pb-[calc(var(--cta-clearance)+env(safe-area-inset-bottom))] tablet:px-lg">
       <div className="gap-md mb-lg flex items-start">
         <HeroCircleButton
           icon={Icons.back}

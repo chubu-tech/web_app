@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import {
   BACK_OFFICE_DESTINATIONS,
   SETUP_DESTINATIONS,
@@ -111,6 +112,28 @@ export function SettingsHub({
       <p className="text-caption-sm text-muted mt-lg">
         Everything here is shared with the phone app — the same salon, the same numbers.
       </p>
+
+      {/*
+        The way out, and from 1024 up the *only* way out.
+
+        The console's collapse panel used to carry sign-out at every width. It now exists only
+        below 1024, where the hamburger that opens it does — so without this an owner on a
+        desktop would be back to the defect the panel was added to fix: no reachable sign-out
+        anywhere in the console, the salon switcher included.
+
+        At the bottom, under a rule and its own heading, because a session control is not a
+        setting: it does not belong in either group above, and a red button among the rows an
+        owner clicks all day is a mis-click waiting to happen. `fullWidth` off for the same
+        reason — a full-bleed red bar reads as the page's primary action.
+      */}
+      <div className="border-hairline-soft mt-xl pt-lg border-t">
+        <SectionHeader title="Account" />
+        <p className="text-body-sm text-muted mb-base">
+          Signing out ends the session on this device and forgets which salon you were
+          looking at. Your salon, your bookings and your team are untouched.
+        </p>
+        <SignOutButton label="Log out" fullWidth={false} destructive />
+      </div>
     </div>
   );
 }

@@ -293,6 +293,12 @@ export function toBooking(m: Row): Booking {
     attachmentPaths: rawAttachments
       .map((a) => str(a.url))
       .filter((p): p is string => p != null),
+    // `BOOKING_SELECT` is `*`, so the column already arrives on every booking read —
+    // the customer's list, one booking, and the owner's day. Defaulted rather than left
+    // undefined, because the toggle's checked state is `!remindersMuted` and a missing
+    // value must read as "reminders on", which is the column's own default.
+    remindersMuted: (m.reminders_muted as boolean | null) ?? false,
+    businessPlan: biz ? str(biz.plan) : null,
   };
 }
 

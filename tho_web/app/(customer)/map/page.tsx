@@ -21,19 +21,27 @@ export const metadata: Metadata = {
  * decision is made where the search is.
  *
  * The height is fixed rather than flexed. `main` in the customer shell is a flex child
- * of a `min-h-full` column, and a leaflet container needs a definite height to size
- * its panes, so this subtracts the chrome directly: below 744 the fixed tab bar (whose
- * space `main` already reserves with padding), above it the sticky top nav. The one
- * known cost is that while `InLineBar` is on screen the page scrolls by that bar's
- * height — measuring chrome at runtime to avoid ~48px of scroll on one route, for a
- * bar that only appears while a place is held, is the worse trade.
+ * of a `min-h-full` column, and a leaflet container needs a definite height to size its
+ * panes, so this subtracts the chrome directly.
+ *
+ * **One subtraction, at every width, from a token.** It used to be two expressions with
+ * two different literals — `62px` for the phone tab bar below 744 and `64px` for the
+ * sticky top nav above it — plus a safe-area term for the bar's inset. With the bottom
+ * bar gone there is exactly one piece of chrome above this page and nothing below it, so
+ * the arithmetic collapses to the header's own height. `--header-height` is a token
+ * rather than a literal because that literal used to appear in eight files, and getting
+ * one of them wrong is invisible until somebody opens that page at 390px.
+ *
+ * The one known cost is unchanged: while `InLineBar` is on screen the page scrolls by
+ * that bar's height. Measuring chrome at runtime to avoid ~48px of scroll on one route,
+ * for a bar that only appears while a place is held, is still the worse trade.
  */
 export default async function MapPage() {
   const supabase = await createClient();
   const salons = await fetchBusinesses(supabase);
 
   return (
-    <div className="h-[calc(100svh-62px-env(safe-area-inset-bottom))] tablet:h-[calc(100svh-64px)]">
+    <div className="h-[calc(100svh-var(--header-height))]">
       <h1 className="sr-only">Map</h1>
       <MapView salons={salons} />
     </div>

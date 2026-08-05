@@ -19,6 +19,29 @@
 export const ACTIVE_BUSINESS_COOKIE = "tho_active_business";
 
 /**
+ * The cookie's attributes, in one place so the write and the clear cannot drift apart.
+ *
+ * That mattered: until sign-out was fixed, **nothing in the repo ever cleared this cookie** — it
+ * was written with a one-year `maxAge` and `path: "/"` and simply stayed, so a till machine kept
+ * sending a previous user's salon id on every request long after their session was gone. A browser
+ * cannot clear it either, because it is `httpOnly`. Clearing it needs a Route Handler sending the
+ * *same* name, path and protocol back with `maxAge: 0`, which is why these live beside the name
+ * rather than being spelled out at each call site.
+ *
+ * Not a data leak — `resolveActiveBusinessId` filters against what the caller owns and RLS refuses
+ * the rows regardless — but it is exactly the residue a sign-out is expected to clear.
+ */
+export const ACTIVE_BUSINESS_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax",
+  path: "/",
+  secure: process.env.NODE_ENV === "production",
+} as const;
+
+/** A year: which salon you were last looking at is a preference, not a session. */
+export const ACTIVE_BUSINESS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+
+/**
  * The saved salon if it is still one of `ownedIds`, else the first, else `null` for an
  * owner with no salon at all — who gets the "no salon yet" state rather than a crash.
  *

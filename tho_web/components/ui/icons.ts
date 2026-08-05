@@ -38,6 +38,7 @@ import {
   Landmark,
   Link2,
   LogOut,
+  Menu,
   MoreHorizontal,
   Plus,
   Receipt,
@@ -106,6 +107,12 @@ export const Icons = {
   back: ArrowLeft,
   forward: ArrowRight,
   close: X,
+  /**
+   * The collapse-nav trigger. New with the header that replaced the bottom tab bars —
+   * a phone app with a tab bar never needs a hamburger, so the set had no glyph for one.
+   * Pairs with `close`, which is what the button becomes while the panel is open.
+   */
+  menu: Menu,
   share: Share2,
   settings: Settings,
   add: Plus,

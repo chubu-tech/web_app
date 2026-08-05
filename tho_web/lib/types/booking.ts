@@ -52,6 +52,23 @@ export type Booking = {
    * URL here would defeat the bucket's whole point.
    */
   attachmentPaths?: string[];
+  /**
+   * The customer switched this booking's automatic reminders off — `bookings.reminders_muted`.
+   *
+   * **Server-owned**, which is the whole point: the app used to write
+   * `reminder_<bookingId>` to `SharedPreferences`, where nothing read it back and it did not
+   * follow you to another device. `private.enqueue_booking_reminders` now returns early on
+   * this column, so it is honoured — and honoured across a reschedule too, which is the
+   * regression `20260803000003` exists for.
+   *
+   * Note the polarity: the column stores **muted**, `set_booking_reminders` takes **enabled**.
+   */
+  remindersMuted?: boolean;
+  /**
+   * The salon's plan, carried so the reminder toggle can be hidden where reminders are not
+   * enqueued at all. `private.enqueue_booking_reminders` returns early below growth.
+   */
+  businessPlan?: string | null;
 };
 
 /* --------------------------------------------------------------------------

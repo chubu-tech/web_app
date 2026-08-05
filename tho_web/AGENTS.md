@@ -197,8 +197,85 @@ Two rules that are decisions, not styling:
 Stars are **always** `--color-star`, ratings only. Light mode only; there is no
 dark mode in DESIGN.md and the canvas is always pure white.
 
-**Do not borrow from `../landing_page`.** Its cream canvas and editorial type are
-a deliberate marketing-only layer that the product does not use.
+### Two token systems, one file, and a rule
+
+This used to say *"do not borrow from `../landing_page`"*. **That changed deliberately, for the
+customer side only.** The 20 customer routes now render in the marketing site's editorial layer
+— cream `#f6f3ee` canvas, DM Sans / Bricolage Grotesque / Instrument Serif, slab radii — so a
+visitor arriving from the marketing site sees one continuous product. The 26 owner routes keep
+the product tokens unchanged, because a dense operational console loses legibility on an
+editorial canvas.
+
+The mechanism is a scoped variable override: `[data-shell="customer"]` on the customer group's
+wrapper re-points three variables, and because **every generated colour utility resolves through
+`var()`** (verified in the compiled stylesheet: `.bg-canvas { background-color:
+var(--color-canvas) }`) that re-skins 86 call sites — 62 customer, **24 in the shared
+`components/ui` kit** — with no class strings changed, and the kit adapts to whichever shell
+renders it. Three traps, all load-bearing:
+
+- **`font-family`, not `--font-sans`.** Preflight sets `font-family:
+  var(--default-font-family)` on `html, :host` **only**, and that resolves at `:root` — so
+  overriding either variable on a descendant changes nothing.
+- **`body:has([data-shell="customer"])` is what makes the viewport cream**, because
+  `body { background: var(--color-canvas) }` resolves the variable *on body*. Without it iOS
+  overscroll shows white.
+- **Never `@theme inline`.** It substitutes declared values into utilities instead of `var()`,
+  which would make the whole scope block a silent no-op.
+
+> **The rule for adding a token:** override a shared name only when both shells mean the same
+> *role* and differ only in *value*. When they mean different *sizes*, add a new name.
+
+That is why the editorial display scale is `--text-editorial-*` and **not** an override of
+`--text-display-*`: the latter is a 19px section title here and a 30–48px headline there, used
+at 33 call sites including three in the shared kit — so overriding it would have retyped 14
+customer headings invisibly and given `SectionHeader` two different scales depending on its
+caller. Same reasoning for `--radius-slab` versus `--radius-md`.
+
+Also: `@theme` output is **usage-pruned**. A token no utility and no rule references is not
+emitted at all, which is why the chrome heights live outside it.
+
+**A comment is not invisible to Tailwind, and neither is this file.** The scanner is
+content-based and does not parse JS or Markdown — it matches candidates in *any* non-ignored
+source, so a class-shaped string in prose gets compiled. A `pb-` arbitrary value wrapping
+`env(` + an ellipsis + `)` — written in a doc comment as shorthand for the real utility —
+generated an invalid rule and took the dev server down with *"Unexpected token Delim('.')"*,
+while `npm run build` passed.
+
+It happened **twice**: first in `chat-thread.tsx`, then in the sentence you are reading, which
+described the hazard by quoting it and so reproduced it. Two rules, not one:
+
+- Keep bracket utilities out of code comments.
+- In prose, never write a utility prefix immediately followed by `[`. Describe the shape in
+  words, as above, or quote only the part inside the brackets. An ellipsis is not a safe
+  placeholder — `.` is what the CSS parser chokes on.
+
+**A route group is not a `not-found` boundary.** Layouts resolve *through* route groups;
+`not-found.tsx` resolves by **URL path**, and `(customer)` contributes no path segment. So
+`app/(customer)/not-found.tsx` never rendered once — for `/salon/[id]` the boundary lookup
+walks `app` → `salon` → `[id]`, skips the group, finds nothing, and falls back to Next's
+built-in page. It was written, it looked right, and it was dead code. The RSC payload is what
+proved it, naming `"pagePath":"__next_builtin__not-found.js"` with an inline `system-ui` stack
+and `background:#fff`.
+
+The 404s therefore live at **`app/not-found.tsx`** (root) and **`app/business/not-found.tsx`**
+(`business` *is* a real segment, so that one resolves normally and renders inside
+`OwnerLayout`, keeping the console's chrome). Two consequences worth knowing:
+
+- The root boundary renders in `app/layout.tsx` **only** — the `(customer)` layout is not in
+  the tree, so it carries its own `data-shell="customer"` wrapper and wordmark. Without them a
+  404 is a dead end with no navigation.
+- **Only a root boundary can answer an unmatched URL**, which has no segment to look up — and
+  on a website that is the *common* 404, not the rare one.
+
+Do not verify a `notFound()` page with `curl`: Next ships it as a client-rendered error
+fallback, so the markup is in the RSC payload and `data-shell` appears only as escaped
+`data-shell\":\"customer\"` until React hydrates. The computed style of the live DOM is the
+only honest check.
+
+**`tho_web` has never rendered in Inter.** `app/layout.tsx` declared `--font-inter` with a
+comment claiming `globals.css` owned the font stack; nothing referenced that variable, so
+Tailwind's `--default-font-family` resolved to its own system stack on every route. The loader
+is deleted rather than wired up — the owner console is meant to keep looking as it does.
 
 **Desktop is new design work**, not a port. The Flutter screens are phone-only.
 `../tho/DESIGN.md:518-537` gives the breakpoints (`tablet` 744 / `desktop` 1128 /
@@ -362,10 +439,43 @@ Renaming it breaks every QR already on a counter.
 says the page updates itself instead — and 2d's inbox is now where those events actually
 reach someone.
 
-Web Push stays deferred by decision, not by difficulty: `devices` plus the existing worker
-would accept an FCM **web** token with no change in `../tho`, but delivery needs a Firebase
-web config and an `FCM_SERVICE_ACCOUNT` secret that do not exist. If it lands, the strings
-to change are in `QueuePositionCard` and the join form's projection note.
+Web Push stays deferred **by decision** — the in-app inbox is the channel this app offers —
+and that decision is now the only thing keeping it out, because the mechanism upstream is
+done: the app carries `firebase_messaging`, registers tokens through `register_device`, and
+`pushPlatformFor` already returns `'web'` for a browser, which `devices.platform` accepts. So
+a web token would be accepted with **no change in `../tho`**; delivery needs a Firebase web
+config and an `FCM_SERVICE_ACCOUNT` secret that exist for **no** platform yet. If it lands,
+register through the **`register_device` RPC**, never a direct `devices` insert — it deletes
+another profile's claim on the same token, which the client cannot do and which is what stops
+a resold handset receiving the previous owner's appointments. The strings to change are in
+`QueuePositionCard` and the join form's projection note.
+
+### Reminders are real now, and the toggle is ported
+
+`20260803000003_booking_reminder_mute` added `bookings.reminders_muted` and
+`set_booking_reminders`. Until then the app's "Remind me" switch wrote
+`reminder_<bookingId>` to `SharedPreferences` and **nothing read it back**, which is why this
+repo declined to port it. That rationale is gone: the column is server-owned, and every
+reminder branch of `handle_booking_status_event` routes through
+`private.enqueue_booking_reminders`, which returns early on it — so the mute cannot be
+bypassed and it survives a reschedule, the regression the migration exists for.
+
+Three things to get right, all measured against the live RPC:
+
+- **The polarity is inverted.** The RPC takes `p_enabled`; the column stores
+  `reminders_muted = not p_enabled`. Passing the column straight through compiles, runs, and
+  means the opposite.
+- **`42501` covers two cases** — a stranger's booking *and* a walk-in, whose
+  `customer_profile_id` is null so there is nobody to ask. So the toggle is **absent** on a
+  walk-in rather than present and doomed; same rule Check in already follows.
+- **It is Growth+.** `enqueue_booking_reminders` returns early below growth, so on a Basic
+  salon the switch would save a genuine preference against something that never fires. Shown as
+  nothing rather than a locked control: a customer cannot upgrade someone else's salon.
+  `BOOKING_SELECT` carries `businesses(plan)` for this.
+
+`P0002` means *"no such booking"* here and *"a product is no longer available"* for
+`place_order` — which is exactly why `queue-errors.ts` maps by (RPC, code). `booking-errors.ts`
+is booking-scoped so it is unambiguous, but do not merge the two tables.
 
 ## The owner console
 
@@ -890,6 +1000,30 @@ handing back only those four columns. Two lessons worth keeping:
 the facts are an About block on `/profile` and the switches are not ported. `destinations.ts`
 says so where the entry used to be.
 
+## Signing out
+
+**`app/auth/sign-out/route.ts` — a form POST to a Route Handler, not a client call.** It was a
+client `auth.signOut()` in a button rendered by exactly one file, `/profile`, and the owner
+console has no `/profile` and never linked to one — so **an owner had no reachable way to sign
+out at all**. Three surfaces POST to it now: `/profile`, both collapse panels, and the foot of
+`/business/settings` — that last one because the owner's panel stopped existing above 1024 and
+would otherwise have re-opened this hole on desktop. Two further defects came out of the same
+read:
+
+- **No `catch`.** A failed `signOut()` left `busy` true for ever, so the button sat disabled
+  with a spinner. "I can't log out" had two independent causes.
+- **`tho_active_business` was never cleared by anything.** It is `httpOnly` with a one-year
+  `maxAge` and `path: "/"`, so browser JavaScript *architecturally cannot* clear it — only a
+  route handler can send it back expired. On a shared till machine a previous user's salon id
+  kept being transmitted on every request. Not a data leak (`resolveActiveBusinessId` filters
+  against what the caller owns, and RLS refuses the rows regardless), but exactly the residue a
+  sign-out is expected to remove.
+
+Its attributes now live in `ACTIVE_BUSINESS_COOKIE_OPTIONS` beside the name, because a clear
+has to repeat the write's own path and protocol or the browser will not match it. Verified by
+measurement: switch to the second salon, sign out, sign back in, and the console reopens on the
+**first** — which only happens if the cookie is gone.
+
 ## Uploading to the `media` bucket
 
 Two rules, both learned by measurement rather than from the schema:
@@ -921,17 +1055,74 @@ Two rules, both learned by measurement rather than from the schema:
 Measure a storage write against the live bucket before believing it. Both of these looked
 correct in review, and one of them had been shipping broken for four migrations.
 
-## The nav's rule below 744, for both roles
+## The nav collapses; there is no bottom bar
 
-`TABS` — the five the app has — are the **only** things in the bottom bar. `SECONDARY`
-joins the top nav at ≥744 and appears as rows on `/profile` below it, which is what the
-app's drawer is. Both come off `destinations.ts`, so the nav and Profile cannot disagree
-about what exists.
+**Both bottom tab bars are gone.** A thumb-reachable strip glued to the bottom of the
+viewport is a phone-app idiom, and on a desktop browser it was the clearest single tell that
+this app was a port. What replaced them:
 
-The original flattening put `SECONDARY` in the bar too. That was right at four items and
-broke the moment Chats and Notifications landed — nine destinations do not fit on a 390px
-bar at a usable tap size. The **Profile tab carries a dot** when anything under it is
-unread, so nothing arrives unannounced on a phone.
+- `components/ui/app-header.tsx` — one sticky 64px header, used by both shells.
+- `components/ui/collapse-nav.tsx` — the overlay, modelled on the marketing site's circle
+  reveal with its **six** accessibility gaps closed (it has no `aria-expanded`, no
+  `aria-controls`, no `role="dialog"`, no Escape, no focus trap and no focus restore — its own
+  sibling file says so in a comment).
+- `components/ui/use-dialog-overlay.ts` — scroll lock, focus in, Escape, Tab trap, focus
+  restore, **extracted from `Sheet`** so the nav could not fall behind it. `Sheet` calls the
+  same hook; there are 27 `<Sheet>` call sites and the extraction is a verbatim move, so the
+  risk is uniform rather than per-caller.
+
+**Customer:** `<744` wordmark · bell · menu (all nine destinations in two groups) · sign-out.
+`744–1127` the five `TABS` come inline. `≥1128` `SECONDARY` joins as icon buttons and the
+menu disappears. `SECONDARY` still appears as rows on `/profile`, so the nav and Profile
+cannot disagree about what exists.
+
+**Owner: one row, collapsing at 1024** — `--breakpoint-console`, the one breakpoint not in
+DESIGN.md. Above it all five destinations are inline and the hamburger is **not rendered**;
+below it the destinations leave the header entirely and the hamburger takes their place, on
+the right, opening the same five as panel rows. `phoneOwnerTabs()` and the phone-only settings
+gear are **deleted** — their justification was that five fixed items at 390px leaves each
+78px.
+
+The tier exists because the console collapses on a different axis from the customer shell:
+five labelled tabs plus a nine-salon switcher plus a bell do not fit at 744, so the width that
+suits the customer's five left this header cramped between 744 and 1024. `AppHeader` therefore
+takes `navFrom` rather than hard-coding `tablet:`, and `CollapseNavPanel` takes `closeAbove`
+so it dismisses itself at whichever width its own hamburger disappears at — 1128 for the
+customer, 1024 here. **If those two ever disagree the failure is an open menu covering a nav
+that is already visible, with nothing on screen to close it.**
+
+This replaced a second header row — a 44px horizontally-scrollable strip below 744, on the
+reasoning that an owner works one-handed at a till and a tap plus an overlay is the wrong toll
+for the five things they touch all day. That reasoning still holds; the strip only ever
+covered *below 744*, which is not where the problem was. If the toll turns out to matter,
+bring the strip back at 1024 rather than at 744.
+
+**The owner's menu no longer holds only the account**, and the consequence is load-bearing:
+above 1024 there is no panel, so `/business/settings` carries its own sign-out. Without it a
+desktop owner is back to having no reachable way out of the console — the exact defect the
+panel was added to fix. Two surfaces, one route handler.
+
+Two things collapsing the customer pair fixed for free: `CustomerTopNav` and `CustomerTabBar`
+**each** called `useInboxCounts`, so every customer page ran two independent 30-second polls
+of the same two reads — now one. And `secondaryHasUnread`, which made the Profile tab wear a
+dot as a *proxy* for anything unread beneath it, is replaced by `hiddenUnread`: the bell is on
+screen at every width now, so the menu's dot means only the thing the header cannot show.
+
+### Two tokens, because the literal was in eight files
+
+`--header-height: 64px` and `--cta-clearance: 96px`, in a plain `:root` block **outside
+`@theme`** — Tailwind prunes theme variables nothing references, and these are consumed only
+from arbitrary values: an `h-` utility whose value is `calc(100svh - var(--header-height))`.
+The scanner sees that candidate perfectly well (see the comment hazard above) and emits the
+rule; what it does not do is treat a `var()` *inside* an arbitrary value as a **use** of the
+theme token, so declaring these in `@theme` got them pruned out of `:root` while the rules
+referencing them survived. Verified against the compiled sheet, not assumed.
+
+Removing the bar touched **13** sites. Two of them are the interesting ones, and a grep for
+`62px` misses both: `chat-thread.tsx`'s composer and `walk-in-form.tsx`'s footer are
+`position: sticky; bottom: 0` *inside* `main`, and they cleared the bottom edge only because
+`main` reserved 62px of padding for the bar. Remove the padding and they land on the iOS home
+indicator. **A sticky element's clearance can be an accident of an ancestor's padding.**
 
 Badge counts come from `useInboxCounts`, client-side and polled: the shell already does
 `getAccount()` and a `queue_entries` read per page, and two more server reads to render a
@@ -1008,13 +1199,31 @@ Check assumptions against it before trusting a column:
   follower, 1 photo.
 - **1 of 17 profiles has an avatar and 2 have a phone**, both seeded. The app cannot set a
   phone at all, which is why every notification fails with "no deliverable channel".
-- **The local `../tho` checkout can be behind the live schema.** Two migrations were
-  applied on 2026-08-03 (`register_device_rpc`, `booking_reminder_mute`) with no file in the
-  local `supabase/migrations/`; they turned out to be on `origin/main`, **8 commits ahead**
-  of the local `main`. Fetch before concluding that something is missing upstream — and
-  note that the same fetch shows FCM push delivery, multi-service bookings and final
-  pricing have landed in the app, all of which this repo mirrors and none of which it has
-  yet.
+- **The local `../tho` checkout can drift behind the live schema.** Two migrations were applied
+  on 2026-08-03 (`register_device_rpc`, `booking_reminder_mute`) before either had a file
+  locally. Both are now on `main` and present, and the 9 previously-untracked files are
+  committed. Fetch before concluding something is missing upstream. Of the three things that
+  fetch brought, the old note here was wrong about two:
+  - **Final launch pricing is already mirrored** — `lib/plans.ts` carries Nu 399 / 699 / 1,499
+    and the no-free-tier rule, matching `plans_config.dart`.
+  - **Multi-service bookings are mirrored on the owner side only** —
+    `components/owner/walk-in-form.tsx` builds a basket. (Not `add-walk-in-sheet.tsx`, which is
+    the *queue* walk-in and single-service by design, because `join_queue` takes one
+    `p_service_id`.) The **customer** flow still books one service at a time. That is the real
+    gap, and it is the next slice.
+  - **FCM push is upstream and absent here**, deliberately — see the Web Push note.
+- **`services.category` is filled on 2 of 33 rows**, so it cannot carry a taxonomy;
+  `business_categories` has 16 rows across 9 salons and is the only populated one. Anything
+  grouping services by category on live data would file everything under "Other".
+- **`services_select` says nothing about the business** — it is
+  `(is_active and deleted_at is null) or is_business_member(...)`, so a cross-salon
+  `select services` returns services belonging to **pending and inactive** salons. Join
+  `businesses!inner` and filter it. Second instance of this shape after `staff_select` on
+  `/stylist/[id]`.
+- **Every active booking is on a *basic* salon** (4 of them, all `confirmed`), and reminders are
+  Growth+. So the customer reminder toggle has **no live example**: its gate correctly renders
+  nothing everywhere, and the editable branch is proved by RPC inside a rolled-back transaction
+  instead.
 - **`owner@bhutansalons.test` owns NINE salons**, not one — Norzin Salon & Spa on **growth**
   and eight on **basic**. That is a live example on both sides of every plan gate, and it is
   what makes the salon switcher load-bearing rather than theoretical.

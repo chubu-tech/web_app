@@ -111,7 +111,7 @@ export function ReviewSheet({
                     aria-hidden
                     style={{ width: IconSize.xl, height: IconSize.xl }}
                     className={cn(
-                      "transition-transform duration-[--duration-fast]",
+                      "transition-transform duration-[var(--duration-fast)]",
                       lit
                         ? "text-star scale-100 fill-current drop-shadow-[0_0_12px_rgba(232,163,23,0.35)]"
                         : "text-hairline scale-[0.88]",

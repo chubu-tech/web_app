@@ -343,9 +343,14 @@ export default async function SalonPage({
             in column 2 from 1128 up. One instance either way: two radio groups
             sharing a `name` would fight.
 
-            The bottom padding clears the fixed CTA bar plus the tab bar under it,
-            so the last stylist is never hidden behind them. */}
-        <aside className="border-hairline-soft p-base row-start-2 rounded-md border pb-[calc(140px+env(safe-area-inset-bottom))] desktop:col-start-2 desktop:row-start-1 desktop:row-span-2 desktop:sticky desktop:top-20 desktop:self-start desktop:pb-base">
+            The bottom padding clears the fixed CTA bar so the last stylist is never
+            hidden behind it. It used to be 140px — the CTA bar *plus* the 62px tab bar
+            beneath it — and is now just the CTA clearance, since nothing sits under it.
+
+            `desktop:top-*` is the sticky offset for the rail, so it has to be the
+            header's height plus a gap rather than a literal `top-20` that happened to
+            equal it. */}
+        <aside className="border-hairline-soft p-base row-start-2 rounded-md border pb-[calc(var(--cta-clearance)+env(safe-area-inset-bottom))] desktop:col-start-2 desktop:row-start-1 desktop:row-span-2 desktop:sticky desktop:top-[calc(var(--header-height)+var(--spacing-base))] desktop:self-start desktop:pb-base">
           <SalonBooking
             salonId={id}
             services={services}

@@ -127,7 +127,7 @@ export function SlotPicker({
                 onClick={() => pickDay(d)}
                 className={cn(
                   "flex w-14 shrink-0 flex-col items-center justify-center rounded-md border py-md",
-                  "transition-colors duration-[--duration-base]",
+                  "transition-colors duration-[var(--duration-base)]",
                   isSelected
                     ? "border-ink bg-ink"
                     : "border-hairline bg-canvas hover:border-border-strong",

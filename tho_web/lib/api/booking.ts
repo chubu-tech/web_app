@@ -21,8 +21,11 @@ import { toBooking, toHairstyle, toPayment, toSlot } from "./mappers";
  * never render from different columns. It already embeds the **customer's** name, phone
  * and avatar — present since Phase 1 and rendered nowhere until the owner needed them.
  */
+// `plan` is on the embed so the reminder toggle can be hidden where reminders are never
+// enqueued: `private.enqueue_booking_reminders` returns early below growth, so on a Basic
+// salon the switch would save a real preference against something that will never fire.
 export const BOOKING_SELECT =
-  "*, businesses(name, address_text, cover_url), staff_members(display_name), " +
+  "*, businesses(name, address_text, cover_url, plan), staff_members(display_name), " +
   "customer:profiles!bookings_customer_profile_id_fkey(full_name, avatar_url, phone), " +
   "booking_items(service_id, service_name, duration_minutes, price), " +
   "booking_attachments(url)";
@@ -124,6 +127,34 @@ export async function cancelBooking(
   const { error } = await supabase.rpc("cancel_booking", {
     p_booking_id: bookingId,
     p_reason: reason,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Switch a booking's automatic reminders on or off.
+ *
+ * **`p_enabled` is the inverse of the stored column.** `set_booking_reminders` does
+ * `reminders_muted = not p_enabled` — it takes what the customer sees, not what the row
+ * holds. Passing the column value straight through is the one silent bug available here:
+ * it would compile, run, and mean the opposite.
+ *
+ * Customer-only. It raises `42501` for a stranger's booking **and** for a walk-in, whose
+ * `customer_profile_id` is null so there is nobody to ask — which is why the toggle is
+ * absent rather than present-and-doomed on a walk-in.
+ *
+ * Enabling also re-enqueues, but only while `pending`/`confirmed`, and only for a growth or
+ * pro salon; disabling cancels the pending `booking_reminder` rows. All of that is the
+ * RPC's, not ours — do not try to mirror it here.
+ */
+export async function setBookingReminders(
+  supabase: SupabaseClient,
+  bookingId: string,
+  enabled: boolean,
+): Promise<void> {
+  const { error } = await supabase.rpc("set_booking_reminders", {
+    p_booking: bookingId,
+    p_enabled: enabled,
   });
   if (error) throw error;
 }

@@ -24,6 +24,16 @@ export const BOOKING_ERROR = {
   slotTaken: "23P01",
   /** Acting on a booking that isn't theirs. */
   notYours: "42501",
+  /**
+   * The booking id doesn't resolve — deleted, or never existed. Raised by
+   * `set_booking_reminders`.
+   *
+   * Note `P0002` means something else entirely for `place_order` (*"a product is no longer
+   * available"*), which is exactly why `queue-errors.ts` maps by **(RPC, code)** rather than
+   * by code alone. This table is booking-scoped so it is unambiguous here; the collision is
+   * worth knowing before anyone merges the two.
+   */
+  missing: "P0002",
   /** A plan gate, e.g. style selection is Pro-only. */
   notEntitled: "P0001",
 } as const;
@@ -78,6 +88,8 @@ export function bookingErrorMessage(error: unknown, fallback: string): string {
       return "Please sign in and try again.";
     case BOOKING_ERROR.notYours:
       return "That booking isn't yours to change.";
+    case BOOKING_ERROR.missing:
+      return "That booking no longer exists.";
     case BOOKING_ERROR.notEntitled:
       // These carry a specific, useful reason ("this shop is not running a queue",
       // "style selection is a Pro feature") — pass it through rather than flatten it.

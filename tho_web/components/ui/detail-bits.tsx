@@ -59,7 +59,7 @@ export function DetailTabBar({
               aria-hidden
               className={cn(
                 "bg-rausch absolute bottom-0 left-1/2 h-[2.5px] -translate-x-1/2 rounded-full",
-                "transition-[width] duration-[--duration-fast]",
+                "transition-[width] duration-[var(--duration-fast)]",
                 isActive ? "w-7" : "w-0",
               )}
             />
@@ -97,7 +97,7 @@ export function ActionCircle({
     <>
       <span
         className={cn(
-          "flex size-12 items-center justify-center rounded-full transition-colors duration-[--duration-fast]",
+          "flex size-12 items-center justify-center rounded-full transition-colors duration-[var(--duration-fast)]",
           active ? "bg-rausch-cta text-on-primary" : "bg-rausch/10 text-rausch-cta",
         )}
       >

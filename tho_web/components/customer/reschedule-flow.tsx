@@ -70,7 +70,7 @@ export function RescheduleFlow({
       />
 
       {slot ? (
-        <div className="border-hairline bg-canvas p-base fixed inset-x-0 bottom-[calc(62px+env(safe-area-inset-bottom))] z-20 border-t tablet:bottom-0">
+        <div className="border-hairline bg-paper p-base pb-[calc(var(--spacing-base)+env(safe-area-inset-bottom))] fixed inset-x-0 bottom-0 z-20 border-t">
           <div className="mx-auto max-w-[720px]">
             <Button fullWidth busy={busy} onClick={confirm}>
               Move to {formatMinutesOfDay(thimphuMinutesOfDay(slot.start))}

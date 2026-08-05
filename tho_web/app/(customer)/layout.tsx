@@ -1,7 +1,15 @@
+import type { Viewport } from "next";
 import { CartBar } from "@/components/customer/cart-bar";
-import { CustomerTabBar, CustomerTopNav } from "@/components/customer/customer-nav";
+import { CustomerHeader } from "@/components/customer/customer-nav";
 import { InLineBar } from "@/components/customer/in-line-bar";
 import { getAccount } from "@/lib/session";
+
+/**
+ * The cream canvas, so the browser chrome matches the page rather than the owner
+ * console's white. A nested `viewport` overwrites the root's — nested segments win, per
+ * Next's metadata merging.
+ */
+export const viewport: Viewport = { themeColor: "#f6f3ee" };
 
 /**
  * The customer shell, ported from `CustomerHome`'s `Scaffold`
@@ -11,8 +19,12 @@ import { getAccount } from "@/lib/session";
  * headers, exactly as the app does — `customer_home.dart:222` drops the AppBar on
  * the first two tabs because each has its own.
  *
- * The bottom bar is fixed, so the main region reserves its height plus the safe-area
- * inset; above 744 the bar is gone and that padding comes off.
+ * **`main` reserves nothing any more.** It used to carry 62px of bottom padding plus the
+ * safe-area inset, for the fixed bottom tab bar. That bar is
+ * gone — this is a website, and a thumb-reachable tab strip is a phone idiom — so the one
+ * piece of chrome is the sticky header above, which is in normal flow and needs no
+ * reservation at all. Anything that was pinned above the old bar now sits on the bottom
+ * edge; see `CartBar` and the three CTA footers.
  */
 export default async function CustomerLayout({
   children,
@@ -22,14 +34,19 @@ export default async function CustomerLayout({
   const account = await getAccount();
 
   return (
-    <div className="flex min-h-full flex-col">
-      <CustomerTopNav signedIn={account.state === "registered"} />
+    /*
+      `data-shell="customer"` is what switches this whole subtree onto the editorial
+      token layer — see the scope block in `app/globals.css`. It has to be here rather
+      than in the root layout, which cannot know the route without calling `headers()`
+      and forcing every page dynamic. `bg-canvas` on the wrapper is belt to the
+      `body:has()` brace: body carries the cream for overscroll, this covers the subtree.
+    */
+    <div data-shell="customer" className="bg-canvas flex min-h-full flex-col">
+      <CustomerHeader signedIn={account.state === "registered"} />
       {/* Below the nav rather than above it, so the shop's chrome stays where it is
           and the bar reads as a notice about *this* session, not part of the site. */}
       <InLineBar />
-      <main className="flex-1 pb-[calc(62px+env(safe-area-inset-bottom))] tablet:pb-0">
-        {children}
-      </main>
+      <main className="flex-1">{children}</main>
       {/*
         In the shell rather than on the two pages that fill the cart, because a customer who adds
         something and then wanders to `/bookings` should still be able to find it. The app has to
@@ -37,7 +54,6 @@ export default async function CustomerLayout({
         itself when the cart is empty and on `/cart` — see `CartBar`.
       */}
       <CartBar />
-      <CustomerTabBar signedIn={account.state === "registered"} />
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Sheet } from "@/components/ui/sheet";
-import { nearestSalons, withinDistance } from "@/lib/discover-logic";
+import { formatKm, kmTo, nearestSalons, withinDistance } from "@/lib/discover-logic";
 import { resolveLocation, type Fix } from "@/lib/geo";
 import { rank, topRated } from "@/lib/recommendations";
 import {
@@ -183,12 +183,42 @@ export function Discover({
     [inRange, location],
   );
 
+  /**
+   * "0.4 km" per salon for the card's distance chip.
+   *
+   * Built here rather than off `nearby`, which looks like the same thing and is not:
+   * `nearestSalons` takes a `limit` of 5, so leaning on it would have put a chip on
+   * the five closest cards and left the rest bare. Absent from the map means
+   * *unknown* — no fix yet, or a salon with no coordinates — and the card renders
+   * nothing for it, which is the same distinction `kmTo` returns null for.
+   */
+  const distanceLabels = useMemo(() => {
+    const out = new Map<string, string>();
+    if (!location) return out;
+    for (const b of businesses) {
+      const km = kmTo(b, location);
+      if (km != null) out.set(b.id, formatKm(km));
+    }
+    return out;
+  }, [businesses, location]);
+
   const active = filtersActive(filters);
   // Sections show on the default browse view; a live search shows just results.
   const showSections = q.length === 0;
 
   return (
-    <div className="px-base mx-auto w-full max-w-[1440px] tablet:px-lg">
+    /*
+      No width cap. This container was centred and capped at 1440, which on a 1920px
+      display left a 264px band of empty canvas down each side — measured — while the
+      salon rows inside were clipped mid-card by the container they could not grow past.
+      A browse grid is the one thing on this site that has more to show whenever there is
+      more room, so the gutters are the whole constraint and the columns absorb the rest.
+
+      The reading-measure caps elsewhere are a different thing and stay: the salon page
+      holds 1440 because its left column is prose, and the forms hold 720. Width helps a
+      grid of cards; it hurts a paragraph.
+    */
+    <div className="px-base w-full tablet:px-lg">
       <LocationHeader source={fix?.source ?? null} />
 
       {/*
@@ -216,7 +246,7 @@ export function Discover({
               aria-selected={(value === "products") === onProducts}
               onClick={() => goToTab(value)}
               className={cn(
-                "text-title min-h-10 flex-1 rounded-full font-medium transition-colors duration-[--duration-fast]",
+                "text-title min-h-10 flex-1 rounded-full font-medium transition-colors duration-[var(--duration-fast)]",
                 (value === "products") === onProducts
                   ? "bg-canvas text-ink shadow-sm"
                   : "text-muted hover:text-ink",
@@ -295,7 +325,7 @@ export function Discover({
       <div className="gap-xl mt-lg flex items-start">
         {/* The filter rail, from 1128 up. Below that the same panel lives in a
             sheet — DESIGN.md's collapsing strategy, not two different forms. */}
-        <aside className="border-hairline-soft hidden w-[280px] shrink-0 rounded-md border desktop:block">
+        <aside className="border-hairline-soft hidden w-[280px] shrink-0 rounded-lg border desktop:block">
           <h2 className="text-display-sm text-ink px-base pt-base font-semibold">
             Filters
           </h2>
@@ -308,7 +338,11 @@ export function Discover({
 
         <div className="min-w-0 flex-1">
           {showSections ? (
-            <div className="gap-xl mb-xl flex flex-col">
+            /* 48px between rows, up from 32. Four carousels and a grid stacked at
+               `xl` read as one continuous strip of photographs — the gap has to be
+               larger than the gap *inside* a row for the eye to group them, and
+               `gap-lg` (24px) is now the gap between cards. */
+            <div className="gap-xxl mb-xxl flex flex-col">
               <ServicesRow
                 categories={categories}
                 selectedId={filters.categoryId}
@@ -352,10 +386,35 @@ export function Discover({
             />
           ) : (
             <section>
-              {showSections ? <SectionHeader title="All salons" /> : null}
-              <ul className="gap-base grid grid-cols-1 tablet:grid-cols-2 desktop:grid-cols-2 wide:grid-cols-3">
-                {visible.map((b) => (
-                  <li key={b.id}>
+              {showSections ? (
+                <SectionHeader title="All salons" className="mb-base" />
+              ) : null}
+              {/*
+                One auto-fill track at every width, replacing three fixed column
+                counts. The counts are now a consequence of a card's minimum width
+                rather than a list of breakpoints to keep in step with the rail, and
+                that is what makes the brief's targets reachable: a 268px floor puts 1
+                card per row below 768, 2-3 through the tablet band and 4 at 1280 on a
+                full-width grid, rising to 6 at 1920 — without a `min-` variant for
+                either of the two widths the brief names, neither of which is a
+                breakpoint this project has.
+
+                **This grid lands one column short of those numbers**, and the rail is
+                the whole reason: it takes 280px plus a 32px gap out of the row, so at
+                1280 there is 920px left and 3 cards is what fits at a premium size. 4
+                would be 218px each. The rail keeping its width was the previous ask,
+                so the column pays instead. `/saved` has no rail and hits the brief
+                exactly.
+              */}
+              <ul className="gap-lg grid grid-cols-[repeat(auto-fill,minmax(268px,1fr))]">
+                {visible.map((b, i) => (
+                  <li
+                    key={b.id}
+                    className="motion-safe:animate-card-in"
+                    style={
+                      { "--i": i, animationDelay: "calc(var(--i) * 45ms)" } as React.CSSProperties
+                    }
+                  >
                     <BusinessCard
                       id={b.id}
                       name={b.name}
@@ -363,7 +422,11 @@ export function Discover({
                       imageUrl={b.coverUrl}
                       avgRating={b.avgRating}
                       reviewCount={b.reviewCount}
-                      sizes="(min-width: 1440px) 380px, (min-width: 744px) 44vw, 100vw"
+                      // Only once a fix has resolved, and only for a salon that has
+                      // coordinates — `kmTo` returns null otherwise, which means
+                      // unknown and must not render as "0.0 km". 2 of the 13 live
+                      // salons have no location at all.
+                      distanceLabel={distanceLabels.get(b.id) ?? null}
                       favourite={
                         <FavouriteButton
                           businessId={b.id}

@@ -15,7 +15,7 @@ type Variant = "filled" | "outlined" | "quiet" | "pill" | "pillQuiet";
 
 const base =
   "inline-flex min-h-12 items-center justify-center gap-2 rounded-sm px-4 " +
-  "text-title font-medium transition-colors duration-[--duration-fast] " +
+  "text-title font-medium transition-colors duration-[var(--duration-fast)] " +
   "disabled:cursor-not-allowed select-none";
 
 const variants: Record<Variant, string> = {

@@ -111,7 +111,15 @@ export function ProductsBrowse({
 
   return (
     <>
-      <ul className="gap-md grid grid-cols-1 tablet:grid-cols-2 wide:grid-cols-3">
+      {/*
+        Same auto-fill track as Discover's salon grid, and here for the same reason: the
+        page container is uncapped, and this segment has no filter rail to spend the extra
+        width on, so three fixed columns would put the whole of it into the card. The
+        minimum is 360px rather than 320px because a product card carries a price row and
+        a quantity stepper side by side. It still resolves to 3 columns at 1440, which is
+        what the fixed count gave.
+      */}
+      <ul className="gap-md grid grid-cols-1 tablet:grid-cols-2 wide:grid-cols-[repeat(auto-fill,minmax(360px,1fr))]">
         {visible.map((product) => (
           <li key={product.id}>
             <ProductCard

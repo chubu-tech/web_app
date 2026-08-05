@@ -19,9 +19,14 @@ import type { NavMatch } from "@/lib/nav";
  * reloadable, linkable, back-button-correct page is free, and the calendar's `?d=&view=` made
  * the same call in 3a.
  *
- * **The phone bar carries four of the five.** `phoneOwnerTabs()` drops Settings, which moves
- * to a gear in the header — see `owner-nav.tsx` for the width arithmetic. Five fixed items at
- * 390px is one too many.
+ * **All five are always reachable, but not always on screen.** There used to be a fixed bottom
+ * bar carrying four of them, with Settings dropped into a header gear because five fixed
+ * items at 390px leaves each 78px — the width at which "Calendar" truncates. The bar went
+ * first (this is a website, not a phone app), taking `phoneOwnerTabs()` and the gear with it;
+ * the scrollable strip that replaced it went next. From 1024 all five are inline in the
+ * header; below it they are the collapse panel's five rows. Nothing here changes at either
+ * width — this list is the whole set, and `components/owner/owner-nav.tsx` decides how it is
+ * drawn.
  *
  * A separate module from the customer list rather than one parameterised list, because
  * the two navs differ in more than their items: the owner header carries a salon
@@ -182,10 +187,3 @@ export const BACK_OFFICE_DESTINATIONS = [
 ] as const;
 
 export const readyOwnerTabs = () => OWNER_TABS.filter((d) => d.ready);
-
-/**
- * The phone bar's four. Settings is reachable from the header gear instead — five fixed items
- * at 390px leaves each one too narrow to label.
- */
-export const phoneOwnerTabs = () =>
-  readyOwnerTabs().filter((d) => d.href !== "/business/settings");

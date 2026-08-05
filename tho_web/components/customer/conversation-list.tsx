@@ -35,7 +35,7 @@ export function ConversationList({
               href={`/messages/${c.id}`}
               className={cn(
                 "p-base gap-md flex items-center rounded-md border",
-                "transition-colors duration-[--duration-fast]",
+                "transition-colors duration-[var(--duration-fast)]",
                 unread
                   ? "border-rausch bg-surface-soft border-[1.4px]"
                   : "border-hairline bg-canvas hover:border-border-strong",

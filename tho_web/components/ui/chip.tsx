@@ -24,7 +24,7 @@ export function Chip({
       aria-pressed={selected}
       className={cn(
         "text-caption px-lg min-h-11 shrink-0 rounded-full font-semibold",
-        "transition-colors duration-[--duration-fast]",
+        "transition-colors duration-[var(--duration-fast)]",
         selected
           ? "bg-rausch-cta text-on-primary"
           : "bg-surface-strong text-muted hover:text-ink",

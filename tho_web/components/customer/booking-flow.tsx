@@ -244,8 +244,11 @@ export function BookingFlow({
       {slot ? (
         <div
           className={cn(
-            "border-hairline bg-canvas p-base fixed inset-x-0 z-20 border-t",
-            "bottom-[calc(62px+env(safe-area-inset-bottom))] tablet:bottom-0",
+            "border-hairline bg-paper p-base fixed inset-x-0 bottom-0 z-20 border-t",
+            // The inset is padding rather than an offset, so the bar's fill reaches the
+            // bottom edge and only its content clears the iOS home indicator. It used to
+            // offset by the tab bar's 62px as well; there is nothing under it now.
+            "pb-[calc(var(--spacing-base)+env(safe-area-inset-bottom))]",
           )}
         >
           <div className="mx-auto max-w-[720px]">

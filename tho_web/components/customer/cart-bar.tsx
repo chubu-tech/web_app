@@ -19,10 +19,9 @@ import { formatNu } from "@/lib/utils";
  * chrome that says nothing, and a "View cart" bar on the cart is a link to where you already are. The
  * app can only manage the first of those, since it has no notion of a current route.
  *
- * **It sits above the tab bar, not over it.** The customer shell's bottom nav is `fixed` with a 62px
- * height plus the safe-area inset below 744, so this offsets by exactly that — the same arithmetic
- * `app/(customer)/layout.tsx` uses for `main`'s padding. Getting it wrong would put "View cart" under
- * the Discover tab.
+ * **It sits on the bottom edge.** It used to offset by the fixed tab bar's `62px` plus the safe-area
+ * inset, so it floated above it. With the bar gone there is nothing underneath, so the only term
+ * left is the inset itself — which still matters, or the bar lands on an iOS home indicator.
  */
 export function CartBar() {
   const { cart, hydrated } = useCart();
@@ -40,7 +39,7 @@ export function CartBar() {
     <div
       className={
         "px-base fixed inset-x-0 z-20 mx-auto max-w-[720px] " +
-        "bottom-[calc(62px+env(safe-area-inset-bottom)+8px)] tablet:bottom-base"
+        "bottom-[calc(env(safe-area-inset-bottom)+8px)] tablet:bottom-base"
       }
     >
       <Link

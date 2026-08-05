@@ -55,7 +55,9 @@ export default async function BookPage({
   if (!staffByService[service.id]?.includes(staff.id)) notFound();
 
   return (
-    <div className="px-base py-lg mx-auto w-full max-w-[720px] pb-40 tablet:px-lg">
+    // `pb-*` clears `BookingFlow`'s fixed Confirm bar. Was a flat `pb-40` (160px), which
+    // was that bar plus the 62px tab bar that used to sit under it.
+    <div className="px-base py-lg mx-auto w-full max-w-[720px] pb-[calc(var(--cta-clearance)+env(safe-area-inset-bottom))] tablet:px-lg">
       <div className="gap-md mb-lg flex items-start">
         <HeroCircleButton
           icon={Icons.back}

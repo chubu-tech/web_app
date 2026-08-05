@@ -35,7 +35,7 @@ export function SelectTile({
     <label
       className={cn(
         "gap-md p-base flex cursor-pointer items-center rounded-md border",
-        "transition-colors duration-[--duration-fast]",
+        "transition-colors duration-[var(--duration-fast)]",
         checked
           ? "border-rausch bg-[#FFF5F7] border-2"
           : "border-hairline hover:border-border-strong",

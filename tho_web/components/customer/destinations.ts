@@ -86,15 +86,22 @@ export const readySecondary = () => SECONDARY.filter((d) => d.ready);
 export { isCurrent } from "@/lib/nav";
 
 /**
- * True when something under `/profile` has unread items, so the Profile tab can carry a dot
- * at <744 where the badged destinations themselves are not on the bar.
+ * True when something unread is **not already visible in the header**, so the collapse-nav
+ * button can carry a dot.
  *
- * Without it a customer on a phone would have no visible signal that anything arrived —
- * the one thing an inbox must not do quietly.
+ * This replaced `secondaryHasUnread`, and the change is a simplification the new header
+ * earned. That function existed because the phone tab bar had five fixed slots and no room
+ * for a bell, so the Profile tab wore a dot as a *proxy* for whatever was unread beneath
+ * it. The header now carries a real bell at every width, so notifications are shown
+ * directly and only **Chats** can be unread-and-hidden — which happens below 744, where
+ * the inline tabs are collapsed into the menu.
+ *
+ * Only ever consulted for the menu button, and the dot itself is `tablet:hidden`, because
+ * from 744 up the tabs (Chats included, with its own count) are on screen.
+ *
+ * Both arguments matter: without it a customer on a phone would have no visible signal
+ * that a salon replied — the one thing an inbox must not do quietly.
  */
-export function secondaryHasUnread(counts: {
-  messages: number;
-  notifications: number;
-}): boolean {
-  return readySecondary().some((d) => (d.badge ? counts[d.badge] > 0 : false));
+export function hiddenUnread(counts: { messages: number; notifications: number }): boolean {
+  return counts.messages > 0;
 }

@@ -18,6 +18,8 @@ import { checkInErrorMessage } from "@/lib/api/queue-errors";
 import { createClient } from "@/lib/supabase/client";
 import type { Booking } from "@/lib/types/booking";
 import { cn } from "@/lib/utils";
+import { canRemind } from "./booking-card";
+import { ReminderToggle } from "./reminder-toggle";
 import { ReviewSheet, type ReviewResult } from "./review-sheet";
 
 /**
@@ -131,6 +133,25 @@ export function BookingActions({
 
   return (
     <div className="gap-sm mt-lg flex flex-col">
+      {/*
+        The reminder switch, which the app's detail screen does not have — it only puts one
+        on the card. A deliberate addition rather than an oversight the other way: the detail
+        page is where somebody who wants to change one booking's settings goes, and a list
+        item is a poor place to hunt for a control. `canRemind` is shared with the card so
+        the two cannot disagree about when it is offered.
+      */}
+      {canRemind(booking) ? (
+        <div className="border-hairline-soft p-md flex items-center justify-between rounded-sm border">
+          <span className="text-body-sm text-body">
+            Text and push reminders before this appointment
+          </span>
+          <ReminderToggle
+            bookingId={booking.id}
+            initialMuted={booking.remindersMuted ?? false}
+          />
+        </div>
+      ) : null}
+
       {active && cancellationNote ? (
         <p
           className={cn(

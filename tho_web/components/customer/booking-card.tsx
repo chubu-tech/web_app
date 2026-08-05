@@ -2,8 +2,22 @@ import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { StatusPill } from "@/components/ui/status-pill";
+import { hasFeature } from "@/lib/entitlements";
 import { bookingCode, isActive, type Booking } from "@/lib/types/booking";
 import { cn, formatNu } from "@/lib/utils";
+import { ReminderToggle } from "./reminder-toggle";
+
+/**
+ * The three conditions for offering the reminder toggle. Exported so `/bookings/[id]` and
+ * the card cannot disagree about when it appears.
+ */
+export function canRemind(booking: Booking): boolean {
+  return (
+    isActive(booking) &&
+    booking.customerProfileId != null &&
+    hasFeature(booking.businessPlan, "reminders")
+  );
+}
 
 /**
  * The customer booking card, ported from
@@ -15,11 +29,25 @@ import { cn, formatNu } from "@/lib/utils";
  * The perforation is CSS — two radial notches and a dashed rule — rather than the
  * Dart's `CustomPainter`.
  *
- * **The "Remind me" toggle is deliberately not ported.** In the app it writes
- * `reminder_<bookingId>` to SharedPreferences, and nothing anywhere reads it back —
- * not the outbox, not the Edge Function, not the API. It is a switch that remembers
- * its own position and changes nothing that happens. Reminder preferences that
- * actually do something belong in Settings.
+ * **The "Remind me" toggle is ported, and the reason it was not is gone.** It used to write
+ * `reminder_<bookingId>` to SharedPreferences with nothing anywhere reading it back — a
+ * switch that remembered its own position and changed nothing. Since
+ * `20260803000003_booking_reminder_mute` it is `bookings.reminders_muted`, server-owned, and
+ * `private.enqueue_booking_reminders` refuses to enqueue for a muted booking; every reminder
+ * branch of `handle_booking_status_event` routes through that one helper precisely so the
+ * mute cannot be bypassed, which is also what makes it survive a reschedule.
+ *
+ * It renders only when all three hold, and each is a real case rather than caution:
+ *
+ * - **the booking is still active** — nothing to remind anyone about otherwise, matching the
+ *   app's own `_upcoming` gate;
+ * - **it has a customer** — `set_booking_reminders` raises `42501` when
+ *   `customer_profile_id` is null, which is every walk-in, so the toggle is *absent* rather
+ *   than present and doomed. Same rule Check in already follows;
+ * - **the salon is on growth or pro** — below that `enqueue_booking_reminders` returns early,
+ *   so the switch would save a genuine preference against something that never fires. Shown
+ *   as nothing rather than as a locked control: a customer cannot upgrade someone else's
+ *   salon, and which plan the shop is on is not their business.
  */
 export function BookingCard({ booking }: { booking: Booking }) {
   const dead = booking.status === "cancelled" || booking.status === "no_show";
@@ -44,6 +72,14 @@ export function BookingCard({ booking }: { booking: Booking }) {
           {relative ? (
             <span className="bg-surface-soft text-badge text-ink px-sm py-xxs rounded-full font-semibold">
               {relative}
+            </span>
+          ) : null}
+          {canRemind(booking) ? (
+            <span className="ml-auto">
+              <ReminderToggle
+                bookingId={booking.id}
+                initialMuted={booking.remindersMuted ?? false}
+              />
             </span>
           ) : null}
         </div>

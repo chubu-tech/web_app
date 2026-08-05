@@ -53,7 +53,7 @@ export function SegmentedControl({
             onClick={() => onChange(i)}
             className={cn(
               "text-caption px-sm flex h-10 flex-1 items-center justify-center gap-1 rounded-full font-medium",
-              "transition-colors duration-[--duration-base]",
+              "transition-colors duration-[var(--duration-base)]",
               active ? "bg-canvas text-ink shadow-card" : "text-muted hover:text-ink",
             )}
           >

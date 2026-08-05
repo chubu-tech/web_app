@@ -1,18 +1,29 @@
+import type { Viewport } from "next";
 import Link from "next/link";
 import { Icons, IconSize } from "@/components/ui/icons";
 
+export const viewport: Viewport = { themeColor: "#f6f3ee" };
+
 /**
- * The auth pages have no customer shell — no tab bar, no top nav.
+ * The auth pages have no shell — no nav, no header.
  *
  * Deliberate: this is a single-purpose page, and the navigation would offer ways to
  * wander off mid-task. The one route out is the explicit "Browse without an account"
  * on the form itself, which is the app's own affordance (THO-24).
+ *
+ * It carries `data-shell="customer"` all the same. These pages are customer-facing and
+ * are reached from the customer header, so on the editorial cream canvas a white,
+ * system-font sign-in page would be a visible seam at exactly the moment somebody is
+ * deciding whether to trust the site with a password.
  */
 export default function AuthLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <main className="px-base py-xl flex flex-1 items-center justify-center">
+    <main
+      data-shell="customer"
+      className="px-base py-xl bg-canvas flex flex-1 items-center justify-center"
+    >
       <div className="w-full max-w-[420px]">
         <div className="mb-lg flex flex-col items-center">
           <Link

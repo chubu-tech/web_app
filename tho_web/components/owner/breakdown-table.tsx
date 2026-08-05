@@ -62,7 +62,7 @@ export function BreakdownTable({
               type="button"
               onClick={() => setBy(k)}
               aria-pressed={by === k}
-              className={`text-caption-sm rounded-full px-3 py-1 font-medium transition-colors duration-[--duration-fast] ${
+              className={`text-caption-sm rounded-full px-3 py-1 font-medium transition-colors duration-[var(--duration-fast)] ${
                 by === k ? "bg-canvas text-ink shadow-sm" : "text-muted"
               }`}
             >

@@ -1,15 +1,34 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Design tokens — a one-to-one port of `tho/app/lib/ui/tokens.dart` and the
-   type scale in `theme.dart`, which are themselves a mirror of tho's DESIGN.md.
+   Design tokens.
 
-   This is the *product's* system, not the marketing site's. The landing page
-   adds an editorial layer (cream canvas, oversized display type, DM Sans /
-   Bricolage / Instrument Serif) that the app deliberately does not use — so do
-   not reach for landing_page's globals.css when adding a token here.
+   **Two systems, one file, and a rule for choosing between them.**
 
-   Light only. DESIGN.md has no dark mode; the canvas is always pure white.
+   `:root` is the *product* system — a one-to-one port of `tho/app/lib/ui/tokens.dart`
+   and the type scale in `theme.dart`, mirroring tho's DESIGN.md. The **owner console**
+   renders in it unchanged: white canvas, 14px title scale, 8/14px radii, because it is
+   a dense operational tool somebody works at a till.
+
+   `[data-shell="customer"]` re-points three of those values to the marketing site's
+   editorial layer (cream canvas, DM Sans / Bricolage / Instrument Serif) so a visitor
+   arriving from bhutansalons.com sees one continuous product rather than a website and
+   then an app. This file used to say "do not reach for landing_page's globals.css";
+   that changed deliberately, for the customer side only.
+
+   THE RULE FOR ADDING A TOKEN:
+
+     Override a shared name only when both shells mean the same *role* and differ
+     only in *value*. When they mean different *sizes*, add a new name.
+
+   `--color-canvas` is "the page behind everything" in both → overridden below.
+   `--text-display-lg` is a 19px section title here and a 30-48px editorial headline
+   there → **different roles**, so the editorial scale is `--text-editorial-*` and is
+   opted into per element. Overriding it would have retyped 14 customer headings with
+   nothing in the diff to show it, and given `SectionHeader` and `QueuePositionCard` —
+   which both shells render — two different type scales depending on the caller.
+
+   Light only. DESIGN.md has no dark mode.
 
    Do not hardcode a hex, radius or duration in a component. Add it here.
 --------------------------------------------------------------------------- */
@@ -59,7 +78,15 @@
   --color-star: #e8a317;
 
   /* --- Radii ------------------------------------------------------------ */
-  /* sm buttons + inputs · md cards/dialogs · lg sheet tops · full pills */
+  /* sm buttons + inputs · md cards/dialogs · lg sheet tops and the salon browse
+     card · full pills.
+
+     The browse card takes `lg` (20px) rather than a new 18px token: it wanted
+     something in the 16-20px band, and re-pointing `md` was not available — that
+     one is 14px at 40-odd call sites across BOTH shells, including every Sheet,
+     Chip and SelectTile, so widening it would have reshaped the owner console to
+     restyle one customer card. Reusing an existing value beats minting a token
+     two pixels from one we already have. */
   --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 14px;
@@ -135,8 +162,185 @@
   /* Mobile <744 · Tablet 744–1128 · Desktop 1128–1440 · Wide >1440.
      The rule: always reduce columns, never reflow rows. */
   --breakpoint-tablet: 744px;
+  /* A fifth tier, and the only one not in DESIGN.md: the width at which the owner
+     console's five destinations are inline and its hamburger is gone. It exists
+     because the console collapses on a different axis from the customer shell — five
+     labelled tabs *plus* a salon switcher and a bell, where the customer header carries
+     a two-character wordmark — so the tablet tier that fits the customer's five is 280px
+     short of fitting these. Declared in ascending order with the rest; Tailwind emits
+     the variants in declaration order and an out-of-order one would lose to `tablet:`.
+
+     `components/owner/owner-nav.tsx` repeats the number once, for a matchMedia that
+     cannot read a CSS variable. Change both together. */
+  --breakpoint-console: 1024px;
   --breakpoint-desktop: 1128px;
   --breakpoint-wide: 1440px;
+
+  /* --- The customer shell's editorial layer -------------------------------
+     From landing_page's `@theme`. Declared globally so the utilities exist;
+     applied only under `[data-shell="customer"]` (below) or by being named
+     explicitly in a customer component.
+
+     Unused tokens cost nothing — Tailwind prunes any theme variable no utility
+     and no rule references. Measured in the compiled sheet: `--radius-xl` and
+     `--spacing-section` are declared above and absent from the emitted `:root`.
+     That pruning is also why the chrome heights live *outside* `@theme`. */
+
+  /* Paper is "a thing lifted off the page". In the owner console it equals
+     --color-canvas, so reclassifying a shared surface from `bg-canvas` to
+     `bg-paper` is a no-op there and the correct white-on-cream card here. */
+  --color-paper: #ffffff;
+  --color-canvas-deep: #efe9e1;
+  --color-sand: #e6ded2;
+  --color-rausch-soft: #ffe8ec;
+  --color-obsidian: #141312;
+  --color-obsidian-soft: #201e1c;
+
+  /* Bhutanese accents. Decorative only — rausch stays the single action colour,
+     and --color-star stays the product's #e8a317 for every rating. */
+  --color-saffron: #e8a33d;
+  --color-saffron-soft: #fbeed6;
+  --color-maroon: #722030;
+  --color-jade: #1f6f5c;
+
+  /* `--font-sans` is deliberately NOT set: it would put DM Sans on all 26 owner
+     routes. The customer shell sets `font-family` directly instead — see the
+     note on the scope block. */
+  --font-display: var(--font-bricolage), var(--font-dm-sans), sans-serif;
+  --font-serif: var(--font-instrument), Georgia, serif;
+
+  /* NOT `--text-display-*`. See THE RULE at the top of this file. */
+  --text-editorial-2xl: clamp(2.75rem, 5.6vw, 5rem);
+  --text-editorial-xl: clamp(2.25rem, 5.5vw, 4.5rem);
+  --text-editorial-lg: clamp(1.875rem, 3.6vw, 3rem);
+  --text-editorial-md: clamp(1.5rem, 2.4vw, 2rem);
+
+  /* Generous radii for the editorial layer. Do NOT re-point --radius-md (14px)
+     at these: it would reshape every shared card, Sheet, Chip and SelectTile. */
+  --radius-slab: 2rem;
+  --radius-slab-lg: 2.75rem;
+
+  /* landing_page's single easing curve, used for every transition there. */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* The collapse nav's two animations. Written with the curve inlined rather
+     than `var(--ease-out-expo)`: a theme variable whose only reference is
+     another theme variable's value is not worth betting the pruner on. */
+  --animate-nav-reveal: nav-reveal 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-nav-row: nav-row 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  /* The circle reveal. The origin is a custom property so the panel opens from
+     whichever button opened it, set from that button's bounding rect. */
+  @keyframes nav-reveal {
+    from {
+      clip-path: circle(0% at var(--nav-origin-x, 92%) var(--nav-origin-y, 2rem));
+    }
+    to {
+      clip-path: circle(150% at var(--nav-origin-x, 92%) var(--nav-origin-y, 2rem));
+    }
+  }
+
+  @keyframes nav-row {
+    from {
+      opacity: 0;
+      transform: translateY(28px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* The browse grid's entrance, staggered per card by an inline `--i` off the same
+     pattern `NavRow` uses. A grid of 13 salons then arrives as one wave instead of
+     13 simultaneous pops.
+     TWO THINGS ARE LOAD-BEARING:
+     1. `both` fill holds the closing frame for ever, and that frame sets
+        `transform: none`. An animation's filled value beats a specified one, so
+        whichever element carries this class can never be transformed again — which
+        is why the class goes on the list item and the hover lift on the card
+        surface inside it. Put both on one element and the lift silently stops
+        working, with nothing in the diff to show why.
+     2. It is applied under `motion-safe` rather than left to the reduced-motion
+        block below. That block neutralises duration AND delay, so this would
+        resolve instantly and correctly either way — but an opening frame at
+        opacity 0 behind a stagger delay is exactly the shape that made the nav
+        render blank once, and not relying on it twice is cheap. */
+  --animate-card-in: card-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes card-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Chrome measurements.
+
+   Deliberately NOT in `@theme`. Tailwind prunes theme variables nothing
+   references, and these are consumed only from arbitrary values —
+   `h-[calc(100svh-var(--header-height))]` — which the pruner cannot see.
+   Declaring them here makes the emission unconditional.
+
+   They exist at all because the removed bottom bar's height was written as the
+   literal `62px` in eight files plus two `pb-40`s, and getting one of them wrong
+   is invisible until someone opens that page at 390px.
+--------------------------------------------------------------------------- */
+:root {
+  /* One top bar, at every width. Constant on purpose: the header condenses
+     visually *inside* a fixed box, so nothing has to re-measure it on scroll. */
+  --header-height: 64px;
+
+  /* Clearance for a fixed CTA footer: p-base twice + min-h-12 + a note line.
+     A floor rather than a measurement, the same trade the map page states. */
+  --cta-clearance: 96px;
+}
+
+/* ---------------------------------------------------------------------------
+   The customer shell. Same utilities, different values.
+
+   Every generated colour utility resolves through `var()` — verified in the
+   compiled stylesheet: `.bg-canvas { background-color: var(--color-canvas) }`.
+   So re-pointing three variables re-skins 86 call sites (62 in customer files,
+   24 in the shared UI kit) with **no class strings changed**, and the shared kit
+   adapts to whichever shell renders it.
+
+   `:root` above IS the product system, so the owner console needs no attribute
+   and gets no override. An attribute that changes nothing is a thing to misread.
+
+   Three things here are load-bearing:
+
+   1. `font-family`, not `--font-sans`. Preflight declares
+      `font-family: var(--default-font-family)` on `html, :host` ONLY, and
+      `--default-font-family: var(--font-sans)` is computed at `:root` — both
+      indirections resolve before a descendant is reached, so overriding either
+      one here would change nothing. The property must be set directly.
+
+   2. The `body:has()` half is what makes the whole viewport cream.
+      `body { background: var(--color-canvas) }` resolves the variable *on body*,
+      so body must be inside the scope or iOS overscroll reveals white.
+
+   3. Unlayered on purpose. `@theme` lands in `@layer theme`, and an unlayered
+      rule beats a layered one whatever the specificity — which matters, because
+      `:root` and `[data-shell="customer"]` are both (0,1,0) and specificity
+      alone would leave this to source order.
+
+   And never add `@theme inline` to this file: it substitutes declared values
+   into utilities instead of `var()`, which would make this entire block a no-op.
+--------------------------------------------------------------------------- */
+[data-shell="customer"],
+body:has([data-shell="customer"]) {
+  --color-canvas: #f6f3ee;
+  --color-surface-soft: #efe9e1; /* canvas-deep: a tint OF cream, not of white */
+  --color-surface-strong: #e6ded2; /* sand */
+
+  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
@@ -176,6 +380,15 @@
     rgba(0, 0, 0, 0.02) 0 0 0 1px,
     rgba(0, 0, 0, 0.04) 0 2px 6px,
     rgba(0, 0, 0, 0.1) 0 4px 8px;
+}
+
+/* The second tier, and the only one — for a surface floating *above* the page
+   rather than resting on it: an open facet panel, a featured card. Customer
+   shell only; the product system still has exactly one tier. */
+@utility shadow-lift {
+  box-shadow:
+    rgba(0, 0, 0, 0.02) 0 0 0 1px,
+    rgba(0, 0, 0, 0.28) 0 18px 40px -12px;
 }
 
 /* Scrim behind sheets and dialogs — black at 50%, as applied at render time. */
@@ -254,6 +467,13 @@
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    /* `animation-delay` matters as much as duration once anything staggers, and
+       it was missing. The collapse nav's rows use
+       `animation-delay: calc(var(--i) * 45ms)` with `both` fill — so without
+       this line a reduced-motion user holds the `from` keyframe (opacity 0)
+       through the full delay and sees a nav that is simply blank. Dormant until
+       that shipped; not dormant now. */
+    animation-delay: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;

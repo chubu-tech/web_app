@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { OwnerHeader, OwnerTabBar } from "@/components/owner/owner-nav";
+import { OwnerHeader } from "@/components/owner/owner-nav";
 import { unreadNotificationCount } from "@/lib/api/notifications";
 import { fetchOwnerConversations } from "@/lib/api/owner-back-office";
 import { unreadThreadCount } from "@/lib/chat-logic";
@@ -27,9 +27,13 @@ export const metadata: Metadata = {
  *   a tab, and the two would be confusing side by side.
  * - **No "Sign in" call to action.** Nobody reaches this shell without a session.
  *
- * The bottom bar and `main`'s padding follow the customer shell exactly — 62px plus the
- * safe-area inset below 744, dropped at `tablet:` — because the tab bar is `fixed` and
- * would otherwise sit on top of the last row of the page.
+ * **There is no bottom bar and `main` reserves nothing.** Both shells lost their fixed
+ * tab bar: this is a website, not a phone app. The owner console keeps one-tap navigation
+ * all the same — below 744 `OwnerHeader` grows a second row carrying a scrollable tab
+ * strip, rather than putting the console's five daily destinations behind a hamburger.
+ * An owner works this one-handed at a till; costing them a tap and an overlay per
+ * navigation would have been the wrong trade, and it is the one place the two shells
+ * deliberately differ in structure rather than only in content.
  */
 export default async function OwnerLayout({
   children,
@@ -58,10 +62,7 @@ export default async function OwnerLayout({
         unreadNotifications={unreadNotifications}
         unreadMessages={unreadMessages}
       />
-      <main className="flex-1 pb-[calc(62px+env(safe-area-inset-bottom))] tablet:pb-0">
-        {children}
-      </main>
-      <OwnerTabBar unreadMessages={unreadMessages} />
+      <main className="flex-1">{children}</main>
     </div>
   );
 }

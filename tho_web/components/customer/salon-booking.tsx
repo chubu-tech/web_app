@@ -132,8 +132,15 @@ export function SalonBooking({
         </div>
       </div>
 
-      {/* The app's sticky bottom bar, kept below 1128 where the rail collapses. */}
-      <div className="border-hairline bg-canvas p-base fixed inset-x-0 bottom-[calc(62px+env(safe-area-inset-bottom))] z-20 border-t desktop:hidden">
+      {/*
+        The app's sticky bottom bar, kept below 1128 where the rail collapses.
+
+        `desktop:hidden` (1128) is about the rail, a different axis from the chrome — and
+        it used to combine badly with the old `62px` offset, which only came off at
+        `tablet:` (744). Between those two widths the bar floated 62px above the bottom
+        over empty space. `bottom-0` at every width fixes that as a side effect.
+      */}
+      <div className="border-hairline bg-paper p-base pb-[calc(var(--spacing-base)+env(safe-area-inset-bottom))] fixed inset-x-0 bottom-0 z-20 border-t desktop:hidden">
         <BookCta href={href} note={missing} />
       </div>
     </>

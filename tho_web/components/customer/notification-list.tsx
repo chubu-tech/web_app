@@ -129,7 +129,7 @@ export function NotificationList({
                   onClick={() => setFilter(f.id)}
                   className={cn(
                     "text-caption px-md py-sm gap-xs flex shrink-0 items-center rounded-full border font-medium",
-                    "transition-colors duration-[--duration-fast]",
+                    "transition-colors duration-[var(--duration-fast)]",
                     selected
                       ? "border-ink bg-ink text-on-primary"
                       : "border-hairline text-muted hover:border-border-strong",

@@ -26,7 +26,7 @@ export function SlotChip({
     <label
       className={cn(
         "text-title flex min-h-12 cursor-pointer items-center justify-center rounded-full border font-medium tabular-nums",
-        "transition-colors duration-[--duration-fast]",
+        "transition-colors duration-[var(--duration-fast)]",
         selected
           ? "border-ink bg-ink text-on-primary"
           : "border-hairline text-ink hover:border-border-strong",

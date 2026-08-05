@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { fetchMyBusinesses } from "@/lib/api/owner";
-import { ACTIVE_BUSINESS_COOKIE } from "@/lib/owner/active-business";
+import {
+  ACTIVE_BUSINESS_COOKIE,
+  ACTIVE_BUSINESS_COOKIE_MAX_AGE,
+  ACTIVE_BUSINESS_COOKIE_OPTIONS,
+} from "@/lib/owner/active-business";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 
@@ -41,14 +45,12 @@ export async function POST(request: NextRequest) {
   });
 
   if (valid) {
+    // Attributes come from the one place that owns them, so this write and the clear in
+    // `app/auth/sign-out` cannot drift — a mismatched path or protocol makes a cookie
+    // undeletable, and this one is `httpOnly` so nothing else can reach it.
     response.cookies.set(ACTIVE_BUSINESS_COOKIE, requested as string, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      // A year: which salon you were last looking at is a preference, not a session, and
-      // an owner who signs back in on Monday expects the same shop.
-      maxAge: 60 * 60 * 24 * 365,
-      secure: process.env.NODE_ENV === "production",
+      ...ACTIVE_BUSINESS_COOKIE_OPTIONS,
+      maxAge: ACTIVE_BUSINESS_COOKIE_MAX_AGE,
     });
   }
 

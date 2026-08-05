@@ -22,7 +22,10 @@ export default async function SavedPage() {
   const salons = await fetchMyFavourites(supabase).catch(() => []);
 
   return (
-    <div className="px-base py-lg mx-auto w-full max-w-[1440px] tablet:px-lg">
+    // Uncapped, and the grid auto-fills above 1440 — the same treatment Discover gets,
+    // because this is the same salon-card grid and the two must not disagree about how
+    // wide a salon card is.
+    <div className="px-base py-lg w-full tablet:px-lg">
       <h1 className="text-display-lg text-ink font-medium">Saved salons</h1>
 
       {salons.length === 0 ? (
@@ -40,9 +43,17 @@ export default async function SavedPage() {
           }
         />
       ) : (
-        <ul className="gap-base mt-lg grid grid-cols-1 tablet:grid-cols-2 desktop:grid-cols-3 wide:grid-cols-4">
-          {salons.map((b) => (
-            <li key={b.id}>
+        /* The same track Discover's grid uses, and with no filter rail to pay for it
+           this is where the brief's counts land exactly: 1 card below 768, 2 from 768,
+           4 at 1280, 6 at 1920. `sizes` is `BusinessCard`'s own default, which is
+           written for this track. */
+        <ul className="gap-lg mt-lg grid grid-cols-[repeat(auto-fill,minmax(268px,1fr))]">
+          {salons.map((b, i) => (
+            <li
+              key={b.id}
+              className="motion-safe:animate-card-in"
+              style={{ "--i": i, animationDelay: "calc(var(--i) * 45ms)" } as React.CSSProperties}
+            >
               <BusinessCard
                 id={b.id}
                 name={b.name}

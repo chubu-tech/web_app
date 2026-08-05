@@ -126,7 +126,7 @@ export function InsightsBoard({
                   <Link
                     href={`/business/insights?period=${g.value}`}
                     aria-current={on ? "true" : undefined}
-                    className={`text-title inline-flex items-center rounded-full border px-4 py-2 font-medium whitespace-nowrap transition-colors duration-[--duration-fast] ${
+                    className={`text-title inline-flex items-center rounded-full border px-4 py-2 font-medium whitespace-nowrap transition-colors duration-[var(--duration-fast)] ${
                       on
                         ? "bg-ink text-on-primary border-ink"
                         : "border-hairline text-ink hover:bg-surface-soft"

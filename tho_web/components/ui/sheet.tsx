@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Icons, IconSize } from "./icons";
+import { useDialogOverlay } from "./use-dialog-overlay";
 import { cn } from "@/lib/utils";
 
 /**
@@ -20,13 +21,14 @@ import { cn } from "@/lib/utils";
  * - **Tab is trapped**, so you cannot tab into the page underneath
  * - background scroll is locked, and a backdrop click dismisses
  *
+ * Those five now live in `useDialogOverlay`, because the collapse nav needs the same five
+ * and a second copy would have drifted. What stays here is the *shape*: a titled bottom
+ * sheet with a scrim, which is not what a nav overlay looks like.
+ *
  * Shape follows the breakpoint, per DESIGN.md's collapsing strategy: a bottom
  * sheet under 744 (thumb reach), a centred dialog at or above it — a sheet glued
  * to the bottom of a 1400px window is a phone artefact.
  */
-
-const FOCUSABLE =
-  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 export function Sheet({
   open,
@@ -47,60 +49,10 @@ export function Sheet({
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
-  useEffect(() => {
-    if (!open) return;
-
-    // Remember who opened this, so focus can go back there on close. Without it
-    // the caret lands at the top of the document and a keyboard user has to walk
-    // the whole page again to get back to where they were.
-    const opener = document.activeElement as HTMLElement | null;
-
-    const { overflow } = document.body.style;
-    document.body.style.overflow = "hidden";
-
-    // Focus the panel itself rather than its first control: a sheet that opens
-    // with the caret already inside a text field hides the title from a screen
-    // reader, which is the one thing that says what just happened.
-    panel.current?.focus();
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab" || !panel.current) return;
-
-      const items = Array.from(
-        panel.current.querySelectorAll<HTMLElement>(FOCUSABLE),
-      ).filter((el) => el.offsetParent !== null);
-      if (items.length === 0) {
-        // Nothing to move to — keep the caret on the panel rather than letting
-        // it escape to the page behind the scrim.
-        event.preventDefault();
-        return;
-      }
-
-      const first = items[0]!;
-      const last = items[items.length - 1]!;
-      const active = document.activeElement;
-
-      if (event.shiftKey && (active === first || active === panel.current)) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown, true);
-      document.body.style.overflow = overflow;
-      opener?.focus?.();
-    };
-  }, [open, onClose]);
+  // Scroll lock, focus in, Escape, the Tab trap and focus restore. Shared with the
+  // collapse nav — see `use-dialog-overlay.ts` for why it is a hook rather than a
+  // `variant` on this component.
+  useDialogOverlay({ open, onClose, panel });
 
   if (!open || typeof document === "undefined") return null;
 

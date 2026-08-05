@@ -146,7 +146,14 @@ export function ChatThread({
           e.preventDefault();
           void send(draft);
         }}
-        className="border-hairline bg-canvas gap-sm sticky bottom-0 flex items-end border-t pt-sm"
+        /*
+          The safe-area bottom padding is not decoration. A sticky element cannot leave its containing
+          block, and `main` used to carry 62px of bottom padding for the tab bar — so this
+          composer parked clear of the bottom edge **by accident of that padding**, never
+          by design. It hard-codes no `62px`, so a grep for the removed bar misses it
+          entirely; with the padding gone it would sit on the iOS home indicator.
+        */
+        className="border-hairline bg-paper gap-sm sticky bottom-0 flex items-end border-t pt-sm pb-[env(safe-area-inset-bottom)]"
       >
         <label className="min-w-0 flex-1">
           <span className="sr-only">Message</span>

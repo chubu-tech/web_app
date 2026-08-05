@@ -191,6 +191,10 @@ export function MapView({ salons }: { salons: Business[] }) {
                 avgRating={selected.avgRating}
                 reviewCount={selected.reviewCount}
                 sizes="(min-width: 744px) 560px, 100vw"
+                // Keeps this preview's 150px banner. The browse ratio would make the
+                // cover alone 350px tall at 560px wide, and this card floats over the
+                // map it is describing.
+                compact
               />
             </div>
           </div>
