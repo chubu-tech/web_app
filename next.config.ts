@@ -20,6 +20,24 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+
+  /**
+   * iOS refuses an Associated Domains file that is not served as JSON, and the
+   * file must have no extension — so nothing infers the type for us. Android's
+   * `assetlinks.json` needs no rule; its `.json` extension is enough.
+   *
+   * Both files live in `public/.well-known/`. Without this header, universal
+   * links fail silently: the OS fetches the file, cannot parse it, and simply
+   * opens the URL in a browser instead of the app.
+   */
+  async headers() {
+    return [
+      {
+        source: "/.well-known/apple-app-site-association",
+        headers: [{ key: "Content-Type", value: "application/json" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

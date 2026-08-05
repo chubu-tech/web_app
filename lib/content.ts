@@ -62,12 +62,17 @@ export const brand = {
   stores: { ios: "", android: "" },
 } as const;
 
+/**
+ * Root-relative (`/#id`, not `#id`) so the same header works on `/privacy` and
+ * `/q/<id>`, where a bare hash would only rewrite the URL and scroll nowhere.
+ * On the home page it still resolves to a plain anchor scroll.
+ */
 export const nav = [
-  { label: "Find a salon", href: "#find" },
-  { label: "How it works", href: "#how-it-works" },
-  { label: "Live queue", href: "#queue" },
-  { label: "For salons", href: "#for-salons" },
-  { label: "Pricing", href: "#pricing" },
+  { label: "Find a salon", href: "/#find" },
+  { label: "How it works", href: "/#how-it-works" },
+  { label: "Live queue", href: "/#queue" },
+  { label: "For salons", href: "/#for-salons" },
+  { label: "Pricing", href: "/#pricing" },
 ] as const;
 
 /**
@@ -412,24 +417,192 @@ export const waitlist = {
 } as const;
 
 export const footer = {
+  /** Root-relative for the same reason as `nav` — these render on every route. */
   columns: [
     {
       title: "Product",
       links: [
-        { label: "How it works", href: "#how-it-works" },
-        { label: "Live queue", href: "#queue" },
-        { label: "Pricing", href: "#pricing" },
+        { label: "How it works", href: "/#how-it-works" },
+        { label: "Live queue", href: "/#queue" },
+        { label: "Pricing", href: "/#pricing" },
       ],
     },
     {
       title: "Salons",
       links: [
-        { label: "For salon owners", href: "#for-salons" },
-        { label: "List your shop", href: "#salon-plans" },
-        { label: "Questions", href: "#faq" },
+        { label: "For salon owners", href: "/#for-salons" },
+        { label: "List your shop", href: "/#salon-plans" },
+        { label: "Questions", href: "/#faq" },
       ],
     },
   ],
   /** Must match `brand.cities` — one coverage claim, stated the same way twice. */
   cities: ["Thimphu", "Paro", "Phuentsholing"],
+  /** Sits in the bottom bar, not a column: it is a legal link, not navigation. */
+  legalLinks: [{ label: "Privacy", href: "/privacy" }],
+} as const;
+
+/**
+ * Who operates the service, for the privacy policy's benefit.
+ *
+ * Both app stores read `/privacy`, and every value here is a commitment made to
+ * a regulator and to users — not marketing copy. Change them only deliberately.
+ *
+ * `contactEmail` is deliberately NOT `brand.supportEmail`: account-deletion
+ * requests legally land at this address, so it has to be a mailbox that is
+ * actually read. `hello@bhutansalons.com` does not exist yet; when it does and
+ * someone monitors it, point this there and delete this paragraph.
+ */
+export const legal = {
+  operator: "Chojay Wangchuk",
+  jurisdiction: "Bhutan",
+  contactEmail: "chemsbhai@gmail.com",
+  /** Update whenever the policy text below changes materially. */
+  lastUpdated: "4 August 2026",
+  /** Days to honour a deletion request. A promise — keep it achievable. */
+  deletionDays: 30,
+} as const;
+
+/**
+ * The privacy policy, as data.
+ *
+ * Prose lives here rather than in the page component for the same reason the
+ * rest of the copy does: one place to edit. Each list item is split into a
+ * bolded `lead` and its `body` so the page needs no markdown renderer.
+ *
+ * Every claim here must stay true of the shipped app. The specifics — location
+ * never leaving the device, QR frames never being uploaded, instruction photos
+ * behind signed links — are real properties of the build, and a policy that
+ * overstates them is worse than one that says less.
+ */
+export const privacy = {
+  title: "Privacy Policy",
+  description: `How ${brand.appName} collects, uses and stores your information.`,
+  sections: [
+    {
+      title: "Overview",
+      body: `${brand.appName} ("the app") helps customers discover and book salons and barbers, and helps salon owners manage bookings, staff and services. This policy explains what we collect, why, and the choices you have.`,
+    },
+    {
+      title: "Information we collect",
+      items: [
+        {
+          lead: "Account information",
+          body: "your email address, name and, optionally, a phone number you give at sign-up or add to your profile.",
+        },
+        {
+          lead: "Content you create",
+          body: "bookings, reviews, messages to salons, and photos you upload (profile picture, salon gallery, service images, review photos, and instruction photos attached to a booking).",
+        },
+        {
+          lead: "Approximate location",
+          body: "with your permission, your device's location is used on your device to show salons near you and sort them by distance. We do not store your location on our servers.",
+        },
+        {
+          lead: "Camera",
+          body: "used only to scan a salon's walk-in-queue QR code. The image is decoded on your device and is never uploaded or stored.",
+        },
+        {
+          lead: "Notification token",
+          body: "if you allow notifications, your device's push token is stored so we can send booking reminders and queue updates. It is tied to your account and removed when another account signs in on that device.",
+        },
+        {
+          lead: "Service activity",
+          body: "the bookings, orders, queue entries and loyalty points needed to operate the service.",
+        },
+      ],
+      footnote:
+        "We do not knowingly collect data from children, sell your data, or use third-party advertising SDKs.",
+    },
+    {
+      title: "How we use it",
+      items: [
+        { body: "To create and secure your account and sign you in." },
+        {
+          body: "To provide the service: discovery, booking, rescheduling and cancellation, walk-in queues, messaging, reviews, loyalty, product orders, and — for salon staff — calendar, client and business management.",
+        },
+        { body: "To show salons near you (location stays on your device)." },
+        {
+          body: "To notify you about your bookings, your place in a queue, and rewards.",
+        },
+      ],
+    },
+    {
+      title: "How it is stored and shared",
+      items: [
+        {
+          body: "Data is stored with our backend provider, Supabase, and transmitted over encrypted connections (HTTPS).",
+        },
+        {
+          body: "Access is enforced by row-level security in the database: you see your own data; a salon's owner and staff see the data for that salon's bookings, orders and queue.",
+        },
+        {
+          body: "Salon and stylist gallery photos are public — they are marketing material shown to anyone browsing the app.",
+        },
+        {
+          body: "Instruction photos you attach to a booking are held in a private store and are readable only through short-lived signed links, by you and the salon you booked.",
+        },
+        {
+          body: "A salon you book with, join the queue at, or order from can see your name, profile photo and contact details, and the history of your visits with that salon.",
+        },
+        {
+          body: "We share data only as needed to operate the service or where the law requires it. We do not sell personal data.",
+        },
+      ],
+    },
+    {
+      title: "Your rights and choices",
+      items: [
+        { lead: "Access and update", body: "edit your profile in the app." },
+        {
+          lead: "Location",
+          body: "deny or withdraw the permission in your device settings at any time; the map falls back to a default city view.",
+        },
+        {
+          lead: "Notifications",
+          body: "turn them off in the app's Settings or in your device settings.",
+        },
+        {
+          lead: "Account and data deletion",
+          body: `email ${legal.contactEmail} and we will delete your account and personal data within ${legal.deletionDays} days. Records a salon must keep for its own accounts — for example that a booking took place and what it cost — are kept in a form that no longer identifies you.`,
+        },
+      ],
+    },
+    {
+      title: "Data retention",
+      body: "We keep your data while your account is active and for as long as needed to provide the service or meet a legal obligation, then delete or anonymise it.",
+    },
+    {
+      title: "Changes",
+      body: 'We may update this policy. Material changes will be posted here with a new "Last updated" date.',
+    },
+  ],
+} as const;
+
+/**
+ * Where a walk-in-queue QR code lands for someone who does not have the app.
+ *
+ * Anyone who does have it never sees this page: once the two files in
+ * `public/.well-known/` are live and verified, the OS hands
+ * `https://<domain>/q/<id>` straight to the app. So this leads with "get the
+ * app" and keeps "open in Tho" as the fallback for before verification has
+ * propagated.
+ *
+ * Deliberately no automatic redirect to the custom scheme — on a phone without
+ * the app that raises a browser error dialog, which is a worse first impression
+ * than a page that explains itself.
+ */
+export const queueLanding = {
+  title: "Join the walk-in queue",
+  /** Used when the salon is known; `{salon}` is replaced with its name. */
+  titleWithSalon: "Join the queue at {salon}",
+  lede: `Open this shop's line in the ${brand.appName} app.`,
+  reassurance: `In the app you'll see the shop's live wait and your projected place in line — "You'd be #3 · ~35 min" — before you commit to joining.`,
+  getApp: `Get ${brand.appName}`,
+  openApp: `Open in ${brand.appName}`,
+  /**
+   * Shown when the path segment is not a well-formed shop code — a truncated or
+   * mistyped link. (It can never be *absent*: `/q` without a code is a 404.)
+   */
+  badId: `That link doesn't carry a valid shop code. Scan the shop's QR again, or open ${brand.appName} and scan from inside the app.`,
 } as const;

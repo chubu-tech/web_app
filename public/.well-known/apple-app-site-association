@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TEAMID.bt.tho.app"],
+        "components": [
+          { "/": "/q/*", "comment": "walk-in queue links" }
+        ]
+      }
+    ]
+  }
+}

@@ -235,12 +235,45 @@ the moment it dipped below the threshold.
    (`content.ts`) — the domain drives `metadataBase`, the canonical URL, the
    sitemap and every JSON-LD `@id`. The WhatsApp number is still the same
    `+975 17 00 00 00` placeholder the app carries.
-5. Add the `/privacy` and `/terms` routes (the footer no longer links to them,
-   but the store listings need a hosted privacy policy — tho's
-   `docs/deployment/PRIVACY_POLICY.md` has the copy). Add each to `sitemap.ts`.
-   tho's `STORE_DEPLOYMENT_CHECKLIST.md` also expects this site to host
-   `/q/<id>`, `/.well-known/assetlinks.json` and `apple-app-site-association`
-   for deep links.
+5. **Swap the `assetlinks.json` fingerprint** — see "Deep links" below. This is
+   the one item on this list that fails *silently*. `/privacy`, `/q/<id>` and
+   both `.well-known` files now exist; `/terms` still does not.
 6. Social proof was removed on purpose: the earlier testimonials and stat
    figures were invented. Add them back only with real, consented quotes and
    measured numbers.
+
+## Deep links
+
+A shop's printed queue QR code encodes `bhutansalons://q/<id>` (the custom
+scheme — see `queue_links.dart` in the tho repo). `/q/<id>` is the web landing
+page for a phone that does *not* have Tho, and the two files in
+`public/.well-known/` are what let a phone that *does* have it skip this page
+and open the app directly.
+
+**`assetlinks.json` currently carries the wrong fingerprint, on purpose.** The
+SHA-256 in it is the *upload* key from `~/.keystores/tho-upload.jks`. But new
+apps ship as App Bundles, so Google re-signs every install with its own **app
+signing key** — a different certificate. Android verifies the App Link against
+the certificate the installed APK was signed with, which is Google's, not ours.
+
+So after the first Play upload:
+
+1. Play Console → your app → **Test and release → Setup → App signing**.
+2. Copy the **app signing key certificate**'s SHA-256 fingerprint.
+3. Put it in `sha256_cert_fingerprints`. Keep the upload-key fingerprint in the
+   array too — the array holds several, and it is what locally-built debug/
+   sideloaded APKs are signed with, so both cases then verify.
+
+Until that swap, `/q/<id>` links open in a browser rather than the app, with no
+error anywhere. Verify with:
+
+```bash
+curl -s https://bhutansalons.com/.well-known/assetlinks.json
+# Content-Type must be application/json for BOTH files:
+curl -sI https://bhutansalons.com/.well-known/apple-app-site-association
+```
+
+`apple-app-site-association` still has a literal `TEAMID` placeholder — replace
+it with the real Apple Developer Team ID before any iOS build. It has no
+extension, so `next.config.ts` sets its `Content-Type` explicitly; iOS rejects
+it otherwise.
