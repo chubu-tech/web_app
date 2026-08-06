@@ -1,58 +1,47 @@
 import type { Metadata, Viewport } from "next";
-import {
-  Bricolage_Grotesque,
-  DM_Sans,
-  Instrument_Serif,
-} from "next/font/google";
+import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 
 /**
- * The three faces the **customer** shell renders in, mirroring the marketing site.
+ * **One face, every route.** Inter carries the whole product — the 25 customer routes and
+ * the 26 owner-console routes alike.
  *
- * ## They have to be declared here, and they only apply over there
+ * ## What this replaced, and why it was wrong
  *
- * Only `<html>` can carry a font className, so all three load in the root layout — but
- * nothing here applies them. `[data-shell="customer"]` in `globals.css` sets
- * `font-family` for the customer routes; the owner console inherits the system stack it
- * has always had.
+ * Three loaders used to sit here: DM Sans, Bricolage Grotesque and Instrument Serif. Two
+ * of the three were **never rendered by anything**. `--font-display` and `--font-serif`
+ * were declared in `@theme` and no component in the repo referenced either, so Bricolage
+ * and Instrument were downloaded-on-demand faces with no demand — dead weight carried
+ * because the marketing site had them.
  *
- * `--font-display` in `@theme` resolves `var(--font-bricolage)` **because both land on
- * `<html>`** — `:root` and next/font's generated class are the same element. If these
- * classNames are ever moved down onto a layout's `<div>`, `--font-display` computed at
- * `:root` resolves to nothing and every `font-display` element silently falls back.
+ * Worse, DM Sans applied to the customer shell **only**. `[data-shell="customer"]` set
+ * `font-family` directly, so the console inherited Tailwind's system stack and rendered in
+ * whatever the visitor's OS happened to supply — Segoe UI on Windows, San Francisco on a
+ * Mac, Roboto on Android. Half the product had no typeface of its own and looked different
+ * on every machine. Measured before the change: `getComputedStyle(html).fontFamily` was
+ * `-apple-system, …, "Segoe UI", …` while `body` under the customer wrapper was DM Sans.
  *
- * ## Inter used to be here and was never rendered
+ * ## The mechanism is `--font-sans`, not a `font-family` declaration
  *
- * The removed loader declared `--font-inter` with a comment claiming `globals.css` owned
- * the stack. Nothing in the repo referenced that variable: Tailwind's
- * `--default-font-family` resolved to its own system stack, so **tho_web has never
- * rendered in Inter** on any route — it has always been on the OS font. The variable was
- * a link that was never made. Deleted rather than wired up, because the owner console is
- * meant to keep looking exactly as it does.
+ * `globals.css` sets `--font-sans` inside `@theme`. Tailwind's preflight declares
+ * `font-family: var(--default-font-family)` on `html, :host`, and `--default-font-family`
+ * resolves `--font-sans` at `:root` — the same element `inter.variable` lands on. So one
+ * token reaches every route, and the customer shell no longer needs a `font-family`
+ * override at all.
+ *
+ * That resolution order is the whole reason this works and is easy to break: if
+ * `inter.variable` is ever moved off `<html>` onto a layout's `<div>`, `--font-sans`
+ * computed at `:root` resolves to nothing and the entire app silently falls back to the
+ * system stack — the exact bug that was here before, in a new costume.
+ *
+ * Inter is loaded variable (no `weight`), so 400/500/600/700 all come from one file and
+ * the scale in `globals.css` can use any of them at no extra cost.
  */
-const dmSans = DM_Sans({
-  variable: "--font-dm-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
   display: "swap",
-});
-
-// Accent faces: one hero heading and a few italic words. `preload: false` keeps them off
-// the critical path of the 26 owner routes, which never render either of them.
-const bricolage = Bricolage_Grotesque({
-  variable: "--font-bricolage",
-  subsets: ["latin"],
-  display: "swap",
-  preload: false,
-});
-
-const instrument = Instrument_Serif({
-  variable: "--font-instrument",
-  subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
-  display: "swap",
-  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -80,7 +69,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${dmSans.variable} ${bricolage.variable} ${instrument.variable} h-full antialiased`}
+      className={`${inter.variable} h-full antialiased`}
     >
       <body className="bg-canvas text-ink flex min-h-full flex-col">
         {children}

@@ -32,7 +32,8 @@ import { Icons } from "@/components/ui/icons";
  * It deliberately does **not** call `getAccount()` to render the real nav. That would read
  * cookies, turn the one static route in the build into a dynamic one, and start the inbox
  * poll on an error page — to decide whether a header says "Sign in". `data-shell="customer"`
- * still puts it on the cream canvas and DM Sans, so it reads as this site either way.
+ * still puts it on the cream canvas, so it reads as this site either way. (The typeface is
+ * no longer part of that — Inter comes from `--font-sans` at `:root` on every route.)
  *
  * Owner routes get their own at `app/business/not-found.tsx`; `business` **is** a real URL
  * segment, so that boundary resolves normally and keeps the console's own chrome.

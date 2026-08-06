@@ -5,16 +5,22 @@
 
    **Two systems, one file, and a rule for choosing between them.**
 
-   `:root` is the *product* system — a one-to-one port of `tho/app/lib/ui/tokens.dart`
-   and the type scale in `theme.dart`, mirroring tho's DESIGN.md. The **owner console**
-   renders in it unchanged: white canvas, 14px title scale, 8/14px radii, because it is
-   a dense operational tool somebody works at a till.
+   `:root` is the *product* system — colour, radii and motion ported from
+   `tho/app/lib/ui/tokens.dart`, mirroring tho's DESIGN.md. The **owner console** renders
+   in it: white canvas, 8/14px radii, because it is a dense operational tool somebody
+   works at a till.
 
-   `[data-shell="customer"]` re-points three of those values to the marketing site's
-   editorial layer (cream canvas, DM Sans / Bricolage / Instrument Serif) so a visitor
-   arriving from bhutansalons.com sees one continuous product rather than a website and
-   then an app. This file used to say "do not reach for landing_page's globals.css";
-   that changed deliberately, for the customer side only.
+   The **type scale is not a port** — see the block below. `theme.dart`'s phone metrics
+   were the wrong numbers for a browser.
+
+   `[data-shell="customer"]` re-points three colours to the marketing site's editorial
+   layer (cream canvas) so a visitor arriving from bhutansalons.com sees one continuous
+   product rather than a website and then an app. This file used to say "do not reach for
+   landing_page's globals.css"; that changed deliberately, for the customer side only.
+
+   **The typeface is not part of that split.** `--font-sans` below puts Inter on all 51
+   routes, and it is the same face `../landing_page` and the Flutter app use. The scope
+   block decides colour and nothing else.
 
    THE RULE FOR ADDING A TOKEN:
 
@@ -22,11 +28,10 @@
      only in *value*. When they mean different *sizes*, add a new name.
 
    `--color-canvas` is "the page behind everything" in both → overridden below.
-   `--text-display-lg` is a 19px section title here and a 30-48px editorial headline
-   there → **different roles**, so the editorial scale is `--text-editorial-*` and is
-   opted into per element. Overriding it would have retyped 14 customer headings with
-   nothing in the diff to show it, and given `SectionHeader` and `QueuePositionCard` —
-   which both shells render — two different type scales depending on the caller.
+   `--radius-slab` (2rem) and `--radius-md` (14px) are different *sizes* → two names,
+   opted into per element. Re-pointing `--radius-md` at the slab value would have
+   reshaped every shared card, Sheet, Chip and SelectTile with nothing in the diff to
+   show it.
 
    Light only. DESIGN.md has no dark mode.
 
@@ -116,32 +121,80 @@
   --ease-exit: cubic-bezier(0.55, 0.055, 0.675, 0.19); /* easeInCubic */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* easeOutBack */
 
-  /* --- Type scale (theme.dart AppText) ---------------------------------- */
-  /* THO-57 dropped the scale two steps (~12%); the app read large on a phone.
-     `badge` holds at 11px — it is the smallest text in the app and lives in
-     count pills, where a further drop stops being legible. */
-  --text-display-xl: 24px;
-  --text-display-xl--line-height: 1.2;
-  --text-display-lg: 19px;
-  --text-display-lg--line-height: 1.18;
-  --text-display-lg--letter-spacing: -0.44px;
-  --text-display-md: 19px;
+  /* --- Type scale -------------------------------------------------------
+     **A web scale, not a port.** This used to be `theme.dart`'s `AppText`
+     one-to-one: 14px titles, 12px secondary text, 11px captions, line-heights
+     from 1.18 to 1.29. Those are the numbers THO-57 arrived at for a phone held
+     at arm's length, and they are the wrong numbers for a browser window — 762
+     usages across ten tokens rendered the whole product a size too small with
+     the leading pulled tight, which is most of what read as dense and generic.
+
+     Same deliberate divergence already made for the breakpoints and the
+     editorial canvas: the Flutter screens are phone-only, so their metrics are
+     not the web's. Ten tokens carry all 762 call sites, so this file is the only
+     place the scale exists and not one class string changes.
+
+     Three rules the numbers follow:
+
+     1. **Leading opens as size drops.** 1.15 at 32px up to 1.6 at 16px. Long
+        measures of small text need the room; a headline does not.
+     2. **Tracking tightens as size grows, and only above 18px.** Inter is drawn
+        for negative tracking at display sizes and needs none below that. The two
+        smallest steps go slightly *positive*, which is what keeps 11-12px legible.
+     3. **16px is the prose floor.** `body-md` is what paragraphs use, so it is
+        the one step that may not go below the accessibility floor.
+
+     `badge` holds at 11px, as it did: it lives inside count pills whose size is
+     fixed by the glyph beside them. It earns its legibility from 600 weight and
+     +0.02em instead. */
+
+  /* Page hero, and the one or two big figures in the console. */
+  --text-display-xl: 2rem; /* 32px */
+  --text-display-xl--line-height: 1.15;
+  --text-display-xl--letter-spacing: -0.02em;
+
+  /* Page title. */
+  --text-display-lg: 1.5rem; /* 24px */
+  --text-display-lg--line-height: 1.2;
+  --text-display-lg--letter-spacing: -0.018em;
+
+  /* Section title. */
+  --text-display-md: 1.25rem; /* 20px */
   --text-display-md--line-height: 1.25;
-  --text-display-sm: 17px;
-  --text-display-sm--line-height: 1.2;
-  --text-display-sm--letter-spacing: -0.18px;
-  --text-title: 14px;
-  --text-title--line-height: 1.25;
-  --text-body-md: 14px;
-  --text-body-md--line-height: 1.5;
-  --text-body-sm: 12px;
-  --text-body-sm--line-height: 1.43;
-  --text-caption: 12px;
-  --text-caption--line-height: 1.29;
-  --text-caption-sm: 11px;
-  --text-caption-sm--line-height: 1.23;
-  --text-badge: 11px;
-  --text-badge--line-height: 1.18;
+  --text-display-md--letter-spacing: -0.012em;
+
+  /* Card and sub-section title. */
+  --text-display-sm: 1.125rem; /* 18px */
+  --text-display-sm--line-height: 1.3;
+  --text-display-sm--letter-spacing: -0.008em;
+
+  /* The UI voice: nav, buttons, labels, table headers. Carries 500 or 600. */
+  --text-title: 0.9375rem; /* 15px */
+  --text-title--line-height: 1.4;
+  --text-title--letter-spacing: -0.006em;
+
+  /* Prose. The accessibility floor — do not take this below 16px. */
+  --text-body-md: 1rem; /* 16px */
+  --text-body-md--line-height: 1.6;
+
+  /* Secondary prose and dense rows. */
+  --text-body-sm: 0.875rem; /* 14px */
+  --text-body-sm--line-height: 1.55;
+
+  /* Captions and metadata, usually in `text-muted`. */
+  --text-caption: 0.8125rem; /* 13px */
+  --text-caption--line-height: 1.45;
+
+  /* The smallest label. Positive tracking is what keeps it readable. */
+  --text-caption-sm: 0.75rem; /* 12px */
+  --text-caption-sm--line-height: 1.4;
+  --text-caption-sm--letter-spacing: 0.01em;
+
+  /* Count pills only. Fixed by the glyph beside it, so it earns legibility from
+     weight and tracking rather than size. */
+  --text-badge: 0.6875rem; /* 11px */
+  --text-badge--line-height: 1.2;
+  --text-badge--letter-spacing: 0.02em;
 
   /* --- Animation -------------------------------------------------------- */
   /* The skeleton sweep. `app_skeleton.dart` runs a ShaderMask across a grey
@@ -203,17 +256,25 @@
   --color-maroon: #722030;
   --color-jade: #1f6f5c;
 
-  /* `--font-sans` is deliberately NOT set: it would put DM Sans on all 26 owner
-     routes. The customer shell sets `font-family` directly instead — see the
-     note on the scope block. */
-  --font-display: var(--font-bricolage), var(--font-dm-sans), sans-serif;
-  --font-serif: var(--font-instrument), Georgia, serif;
+  /* **This is what puts Inter on every route.** Preflight declares
+     `font-family: var(--default-font-family)` on `html, :host`, and
+     `--default-font-family` resolves `--font-sans` at `:root` — which is the same
+     element `inter.variable` lands on in `app/layout.tsx`.
 
-  /* NOT `--text-display-*`. See THE RULE at the top of this file. */
-  --text-editorial-2xl: clamp(2.75rem, 5.6vw, 5rem);
-  --text-editorial-xl: clamp(2.25rem, 5.5vw, 4.5rem);
-  --text-editorial-lg: clamp(1.875rem, 3.6vw, 3rem);
-  --text-editorial-md: clamp(1.5rem, 2.4vw, 2rem);
+     It used to say "`--font-sans` is deliberately NOT set: it would put DM Sans on
+     all 26 owner routes", and the customer shell set `font-family` directly to
+     compensate. That is exactly the split that left the console on the visitor's OS
+     font. One family everywhere is the point now, so the token is set here and the
+     scope block below no longer touches `font-family` at all. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* `--font-display`, `--font-serif` and the four `--text-editorial-*` clamps used
+     to live here, for Bricolage Grotesque and Instrument Serif. **Nothing in the
+     repo ever referenced any of the six** — no `font-display`, `font-serif` or
+     `text-editorial-*` class exists in any component — so two webfonts were being
+     declared for call sites that never arrived. Deleted with their loaders rather
+     than repointed at Inter: one family needs no display alias, and hierarchy here
+     comes from the weight and size steps above. */
 
   /* Generous radii for the editorial layer. Do NOT re-point --radius-md (14px)
      at these: it would reshape every shared card, Sheet, Chip and SelectTile. */
@@ -314,19 +375,13 @@
    `:root` above IS the product system, so the owner console needs no attribute
    and gets no override. An attribute that changes nothing is a thing to misread.
 
-   Three things here are load-bearing:
+   Two things here are load-bearing:
 
-   1. `font-family`, not `--font-sans`. Preflight declares
-      `font-family: var(--default-font-family)` on `html, :host` ONLY, and
-      `--default-font-family: var(--font-sans)` is computed at `:root` — both
-      indirections resolve before a descendant is reached, so overriding either
-      one here would change nothing. The property must be set directly.
-
-   2. The `body:has()` half is what makes the whole viewport cream.
+   1. The `body:has()` half is what makes the whole viewport cream.
       `body { background: var(--color-canvas) }` resolves the variable *on body*,
       so body must be inside the scope or iOS overscroll reveals white.
 
-   3. Unlayered on purpose. `@theme` lands in `@layer theme`, and an unlayered
+   2. Unlayered on purpose. `@theme` lands in `@layer theme`, and an unlayered
       rule beats a layered one whatever the specificity — which matters, because
       `:root` and `[data-shell="customer"]` are both (0,1,0) and specificity
       alone would leave this to source order.
@@ -340,7 +395,11 @@ body:has([data-shell="customer"]) {
   --color-surface-soft: #efe9e1; /* canvas-deep: a tint OF cream, not of white */
   --color-surface-strong: #e6ded2; /* sand */
 
-  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  /* No `font-family` here any more. This block used to set DM Sans directly,
+     which is what made the typeface a property of *one shell* and left the
+     console on the OS font. `--font-sans` in `@theme` now reaches both, so this
+     scope is purely about colour — which is the only thing the two shells were
+     ever meant to disagree about. */
 }
 
 @layer base {
@@ -352,8 +411,27 @@ body:has([data-shell="customer"]) {
     background: var(--color-canvas);
     color: var(--color-ink);
     font-size: var(--text-body-md);
-    line-height: 1.5;
+    /* The token's own leading, not a second hardcoded 1.5 beside it. They used to
+       disagree silently — `--text-body-md--line-height` said one thing and this
+       line overrode it for every element that never sets a `text-` utility. */
+    line-height: var(--text-body-md--line-height);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Inter's contextual alternates fix the 'ti'/'tt' collisions its default
+       spacing leaves at UI sizes. `cv11` gives the single-storey 'a' a straight
+       tail, which is what keeps 12-13px labels from muddying. */
+    font-feature-settings: "cv11", "calt";
+    /* Numerals line up in tables, price columns and the calendar. This product is
+       mostly figures — an owner reading a payroll column should not see the digits
+       shift width between rows. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Prose gets proportional figures back: tabular digits in a sentence read as a
+     spreadsheet. Only the tables, pills and time strings want the monospaced set,
+     and they inherit it from body. */
+  p {
+    font-variant-numeric: normal;
   }
 
   /* One visible focus treatment for the whole app. */

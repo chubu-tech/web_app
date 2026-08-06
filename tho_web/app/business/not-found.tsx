@@ -13,8 +13,8 @@ import { Icons } from "@/components/ui/icons";
  * are all still there. So this file is content only; adding a header would double it.
  *
  * Without it, an owner hitting a stale link would fall through to the root boundary and get
- * the *customer* shell — cream canvas, DM Sans, a "Find a salon" button — which is a
- * disorienting place to land while working at a till, and offers nothing that helps.
+ * the *customer* shell — cream canvas, a "Find a salon" button — which is a disorienting
+ * place to land while working at a till, and offers nothing that helps.
  */
 export default function OwnerNotFound() {
   return (
