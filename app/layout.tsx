@@ -1,32 +1,29 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, DM_Sans, Instrument_Serif } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { WaitlistProvider } from "@/components/waitlist-provider";
 import { brand, hero } from "@/lib/content";
 
-/* DM Sans carries the whole marketing site: geometric, open, low contrast —
-   it holds up at 5rem display sizes without feeling dense. (The Flutter app
-   stays on Inter; this page is deliberately the cleaner-typed surface.) */
-const dmSans = DM_Sans({
+/**
+ * **One face, loaded variable.** Inter carries every line on the site, and the same
+ * face carries `../tho_web` and the Flutter app — so a visitor moving from this page
+ * into the product never crosses a typographic seam.
+ *
+ * ## Three loaders used to sit here
+ *
+ * DM Sans for body, Inter Black 900 for the hero `h1`, Instrument Serif for the
+ * italic accent word. That is three families and three downloads on a two-route
+ * static site, and the h1 at `weight: "900"` was a second Inter file on top of the
+ * variable one any other weight would have needed.
+ *
+ * No `weight` here on purpose: Inter ships variable, so 400/500/600/700 all come out
+ * of one file. The scale in `globals.css` can reach for any of them at no extra
+ * request, which is what lets hierarchy come from weight instead of from a second
+ * family.
+ */
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-dm-sans",
-  display: "swap",
-});
-
-/* The hero headline only. Tighter joins and more character than DM Sans, which
-   is what carries a 5rem line; everywhere else would be shouting. */
-const bricolage = Bricolage_Grotesque({
-  subsets: ["latin"],
-  variable: "--font-bricolage",
-  display: "swap",
-});
-
-/* Editorial accent only — the italic emphasis word inside display headings. */
-const instrument = Instrument_Serif({
-  variable: "--font-instrument",
-  subsets: ["latin"],
-  weight: "400",
-  style: ["italic", "normal"],
+  variable: "--font-inter",
   display: "swap",
 });
 
@@ -82,7 +79,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${dmSans.variable} ${bricolage.variable} ${instrument.variable} h-full antialiased`}
+      className={`${inter.variable} h-full antialiased`}
     >
       <body className="bg-canvas text-ink flex min-h-full flex-col overflow-x-hidden">
         <a

@@ -97,10 +97,10 @@ export function StoreBadges({
           <>
             {badge.mark}
             <span className="text-left">
-              <span className="block text-[0.625rem] tracking-[0.08em] text-white/65 uppercase">
+              <span className="block text-caption-sm tracking-[0.08em] text-white/65 uppercase">
                 {badge.href ? badge.top : "Coming soon to"}
               </span>
-              <span className="block text-[0.9375rem] leading-tight font-semibold">
+              <span className="block text-ui leading-tight font-semibold">
                 {badge.store}
               </span>
             </span>

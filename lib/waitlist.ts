@@ -36,15 +36,19 @@ export type WaitlistSource =
   | "app_store"
   | "google_play"
   | "header"
+  | "footer"
   | "pricing"
   | "qr"
   | "waitlist_page";
 
+// Two lists, deliberately: the union types the call sites, the Set narrows an
+// attacker-controlled `?src=`. Adding a source means adding it to both.
 const SOURCES = new Set<string>([
   "download_button",
   "app_store",
   "google_play",
   "header",
+  "footer",
   "pricing",
   "qr",
   "waitlist_page",

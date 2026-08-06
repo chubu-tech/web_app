@@ -195,13 +195,13 @@ function WaitlistDialog({
           <X className="size-4" strokeWidth={2} aria-hidden />
         </button>
 
-        <span className="text-rausch text-[0.6875rem] font-semibold tracking-[0.16em] uppercase">
+        <span className="text-rausch text-caption-sm font-semibold tracking-[0.16em] uppercase">
           {waitlist.eyebrow}
         </span>
 
         <h2
           id={`${id}-title`}
-          className="text-ink mt-3 pr-10 text-[1.75rem] leading-[1.1] font-semibold tracking-tight"
+          className="text-ink text-display-md mt-3 pr-10 font-semibold"
         >
           {lines.map((line, lineIndex) => (
             <span key={lineIndex} className="block">
@@ -209,7 +209,7 @@ function WaitlistDialog({
                 typeof word === "string" ? (
                   <span key={wordIndex}>{word} </span>
                 ) : (
-                  <span key={wordIndex} className="font-serif italic">
+                  <span key={wordIndex} className="font-normal tracking-[-0.01em]">
                     {word.text}{" "}
                   </span>
                 ),
@@ -218,7 +218,7 @@ function WaitlistDialog({
           ))}
         </h2>
 
-        <p id={`${id}-body`} className="text-body mt-3 text-[0.9375rem] leading-relaxed">
+        <p id={`${id}-body`} className="text-body mt-3 text-ui leading-relaxed">
           {waitlist.body}
         </p>
 

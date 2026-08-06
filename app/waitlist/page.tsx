@@ -35,7 +35,7 @@ export default function WaitlistPage() {
       <div className="mx-auto flex w-full max-w-[36rem] flex-1 flex-col justify-center px-5 py-16 sm:px-8">
         <Link
           href="/"
-          className="text-body hover:text-ink group inline-flex items-center gap-2 self-start text-[0.9375rem] font-medium transition-colors"
+          className="text-body hover:text-ink group inline-flex items-center gap-2 self-start text-ui font-medium transition-colors"
         >
           <ArrowLeft
             className="size-4 transition-transform duration-300 group-hover:-translate-x-0.5"
@@ -49,18 +49,20 @@ export default function WaitlistPage() {
             <Scissors className="size-5" strokeWidth={2.2} aria-hidden />
           </span>
 
-          <span className="text-rausch mt-7 block text-[0.6875rem] font-semibold tracking-[0.16em] uppercase">
+          <span className="text-rausch mt-7 block text-caption-sm font-semibold tracking-[0.16em] uppercase">
             {waitlist.eyebrow}
           </span>
 
-          <h1 className="text-ink mt-3 text-[2.25rem] leading-[1.05] font-semibold tracking-tight sm:text-[2.75rem]">
+          {/* `text-display-lg` clamps 30-48px and carries its own leading and
+              tracking, so the manual pair and the `sm:` step both go. */}
+          <h1 className="text-ink text-display-lg mt-3 font-semibold">
             {lines.map((line, lineIndex) => (
               <span key={lineIndex} className="block">
                 {line.map((word, wordIndex) =>
                   typeof word === "string" ? (
                     <span key={wordIndex}>{word} </span>
                   ) : (
-                    <span key={wordIndex} className="font-serif italic">
+                    <span key={wordIndex} className="font-normal tracking-[-0.01em]">
                       {word.text}{" "}
                     </span>
                   ),
@@ -69,7 +71,7 @@ export default function WaitlistPage() {
             ))}
           </h1>
 
-          <p className="text-body mt-4 text-[1.0625rem] leading-relaxed">
+          <p className="text-body mt-4 text-body-lg leading-relaxed">
             {waitlist.body}
           </p>
 
@@ -82,7 +84,7 @@ export default function WaitlistPage() {
       </div>
 
       <MountainRule className="text-sand h-16 w-full shrink-0 sm:h-20" />
-      <p className="text-body/60 pb-8 text-center text-[0.8125rem]">
+      <p className="text-body/60 pb-8 text-center text-caption">
         {brand.name} · {brand.cities.join(" · ")}
       </p>
     </main>

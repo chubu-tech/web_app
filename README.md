@@ -152,7 +152,7 @@ CTAs and active states, ink `#222222` (never pure black), the single
 | Token | Face | Used for |
 |---|---|---|
 | `font-sans` | DM Sans | everything — geometric, open, low contrast |
-| `font-display` | Bricolage Grotesque | the hero `<h1>` only |
+| `font-display` | Inter Black (900) | the hero `<h1>` only |
 | `font-serif` | Instrument Serif italic | the accent word in a heading |
 
 The Flutter app stays on Inter (tho's `DESIGN.md` names it as the substitute for

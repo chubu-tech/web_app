@@ -15,16 +15,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
-<<<<<<< HEAD
       // The QR's landing page. Listed so the URL is discoverable and stable —
       // it is printed on things — but its own metadata sets `index: false`,
       // because a bare signup form is not what should rank for "Bhutan salons".
       url: `https://${brand.domain}/waitlist`,
       changeFrequency: "monthly",
-=======
+      priority: 0.3,
+    },
+    {
       url: `https://${brand.domain}/privacy`,
       changeFrequency: "yearly",
->>>>>>> 2b1c5be2d43ab96cbdc5ce2e566db20d7c3ee431
       priority: 0.3,
     },
   ];

@@ -51,21 +51,26 @@ export function DownloadBand() {
 
           <div className="relative flex min-h-[28rem] flex-col items-center justify-center px-6 py-20 text-center sm:min-h-[32rem]">
             <Reveal>
-              <span className="text-saffron text-[0.6875rem] font-semibold tracking-[0.16em] uppercase">
+              <span className="text-rausch text-caption-sm font-semibold tracking-[0.16em] uppercase">
                 {download.eyebrow}
               </span>
             </Reveal>
 
+            {/* Rausch, matching the eyebrow above and the Sign in button — this band
+                was the last saffron text on the page. Note this accent does sit beside
+                real controls (the waitlist button and the QR card below), which the
+                hero's accent deliberately does not; the weight drop and the display
+                size are what keep it reading as a headline rather than a link. */}
             <TextReveal
               as="h2"
               id="download-title"
               lines={parseHeading("The chair is ready _when you are_")}
-              className="text-display-xl mt-4 max-w-3xl leading-[1.02] font-semibold text-white"
-              accentClassName="text-saffron"
+              className="text-display-xl mt-4 max-w-3xl font-semibold text-white"
+              accentClassName="text-rausch"
             />
 
             <Reveal delay={0.12}>
-              <p className="mt-5 max-w-lg text-[1.0625rem] leading-relaxed text-white/80">
+              <p className="mt-5 max-w-lg text-body-lg leading-relaxed text-white/80">
                 {download.body}
               </p>
             </Reveal>
@@ -86,10 +91,10 @@ export function DownloadBand() {
                     />
                   </div>
                   <span className="pr-2 text-left">
-                    <span className="block text-[0.9375rem] font-semibold text-white">
+                    <span className="block text-ui font-semibold text-white">
                       {waitlist.qr.caption}
                     </span>
-                    <span className="block text-[0.8125rem] text-white/65">
+                    <span className="block text-caption text-white/65">
                       {waitlist.qr.sub}
                     </span>
                   </span>

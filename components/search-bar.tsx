@@ -273,7 +273,7 @@ export function SearchBar({
           />
 
           <div className="border-hairline-soft border-t px-5 py-4">
-            <p className="text-muted text-[0.6875rem] font-semibold tracking-[0.16em] uppercase">
+            <p className="text-muted text-caption-sm font-semibold tracking-[0.16em] uppercase">
               {copy.when.timeLabel}
             </p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -297,7 +297,7 @@ export function SearchBar({
               )}
             </div>
             {/* Says what the filter can actually do. */}
-            <p className="text-muted-soft mt-3 text-[0.75rem] leading-relaxed">
+            <p className="text-muted-soft mt-3 text-caption-sm leading-relaxed">
               {copy.when.note}
             </p>
           </div>
@@ -316,7 +316,7 @@ export function SearchBar({
       </div>
 
       {locationError && (
-        <p role="status" className="text-muted px-2 text-[0.8125rem]">
+        <p role="status" className="text-muted px-2 text-caption">
           {locationError}
         </p>
       )}
@@ -335,7 +335,7 @@ function Divider() {
 
 function CountChip({ label, value }: { label: string; value: number }) {
   return (
-    <span className="bg-canvas text-body inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.75rem] font-medium">
+    <span className="bg-canvas text-body inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-caption-sm font-medium">
       {label}
       <span className="text-muted tabular-nums">{value}</span>
     </span>
@@ -378,7 +378,7 @@ function MonthGrid({
         >
           <ChevronLeft className="size-4" aria-hidden />
         </button>
-        <p className="text-[0.9375rem] font-semibold">
+        <p className="text-ui font-semibold">
           {month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
         </p>
         <button
@@ -396,7 +396,7 @@ function MonthGrid({
           <span
             key={i}
             aria-hidden
-            className="text-muted-soft grid h-7 place-items-center text-[0.6875rem] font-semibold"
+            className="text-muted-soft grid h-7 place-items-center text-caption-sm font-semibold"
           >
             {initial}
           </span>
@@ -413,7 +413,7 @@ function MonthGrid({
               aria-label={prettyDate(value)}
               onClick={() => onPick(value)}
               className={cn(
-                "grid h-9 place-items-center rounded-full text-[0.875rem] tabular-nums transition-colors",
+                "grid h-9 place-items-center rounded-full text-body-sm tabular-nums transition-colors",
                 "disabled:text-muted-soft/50 disabled:pointer-events-none",
                 value === selected
                   ? "bg-ink font-semibold text-white"

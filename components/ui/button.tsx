@@ -75,7 +75,7 @@ export function Button(props: AsLink | AsButton) {
     className: cn(
       "group/btn inline-flex shrink-0 items-center gap-2 rounded-full font-medium",
       "transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
-      size === "lg" ? "h-14 px-7 text-[1.0625rem]" : "h-12 px-6 text-[0.9375rem]",
+      size === "lg" ? "h-14 px-7 text-body-lg" : "h-12 px-6 text-ui",
       VARIANTS[variant],
       "disabled:pointer-events-none disabled:opacity-50",
       className,

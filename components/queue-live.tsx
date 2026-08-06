@@ -66,10 +66,10 @@ export function QueueLive() {
                 <div className="inline-flex items-center gap-4 rounded-2xl bg-white/8 p-4 ring-1 ring-white/12 ring-inset">
                   <QrTile />
                   <span>
-                    <span className="block text-[0.9375rem] font-semibold text-white">
+                    <span className="block text-ui font-semibold text-white">
                       {queueSection.qrCaption}
                     </span>
-                    <span className="block text-[0.8125rem] text-white/60">
+                    <span className="block text-caption text-white/60">
                       {queueSection.qrSub}
                     </span>
                   </span>
@@ -116,15 +116,15 @@ function QueueBoard() {
             <Scissors className="size-5" strokeWidth={2.2} aria-hidden />
           </span>
           <span>
-            <span className="block text-[0.9375rem] font-semibold text-white">
+            <span className="block text-ui font-semibold text-white">
               Norling Hair Studio
             </span>
-            <span className="block text-[0.8125rem] text-white/55">
+            <span className="block text-caption text-white/55">
               2 chairs · Thimphu
             </span>
           </span>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-wider text-white uppercase">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 text-caption-sm font-semibold tracking-wider text-white uppercase">
           <span className="bg-rausch size-1.5 animate-pulse rounded-full" />
           Live
         </span>
@@ -155,7 +155,7 @@ function QueueBoard() {
               >
                 <span
                   className={cn(
-                    "grid size-9 shrink-0 place-items-center rounded-full text-[0.8125rem] font-semibold",
+                    "grid size-9 shrink-0 place-items-center rounded-full text-caption font-semibold",
                     state === "in-chair"
                       ? "bg-white text-ink"
                       : isYou
@@ -173,29 +173,29 @@ function QueueBoard() {
                 <span className="min-w-0 flex-1">
                   <span
                     className={cn(
-                      "block truncate text-[0.9375rem] font-medium",
+                      "block truncate text-ui font-medium",
                       isYou ? "text-white" : "text-white/85",
                     )}
                   >
                     {entry.name}
                   </span>
-                  <span className="block truncate text-[0.8125rem] text-white/50">
+                  <span className="block truncate text-caption text-white/50">
                     {entry.service}
                   </span>
                 </span>
 
                 {state === "in-chair" && (
-                  <span className="shrink-0 rounded-full bg-white/12 px-2.5 py-1 text-[0.6875rem] font-semibold tracking-wider text-white/80 uppercase">
+                  <span className="shrink-0 rounded-full bg-white/12 px-2.5 py-1 text-caption-sm font-semibold tracking-wider text-white/80 uppercase">
                     In chair
                   </span>
                 )}
                 {state === "next" && (
-                  <span className="bg-rausch shrink-0 rounded-full px-2.5 py-1 text-[0.6875rem] font-semibold tracking-wider text-white uppercase">
+                  <span className="bg-rausch shrink-0 rounded-full px-2.5 py-1 text-caption-sm font-semibold tracking-wider text-white uppercase">
                     Next
                   </span>
                 )}
                 {state === "waiting" && (
-                  <span className="shrink-0 text-[0.8125rem] text-white/45">
+                  <span className="shrink-0 text-caption text-white/45">
                     ~{i * 9} min
                   </span>
                 )}
@@ -219,10 +219,10 @@ function QueueBoard() {
               <Bell className="size-4" strokeWidth={2.2} aria-hidden />
             </span>
             <span className="min-w-0">
-              <span className="text-ink block text-[0.875rem] font-semibold">
+              <span className="text-ink block text-body-sm font-semibold">
                 You&apos;re two away — start heading back
               </span>
-              <span className="text-muted block text-[0.8125rem]">
+              <span className="text-muted block text-caption">
                 Norling Hair Studio · about 18 min
               </span>
             </span>

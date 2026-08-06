@@ -42,7 +42,7 @@ export function Faq() {
                     >
                       <span
                         className={cn(
-                          "flex-1 text-[1.0625rem] font-medium transition-colors duration-300 sm:text-[1.125rem]",
+                          "flex-1 text-body-lg font-medium transition-colors duration-300 sm:text-subheading",
                           isOpen ? "text-ink" : "text-ink/80 group-hover:text-ink",
                         )}
                       >

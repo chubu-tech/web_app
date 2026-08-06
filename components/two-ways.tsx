@@ -49,7 +49,7 @@ export function TwoWays() {
                           className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent"
                           aria-hidden
                         />
-                        <span className="absolute top-6 left-1/2 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/35 px-3.5 py-2 text-[0.6875rem] font-semibold tracking-[0.14em] text-white uppercase ring-1 ring-white/25 ring-inset backdrop-blur-md">
+                        <span className="absolute top-6 left-1/2 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/35 px-3.5 py-2 text-caption-sm font-semibold tracking-[0.14em] text-white uppercase ring-1 ring-white/25 ring-inset backdrop-blur-md">
                           <Icon
                             className="size-3.5"
                             strokeWidth={2.2}
@@ -61,7 +61,7 @@ export function TwoWays() {
                     </Curtain>
                   </Tilt>
 
-                  <h3 className="text-ink mt-7 max-w-sm text-[1.375rem] font-semibold">
+                  <h3 className="text-ink mt-7 max-w-sm text-heading font-semibold">
                     {option.title}
                   </h3>
                   <p className="text-body mt-3 max-w-md leading-relaxed">
@@ -72,7 +72,7 @@ export function TwoWays() {
                     {option.points.map((point) => (
                       <li
                         key={point}
-                        className="text-muted flex items-center gap-2 text-[0.875rem]"
+                        className="text-muted flex items-center gap-2 text-body-sm"
                       >
                         <Check
                           className="text-rausch size-4 shrink-0"

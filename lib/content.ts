@@ -28,10 +28,22 @@ function u(id: string, w = 1200, h?: number) {
 }
 
 export const brand = {
-  name: "Bhutan Salons",
-  /** What you install. The platform is Bhutan Salons; the app ships as "Tho"
-   *  on both stores and on the phone home screen. Use this wherever the page
-   *  points at the download, not as a replacement for `name`. */
+  /**
+   * The platform, the company and the site. **Renamed from "Bhutan Salons" to
+   * "THO"** — every surface reads this constant, so the header, the footer, the
+   * page title, the OG image, the JSON-LD and the privacy policy all moved
+   * together. Only `waitlist.back` had it hardcoded, and that is fixed too.
+   *
+   * `domain` and `supportEmail` deliberately did NOT change: bhutansalons.com is
+   * the domain that is actually registered and serving.
+   */
+  name: "THO",
+  /**
+   * What you install. Still cased "Tho" because that is literally the Android
+   * label, the iOS display name and the store listing — the platform is now the
+   * same word, so this is a casing distinction rather than a naming one. Use it
+   * where the page points at the download; `name` everywhere else.
+   */
   appName: "Tho",
   tagline: "Book the chair. Skip the wait.",
   domain: "bhutansalons.com",
@@ -50,6 +62,17 @@ export const brand = {
    * change needs a rebuild, not a redeploy of the same bundle.
    */
   appUrl: (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, ""),
+  /**
+   * The operator console in `../admin`, a third origin. Same mechanism and same
+   * caveats as `appUrl` above — inlined at build, so a change needs a rebuild.
+   *
+   * `/login` is grounded: it is a real route in that repo and its proxy sends every
+   * unauthenticated request there. **The port is not.** All three apps run a bare
+   * `next dev`, so they fight over 3000 and whichever starts third happens to land
+   * on 3002 — a plausible default, not a configured one. Set `NEXT_PUBLIC_ADMIN_URL`
+   * locally rather than relying on the start order.
+   */
+  adminUrl: (process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3002").replace(/\/+$/, ""),
   supportEmail: "hello@bhutansalons.com",
   whatsapp: "+975 17 00 00 00",
   /** Dzongkha greeting, romanised so it renders on every device. */
@@ -60,6 +83,20 @@ export const brand = {
    * until then the badges fall back to the on-page download section.
    */
   stores: { ios: "", android: "" },
+  /**
+   * Social profiles, for the footer's Follow us row.
+   *
+   * **WhatsApp is the only real one.** It is derived from `whatsapp` above, which
+   * is itself a placeholder number (+975 17 00 00 00) — check it before launch.
+   * The other three have no account yet: paste the profile URLs here and the icons
+   * point at them with no other edit. Until then they fall back to the site root,
+   * which is a harmless destination rather than a 404.
+   */
+  social: {
+    facebook: "",
+    instagram: "",
+    tiktok: "",
+  },
 } as const;
 
 /**
@@ -108,7 +145,9 @@ export const signIn = {
  */
 export const search = {
   eyebrow: "Find a salon",
-  title: "What do you need, _and when_?",
+  /* No `_accent_` markers: this heading reads in one voice. The serif italic is
+     still the house style for an emphasised word elsewhere — see `pricing.title`. */
+  title: "What do you need, and when?",
   body: "Every salon here is live on Tho. Pick what you want done, where, and roughly when — then book or join the queue in the app.",
   treatment: {
     label: "What you want done",
@@ -412,34 +451,79 @@ export const waitlist = {
     title: "Join the waitlist",
     description:
       "Tho is nearly here. Leave your email and we'll tell you the day it lands on the App Store and Google Play.",
-    back: "Back to Bhutan Salons",
+    /** The one place the old name was hardcoded rather than read from `brand`. */
+    back: "Back to THO",
   },
 } as const;
 
 export const footer = {
-  /** Root-relative for the same reason as `nav` — these render on every route. */
-  columns: [
-    {
-      title: "Product",
-      links: [
-        { label: "How it works", href: "/#how-it-works" },
-        { label: "Live queue", href: "/#queue" },
-        { label: "Pricing", href: "/#pricing" },
-      ],
-    },
-    {
-      title: "Salons",
-      links: [
-        { label: "For salon owners", href: "/#for-salons" },
-        { label: "List your shop", href: "/#salon-plans" },
-        { label: "Questions", href: "/#faq" },
-      ],
-    },
-  ],
+  /** The company blurb beside the mark. Says what the product does, for a reader
+   *  who scrolled past everything above and is deciding whether to come back. */
+  blurb:
+    "Discover, book, and manage salon appointments with ease. Connecting customers with trusted beauty and wellness professionals across Bhutan.",
+
+  /**
+   * One list, not two. It used to be a Product column and a Salons column of three
+   * links each; the footer now carries Contact, Follow us and the signup beside it,
+   * and four columns of three read as a wall. Sign in and the console join the end
+   * because that is what somebody scrolls to the bottom looking for.
+   *
+   * Root-relative for the same reason as `nav` — these render on every route.
+   */
+  quickLinks: {
+    title: "Quick links",
+    links: [
+      { label: "How it works", href: "/#how-it-works" },
+      { label: "Live queue", href: "/#queue" },
+      { label: "For salon owners", href: "/#for-salons" },
+      { label: "Pricing", href: "/#pricing" },
+      { label: "Questions", href: "/#faq" },
+    ],
+  },
+
+  contact: {
+    title: "Contact",
+    /** Labels, so a screen reader does not read two bare strings in a row. */
+    emailLabel: "Email",
+    phoneLabel: "Phone",
+  },
+
+  social: {
+    title: "Follow us",
+    /** `href` is resolved in the component: WhatsApp from `brand.whatsapp`, the
+     *  rest from `brand.social`, falling back to "/" while they are unset. */
+    networks: [
+      { key: "whatsapp", label: "WhatsApp" },
+      { key: "tiktok", label: "TikTok" },
+      { key: "facebook", label: "Facebook" },
+      { key: "instagram", label: "Instagram" },
+    ],
+  },
+
+  /** The footer's own signup. Shorter than the modal's copy, because the reader
+   *  is skimming a footer rather than having pressed a download button. */
+  newsletter: {
+    title: "Stay updated",
+    body: "Be the first to know when our mobile app launches.",
+  },
+
   /** Must match `brand.cities` — one coverage claim, stated the same way twice. */
   cities: ["Thimphu", "Paro", "Phuentsholing"],
-  /** Sits in the bottom bar, not a column: it is a legal link, not navigation. */
-  legalLinks: [{ label: "Privacy", href: "/privacy" }],
+
+  /**
+   * Sits in the bottom bar, not a column: these are legal links, not navigation.
+   *
+   * **A blank `href` is not rendered.** Only `/privacy` exists as a route today, so
+   * Terms and Cookie would be a pair of 404s in the one place a visitor goes looking
+   * for a commitment. Same self-switching mechanism as `brand.stores`: build the
+   * page, paste the path, and the link appears with no other edit.
+   */
+  legalLinks: [
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms of Service", href: "" },
+    { label: "Cookie Policy", href: "" },
+  ],
+  rights: "All rights reserved.",
 } as const;
 
 /**

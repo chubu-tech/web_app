@@ -73,10 +73,16 @@ The "when" filter matches salons that are **open** at that time, from
 `business_hours`. It cannot know whether a chair is free — `compute_availability`
 is `authenticated`-only — so no copy anywhere may imply it does.
 
-Naming: the platform, company and site are **Bhutan Salons**. The app you
-download is **Tho** — that is the Android label, the iOS display name and the
-store listing. `brand.appName` in `lib/content.ts` holds it; use it only where
-the page points at the download.
+Naming: the platform, company and site are **THO** — renamed from "Bhutan Salons",
+and every surface reads `brand.name`, so the rename was one constant plus the one
+string that had it hardcoded (`waitlist.page.back`). The **domain stays
+`bhutansalons.com`**, because that is what is registered and serving; so does
+`supportEmail`. `brand.appName` is still cased "Tho" because that is literally the
+Android label and the store listing — after the rename it is a casing distinction,
+not a naming one, so do not "fix" one to match the other.
+
+`brand.appName` in `lib/content.ts` holds it; use it only where the page points at
+the download, and `brand.name` everywhere else.
 
 ## The product is not in this repo
 
@@ -107,13 +113,27 @@ It is not part of this app.
 - **Don't invent proof.** Testimonials and stat figures were deliberately
   removed once because they were made up. Numbers go back only when they are
   real and measured.
-- **The editorial design layer is intentional.** The cream canvas, DM Sans /
-  Bricolage Grotesque / Instrument Serif, and the oversized display scale are a
-  marketing-only layer that the in-app system deliberately does not use
-  (`app/globals.css:3-9`). This is divergence by design, not drift — do not
-  "resync" it to the Flutter tokens.
-- Headings use the accent syntax: `_word_` becomes serif italic, `|` forces a
-  line break (`lib/heading.ts`).
+- **The editorial design layer is intentional** — but it is the *canvas and the scale*,
+  not the typeface. The cream ground, the slab radii and the oversized display clamps are
+  a marketing-only layer the in-app system does not use. Divergence by design, not drift;
+  do not "resync" it to the Flutter tokens.
+- **One typeface: Inter.** It replaced three — DM Sans for body, Inter Black 900 for the
+  hero, Instrument Serif italic for accent words. `--font-serif` and `--font-display` are
+  gone, so a stray `font-serif` class now resolves to Tailwind's default Georgia stack
+  rather than to nothing: if you see a serif on this site, that is the bug. The same face
+  carries `../tho_web` and the Flutter app, so the seam between marketing and product is a
+  URL change and nothing else.
+- **There is a type scale now; use it.** Ten steps in `@theme`, each carrying its own
+  line-height and tracking: the display clamps, then `heading`, `subheading`, `body-lg`,
+  `body-md`, `ui`, `body-sm`, `caption`, `caption-sm`. There used to be **none** — 143
+  elements carried a bracketed pixel size across 18 distinct values, none of them with a
+  line-height. Reach for a step; do not invent a size. The handful of arbitrary sizes left
+  are display *figures* (prices, the queue stat, the marquee) where `leading-none` on a
+  numeral is the point.
+- Headings use the accent syntax: `_word_` is an accent, `|` forces a line break
+  (`lib/heading.ts`). The accent is a **weight drop** against the heading — 400 against
+  600/700 — applied in `components/ui/text-reveal.tsx`. It was serif italic; one family
+  means emphasis comes from weight.
 - Add a token to `app/globals.css` rather than hardcoding a hex in a component.
 
 ## Verify

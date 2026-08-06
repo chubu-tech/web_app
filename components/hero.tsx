@@ -93,11 +93,19 @@ export function Hero() {
                 transition={{ duration: 0.8, delay: 0.45, ease: EASE }}
                 className="flex flex-wrap items-center gap-x-4 gap-y-2"
               >
-                <span className="text-saffron font-serif text-[1.25rem] italic">
+                {/* Was `font-serif italic` — Instrument Serif, now deleted, so the
+                    class would have resolved to Tailwind's default Georgia stack. The
+                    greeting sits at medium weight against the uppercase coverage line
+                    beside it, which is contrast enough without a second family.
+
+                    It was saffron until the brand colour was unified: every coloured
+                    word on the page now takes rausch, the same fill the Sign in button
+                    carries. */}
+                <span className="text-rausch text-heading font-medium">
                   {brand.greeting}
                 </span>
                 <TextileRule draw className="w-24" />
-                <span className="text-[0.6875rem] font-semibold tracking-[0.16em] text-white/70 uppercase">
+                <span className="text-caption-sm font-semibold tracking-[0.16em] text-white/70 uppercase">
                   {hero.eyebrow}
                 </span>
               </motion.div>
@@ -109,9 +117,19 @@ export function Hero() {
                     lines={headlineLines}
                     delay={0.3}
                     stagger={0.07}
-                    // The one place the display face is used.
-                    className="text-display-2xl font-display leading-[0.94] font-semibold tracking-[-0.03em] text-white"
-                    accentClassName="font-serif tracking-normal text-saffron"
+                    // Weight and leading come from the token now. This used to be
+                    // `font-display font-black leading-[0.94] tracking-[-0.03em]` —
+                    // a second family at 900 with its own hand-set metrics. One
+                    // family at 700 carries the line, and `--text-display-2xl`
+                    // already sets 1.02 leading and -0.035em tracking.
+                    className="text-display-2xl font-bold text-white"
+                    // Rausch. This was once the *only* decorative use of the action
+                    // colour, on the grounds that it sits on a photograph with no
+                    // control near it and so cannot be read as pressable. That is no
+                    // longer the distinction it was — the greeting above and the
+                    // download band now take rausch too — but it still holds here.
+                    // The accent's own weight drop comes from `TextReveal`.
+                    accentClassName="text-rausch"
                   />
 
                   {/* The product's purpose — the one sentence that has to land. */}
@@ -119,7 +137,7 @@ export function Hero() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.9, delay: 0.85, ease: EASE }}
-                    className="mt-6 max-w-xl text-[1.0625rem] leading-relaxed text-white/85"
+                    className="mt-6 max-w-xl text-body-lg leading-relaxed text-white/85"
                   >
                     {hero.purpose}
                   </motion.p>
@@ -129,7 +147,7 @@ export function Hero() {
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.95, ease: EASE }}
-                    className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/12 px-3.5 py-2 text-[0.8125rem] font-medium text-white ring-1 ring-white/25 ring-inset backdrop-blur-md"
+                    className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/12 px-3.5 py-2 text-caption font-medium text-white ring-1 ring-white/25 ring-inset backdrop-blur-md"
                   >
                     <BadgeCheck className="text-saffron size-4" aria-hidden />
                     {hero.freeNote}
@@ -145,7 +163,7 @@ export function Hero() {
                     <StoreBadges tone="light" />
                     <a
                       href={hero.ownerCta.href}
-                      className="group inline-flex items-center gap-2 text-[0.9375rem] font-medium text-white underline decoration-white/30 underline-offset-4 transition-colors hover:decoration-white"
+                      className="group inline-flex items-center gap-2 text-ui font-medium text-white underline decoration-white/30 underline-offset-4 transition-colors hover:decoration-white"
                     >
                       {hero.ownerCta.label}
                       <ArrowRight
@@ -185,16 +203,16 @@ function QueueCard() {
         transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
       >
         <div className="flex items-center justify-between">
-          <span className="text-[0.6875rem] font-semibold tracking-[0.16em] text-white/60 uppercase">
+          <span className="text-caption-sm font-semibold tracking-[0.16em] text-white/60 uppercase">
             {hero.liveCard.label}
           </span>
-          <span className="bg-rausch inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.6875rem] font-semibold text-white">
+          <span className="bg-rausch inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-caption-sm font-semibold text-white">
             <span className="size-1.5 animate-pulse rounded-full bg-white" />
             LIVE
           </span>
         </div>
 
-        <p className="mt-4 flex items-center gap-2 text-[1.125rem] font-semibold text-white">
+        <p className="mt-4 flex items-center gap-2 text-subheading font-semibold text-white">
           {hero.liveCard.salon}
           <Star className="text-saffron size-4 fill-current" aria-hidden />
         </p>
@@ -212,7 +230,7 @@ function QueueCard() {
                 delay={1.5}
               />
             </span>
-            <span className="text-[0.8125rem] text-white/65">in line</span>
+            <span className="text-caption text-white/65">in line</span>
           </div>
           <div className="border-l border-white/20 pl-6">
             <span className="block text-[1.5rem] leading-none font-semibold text-white">
@@ -223,9 +241,9 @@ function QueueCard() {
                 duration={2.2}
                 delay={1.5}
               />
-              <span className="text-[0.9375rem] font-medium"> min</span>
+              <span className="text-ui font-medium"> min</span>
             </span>
-            <span className="text-[0.8125rem] text-white/65">
+            <span className="text-caption text-white/65">
               estimated wait
             </span>
           </div>
@@ -247,7 +265,7 @@ function QueueCard() {
             </span>
           ))}
         </div>
-        <p className="mt-3 text-[0.8125rem] text-white/70">
+        <p className="mt-3 text-caption text-white/70">
           We&apos;ll ping you two turns before your chair is free.
         </p>
       </motion.div>

@@ -9,9 +9,19 @@ import { cn } from "@/lib/utils";
  * reference design. Each word sits in an `overflow-hidden` box and slides up
  * from behind the mask, staggered left-to-right.
  *
- * Accent words render in the editorial serif italic. Mark them either
+ * Accent words are set apart by **weight, not by a second family.** Mark them either
  * per-word (`{ text: "chair.", accent: true }`) or by listing exact strings in
  * `accents`.
+ *
+ * They used to render `font-serif font-normal italic` — Instrument Serif, the one
+ * decorative face on the site. Dropping it left `font-serif` resolving to Tailwind's
+ * default `ui-serif, Georgia` stack, which is why the class had to go rather than just
+ * the font: a stale `font-serif` here would have quietly set Georgia.
+ *
+ * What replaces it is the contrast the heading already has available: the line is 600
+ * or 700, so an accent word at 400 reads as emphasis on its own, and a touch of
+ * positive tracking keeps the lighter weight from looking merely thinner. One family,
+ * hierarchy from weight — which is the point of the whole exercise.
  */
 export function TextReveal({
   lines,
@@ -78,7 +88,7 @@ export function TextReveal({
                     "inline-block will-change-transform",
                     wordClassName,
                     isAccent &&
-                      cn("font-serif font-normal italic", accentClassName),
+                      cn("font-normal tracking-[-0.01em]", accentClassName),
                   )}
                   variants={{
                     hidden: {

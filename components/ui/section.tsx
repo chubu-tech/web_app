@@ -36,7 +36,7 @@ export function Eyebrow({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-2 text-[0.6875rem] font-semibold tracking-[0.16em] uppercase",
+        "inline-flex items-center gap-2 text-caption-sm font-semibold tracking-[0.16em] uppercase",
         tone === "light" ? "text-white/65" : "text-muted",
         className,
       )}
@@ -96,7 +96,7 @@ export function SectionHeading({
         id={titleId}
         lines={parseHeading(title)}
         className={cn(
-          "mt-5 text-display-lg leading-[1.04] font-semibold",
+          "mt-5 text-display-lg font-semibold",
           tone === "light" ? "text-white" : "text-ink",
           titleClassName,
         )}
@@ -105,7 +105,7 @@ export function SectionHeading({
         <Reveal delay={0.12}>
           <p
             className={cn(
-              "mt-6 max-w-2xl text-[1.0625rem] leading-relaxed",
+              "mt-6 max-w-2xl text-body-lg leading-relaxed",
               align === "center" && "mx-auto",
               tone === "light" ? "text-white/70" : "text-body",
             )}

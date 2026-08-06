@@ -121,7 +121,7 @@ export function ForSalons() {
                     <span className="min-w-0 flex-1">
                       <span
                         className={cn(
-                          "block text-[1.1875rem] font-semibold transition-colors duration-500",
+                          "block text-subheading font-semibold transition-colors duration-500",
                           isActive ? "text-ink" : "text-muted group-hover:text-ink",
                         )}
                       >
@@ -185,7 +185,7 @@ function MockScreen({ active }: { active: number }) {
           <span className="bg-hairline size-2.5 rounded-full" />
           <span className="bg-hairline size-2.5 rounded-full" />
         </span>
-        <span className="text-muted mx-auto text-[0.8125rem] font-medium">
+        <span className="text-muted mx-auto text-caption font-medium">
           Norling Hair Studio
         </span>
       </div>
@@ -196,7 +196,7 @@ function MockScreen({ active }: { active: number }) {
           <span
             key={label}
             className={cn(
-              "shrink-0 rounded-full px-3 py-1.5 text-[0.8125rem] font-medium transition-colors duration-500",
+              "shrink-0 rounded-full px-3 py-1.5 text-caption font-medium transition-colors duration-500",
               active === i ? "bg-ink text-white" : "text-muted",
             )}
           >
@@ -236,8 +236,8 @@ function MockScreen({ active }: { active: number }) {
 function PanelHeading({ title, meta }: { title: string; meta: string }) {
   return (
     <div className="mb-4 flex items-baseline justify-between">
-      <span className="text-ink text-[0.9375rem] font-semibold">{title}</span>
-      <span className="text-muted text-[0.8125rem]">{meta}</span>
+      <span className="text-ink text-ui font-semibold">{title}</span>
+      <span className="text-muted text-caption">{meta}</span>
     </div>
   );
 }
@@ -274,7 +274,7 @@ function BookingsPanel() {
       <div className="flex flex-col gap-3">
         {rows.map((row) => (
           <div key={row.name} className="flex items-center gap-3">
-            <span className="text-muted w-14 shrink-0 text-[0.8125rem]">
+            <span className="text-muted w-14 shrink-0 text-caption">
               {row.name}
             </span>
             <div className="bg-canvas relative h-9 flex-1 rounded-lg">
@@ -302,7 +302,7 @@ function BookingsPanel() {
           </div>
         ))}
       </div>
-      <div className="text-muted mt-4 flex flex-wrap gap-4 text-[0.75rem]">
+      <div className="text-muted mt-4 flex flex-wrap gap-4 text-caption-sm">
         <span className="flex items-center gap-1.5">
           <span className="bg-rausch/85 size-2.5 rounded-sm" /> Booked
         </span>
@@ -341,23 +341,23 @@ function LinePanel() {
           >
             <span
               className={cn(
-                "grid size-7 shrink-0 place-items-center rounded-full text-[0.75rem] font-semibold",
+                "grid size-7 shrink-0 place-items-center rounded-full text-caption-sm font-semibold",
                 i === 0 ? "bg-ink text-white" : "bg-white text-muted",
               )}
             >
               {i}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="text-ink block truncate text-[0.875rem] font-medium">
+              <span className="text-ink block truncate text-body-sm font-medium">
                 {row.name}
               </span>
-              <span className="text-muted block truncate text-[0.75rem]">
+              <span className="text-muted block truncate text-caption-sm">
                 {row.service}
               </span>
             </span>
             <span
               className={cn(
-                "shrink-0 rounded-full px-2.5 py-1 text-[0.6875rem] font-semibold",
+                "shrink-0 rounded-full px-2.5 py-1 text-caption-sm font-semibold",
                 i === 1
                   ? "bg-rausch text-white"
                   : i === 0
@@ -399,23 +399,23 @@ function TeamPanel() {
             transition={{ duration: 0.5, delay: i * 0.06, ease: EASE }}
             className="flex items-center gap-3"
           >
-            <span className="bg-rausch-soft text-rausch grid size-8 shrink-0 place-items-center rounded-full text-[0.75rem] font-semibold">
+            <span className="bg-rausch-soft text-rausch grid size-8 shrink-0 place-items-center rounded-full text-caption-sm font-semibold">
               {person.name
                 .split(" ")
                 .map((n) => n[0])
                 .join("")}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="text-ink block truncate text-[0.875rem] font-medium">
+              <span className="text-ink block truncate text-body-sm font-medium">
                 {person.name}
               </span>
-              <span className="text-muted block truncate text-[0.75rem]">
+              <span className="text-muted block truncate text-caption-sm">
                 {person.role}
               </span>
             </span>
             <span
               className={cn(
-                "shrink-0 text-[0.75rem] font-medium",
+                "shrink-0 text-caption-sm font-medium",
                 person.today === "Day off" ? "text-muted-soft" : "text-success",
               )}
             >
@@ -432,7 +432,7 @@ function TeamPanel() {
             initial={{ opacity: 0, scale: 0.94 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4, delay: 0.15 + i * 0.05, ease: EASE }}
-            className="bg-canvas rounded-full px-3 py-1.5 text-[0.75rem]"
+            className="bg-canvas rounded-full px-3 py-1.5 text-caption-sm"
           >
             <span className="text-ink font-medium">{service.name}</span>
             <span className="text-muted"> · {service.meta}</span>
@@ -465,10 +465,10 @@ function WeekPanel() {
           { label: "No-shows", value: 4, suffix: "" },
         ].map((kpi) => (
           <div key={kpi.label} className="bg-canvas rounded-xl px-3 py-2.5">
-            <span className="text-ink block text-[1.25rem] leading-tight font-semibold">
+            <span className="text-ink block text-heading leading-tight font-semibold">
               <CountUp value={kpi.value} suffix={kpi.suffix} />
             </span>
-            <span className="text-muted block text-[0.6875rem]">
+            <span className="text-muted block text-caption-sm">
               {kpi.label}
             </span>
           </div>
@@ -495,13 +495,13 @@ function WeekPanel() {
         {bars.map((bar, i) => (
           <span
             key={i}
-            className="text-muted flex-1 text-center text-[0.6875rem]"
+            className="text-muted flex-1 text-center text-caption-sm"
           >
             {bar.day}
           </span>
         ))}
       </div>
-      <p className="text-muted mt-4 text-[0.8125rem]">
+      <p className="text-muted mt-4 text-caption">
         Saturday 2–6pm is your busiest time.
       </p>
     </div>

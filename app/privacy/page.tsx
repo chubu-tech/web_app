@@ -31,11 +31,11 @@ export default function PrivacyPage() {
       <main id="main" className="flex-1 pt-28 pb-24 sm:pt-32">
         <Container>
           <article className="mx-auto max-w-[46rem]">
-            <h1 className="text-display-lg leading-[1.06] font-semibold">
+            <h1 className="text-display-lg font-semibold">
               {privacy.title}
             </h1>
 
-            <p className="text-muted mt-6 text-[0.9375rem] leading-relaxed">
+            <p className="text-muted mt-6 text-ui leading-relaxed">
               Last updated: <strong className="text-body">{legal.lastUpdated}</strong>.
               Operated by{" "}
               <strong className="text-body">{legal.operator}</strong>,{" "}
@@ -53,12 +53,12 @@ export default function PrivacyPage() {
 
             {privacy.sections.map((section) => (
               <section key={section.title} className="mt-12 first:mt-10">
-                <h2 className="text-ink text-[1.375rem] leading-snug font-semibold">
+                <h2 className="text-ink text-heading leading-snug font-semibold">
                   {section.title}
                 </h2>
 
                 {"body" in section && section.body && (
-                  <p className="text-body mt-4 text-[1.0625rem] leading-relaxed">
+                  <p className="text-body mt-4 text-body-lg leading-relaxed">
                     {section.body}
                   </p>
                 )}
@@ -68,7 +68,7 @@ export default function PrivacyPage() {
                     {section.items.map((item) => (
                       <li
                         key={item.body}
-                        className="text-body relative pl-5 text-[1.0625rem] leading-relaxed"
+                        className="text-body relative pl-5 text-body-lg leading-relaxed"
                       >
                         <span
                           className="bg-rausch absolute top-[0.6em] left-0 size-1.5 rounded-full"
@@ -89,7 +89,7 @@ export default function PrivacyPage() {
                 )}
 
                 {"footnote" in section && section.footnote && (
-                  <p className="text-body mt-5 text-[1.0625rem] leading-relaxed">
+                  <p className="text-body mt-5 text-body-lg leading-relaxed">
                     {section.footnote}
                   </p>
                 )}
@@ -97,10 +97,10 @@ export default function PrivacyPage() {
             ))}
 
             <section className="mt-12">
-              <h2 className="text-ink text-[1.375rem] leading-snug font-semibold">
+              <h2 className="text-ink text-heading leading-snug font-semibold">
                 Contact
               </h2>
-              <p className="text-body mt-4 text-[1.0625rem] leading-relaxed">
+              <p className="text-body mt-4 text-body-lg leading-relaxed">
                 Questions or requests:{" "}
                 <a
                   href={`mailto:${legal.contactEmail}`}
@@ -112,7 +112,7 @@ export default function PrivacyPage() {
               </p>
             </section>
 
-            <p className="text-muted mt-14 text-[0.9375rem]">
+            <p className="text-muted mt-14 text-ui">
               <Link href="/" className="hover:text-ink transition-colors">
                 {brand.name}
               </Link>{" "}

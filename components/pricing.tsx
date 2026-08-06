@@ -33,7 +33,7 @@ export function Pricing() {
             />
             <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-xl">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-[0.14em] uppercase ring-1 ring-white/20 ring-inset">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-caption-sm font-semibold tracking-[0.14em] uppercase ring-1 ring-white/20 ring-inset">
                   <Smartphone className="size-3.5" strokeWidth={2.2} aria-hidden />
                   {pricing.customer.label}
                 </span>
@@ -42,12 +42,12 @@ export function Pricing() {
                   <span className="text-[3.25rem] leading-none font-semibold tracking-tight">
                     {pricing.customer.price}
                   </span>
-                  <span className="text-[1rem] text-white/60">
+                  <span className="text-body-md text-white/60">
                     {pricing.customer.period}
                   </span>
                 </p>
 
-                <p className="mt-4 text-[1.0625rem] leading-relaxed text-white/75">
+                <p className="mt-4 text-body-lg leading-relaxed text-white/75">
                   {pricing.customer.body}
                 </p>
 
@@ -55,7 +55,7 @@ export function Pricing() {
                   {pricing.customer.points.map((point) => (
                     <li
                       key={point}
-                      className="flex items-center gap-2 text-[0.875rem] text-white/85"
+                      className="flex items-center gap-2 text-body-sm text-white/85"
                     >
                       <Check
                         className="text-rausch size-4 shrink-0"
@@ -83,7 +83,7 @@ export function Pricing() {
             heading clear of the fixed header. */}
         <div id="salon-plans" style={{ scrollMarginTop: "7rem" }}>
           <Reveal className="mt-16 flex items-center gap-4 sm:mt-20">
-            <h3 className="text-ink inline-flex shrink-0 items-center gap-2.5 text-[1.125rem] font-semibold">
+            <h3 className="text-ink inline-flex shrink-0 items-center gap-2.5 text-subheading font-semibold">
               <Store className="text-rausch size-5" strokeWidth={2} aria-hidden />
               {pricing.salonHeading}
             </h3>
@@ -108,16 +108,16 @@ export function Pricing() {
                 )}
               >
                 {tier.featured && (
-                  <span className="bg-rausch absolute -top-3 left-7 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.6875rem] font-semibold tracking-[0.14em] text-white uppercase sm:left-8">
+                  <span className="bg-rausch absolute -top-3 left-7 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-caption-sm font-semibold tracking-[0.14em] text-white uppercase sm:left-8">
                     <Sparkles className="size-3.5" strokeWidth={2.4} aria-hidden />
                     Most salons pick this
                   </span>
                 )}
 
-                <h4 className="text-ink text-[1.125rem] font-semibold">
+                <h4 className="text-ink text-subheading font-semibold">
                   {tier.name}
                 </h4>
-                <p className="text-muted mt-1.5 text-[0.9375rem]">
+                <p className="text-muted mt-1.5 text-ui">
                   {tier.tagline}
                 </p>
 
@@ -125,7 +125,7 @@ export function Pricing() {
                   <span className="text-ink text-[2.5rem] leading-none font-semibold tracking-tight">
                     {tier.price}
                   </span>
-                  <span className="text-muted text-[0.9375rem]">
+                  <span className="text-muted text-ui">
                     {tier.period}
                   </span>
                 </p>
@@ -136,7 +136,7 @@ export function Pricing() {
                       <span className="bg-rausch-soft text-rausch mt-0.5 grid size-5 shrink-0 place-items-center rounded-full">
                         <Check className="size-3" strokeWidth={3.2} aria-hidden />
                       </span>
-                      <span className="text-body text-[0.9375rem] leading-snug">
+                      <span className="text-body text-ui leading-snug">
                         {feature}
                       </span>
                     </li>
@@ -158,7 +158,7 @@ export function Pricing() {
         </RevealGroup>
 
         <Reveal delay={0.15}>
-          <p className="text-muted mx-auto mt-10 max-w-2xl text-center text-[0.875rem] leading-relaxed">
+          <p className="text-muted mx-auto mt-10 max-w-2xl text-center text-body-sm leading-relaxed">
             {pricing.note}
           </p>
         </Reveal>

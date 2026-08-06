@@ -82,12 +82,12 @@ export function SearchPanel({
       >
         <Icon className="text-muted size-[1.125rem] shrink-0" aria-hidden />
         <span className="min-w-0">
-          <span className="text-muted block text-[0.6875rem] font-semibold tracking-[0.12em] uppercase">
+          <span className="text-muted block text-caption-sm font-semibold tracking-[0.12em] uppercase">
             {label}
           </span>
           <span
             className={cn(
-              "block truncate text-[0.9375rem]",
+              "block truncate text-ui",
               value ? "text-ink font-medium" : "text-muted-soft",
             )}
           >
@@ -139,14 +139,14 @@ export function PanelOption({
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "flex w-full items-center justify-between gap-3 px-5 py-3 text-left text-[0.9375rem]",
+        "flex w-full items-center justify-between gap-3 px-5 py-3 text-left text-ui",
         "transition-colors duration-200",
         active ? "bg-rausch-soft text-ink font-medium" : "text-body hover:bg-canvas",
       )}
     >
       <span className="truncate">{children}</span>
       {meta && (
-        <span className="text-muted-soft shrink-0 text-[0.8125rem] tabular-nums">
+        <span className="text-muted-soft shrink-0 text-caption tabular-nums">
           {meta}
         </span>
       )}
@@ -172,7 +172,7 @@ export function PanelChip({
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "rounded-full px-3.5 py-2 text-left text-[0.8125rem] font-medium",
+        "rounded-full px-3.5 py-2 text-left text-caption font-medium",
         "transition-colors duration-200",
         active
           ? "bg-ink text-white"
@@ -183,7 +183,7 @@ export function PanelChip({
       {hint && (
         <span
           className={cn(
-            "block text-[0.6875rem] font-normal",
+            "block text-caption-sm font-normal",
             active ? "text-white/65" : "text-muted-soft",
           )}
         >
@@ -196,7 +196,7 @@ export function PanelChip({
 
 export function PanelHeading({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-muted px-5 pt-4 pb-1.5 text-[0.6875rem] font-semibold tracking-[0.16em] uppercase">
+    <p className="text-muted px-5 pt-4 pb-1.5 text-caption-sm font-semibold tracking-[0.16em] uppercase">
       {children}
     </p>
   );

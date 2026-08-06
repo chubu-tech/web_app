@@ -45,7 +45,7 @@ export function SalonCard({ match }: { match: Match }) {
         )}
 
         {featured && (
-          <span className="bg-paper/90 text-ink absolute top-3 left-3 rounded-full px-2.5 py-1 text-[0.6875rem] font-semibold backdrop-blur-sm">
+          <span className="bg-paper/90 text-ink absolute top-3 left-3 rounded-full px-2.5 py-1 text-caption-sm font-semibold backdrop-blur-sm">
             {copy.featured}
           </span>
         )}
@@ -53,11 +53,11 @@ export function SalonCard({ match }: { match: Match }) {
 
       <div className="flex flex-1 flex-col gap-2 p-5">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-[1.0625rem] leading-snug font-semibold">
+          <h3 className="text-body-lg leading-snug font-semibold">
             {salon.name}
           </h3>
           {salon.reviewCount > 0 && salon.rating != null ? (
-            <span className="text-ink inline-flex shrink-0 items-center gap-1 text-[0.8125rem] font-medium tabular-nums">
+            <span className="text-ink inline-flex shrink-0 items-center gap-1 text-caption font-medium tabular-nums">
               <Star className="text-star size-3.5 fill-current" aria-hidden />
               {salon.rating.toFixed(1)}
               <span className="text-muted-soft font-normal">
@@ -65,13 +65,13 @@ export function SalonCard({ match }: { match: Match }) {
               </span>
             </span>
           ) : (
-            <span className="text-muted-soft shrink-0 text-[0.75rem] font-medium">
+            <span className="text-muted-soft shrink-0 text-caption-sm font-medium">
               {copy.noRating}
             </span>
           )}
         </div>
 
-        <p className="text-muted inline-flex items-center gap-1.5 text-[0.8125rem]">
+        <p className="text-muted inline-flex items-center gap-1.5 text-caption">
           <MapPin className="size-3.5 shrink-0" aria-hidden />
           {salon.city ?? "Bhutan"}
           {distanceKm != null && (
@@ -83,7 +83,7 @@ export function SalonCard({ match }: { match: Match }) {
         </p>
 
         {salon.services.length > 0 && (
-          <p className="text-muted-soft mt-1 line-clamp-2 text-[0.8125rem] leading-relaxed">
+          <p className="text-muted-soft mt-1 line-clamp-2 text-caption leading-relaxed">
             {salon.services.slice(0, 4).join(" · ")}
           </p>
         )}
@@ -92,7 +92,7 @@ export function SalonCard({ match }: { match: Match }) {
             hands off to the download band rather than to a dead URL. */}
         <a
           href="#download"
-          className="text-ink mt-auto pt-3 text-[0.875rem] font-medium underline decoration-transparent underline-offset-4 transition-colors group-hover:decoration-current"
+          className="text-ink mt-auto pt-3 text-body-sm font-medium underline decoration-transparent underline-offset-4 transition-colors group-hover:decoration-current"
         >
           {copy.cta}
         </a>

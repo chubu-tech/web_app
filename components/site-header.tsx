@@ -95,7 +95,7 @@ export function SiteHeader() {
             </span>
             <span
               className={cn(
-                "text-[1.0625rem] font-semibold tracking-tight transition-colors duration-500",
+                "text-body-lg font-semibold tracking-tight transition-colors duration-500",
                 condensed ? "text-ink" : "text-ink",
               )}
             >
@@ -109,7 +109,7 @@ export function SiteHeader() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "group/nav relative overflow-hidden rounded-full px-3.5 py-2 text-[0.9375rem] font-medium",
+                  "group/nav relative overflow-hidden rounded-full px-3.5 py-2 text-ui font-medium",
                   // Underline grows from the left on hover.
                   "after:bg-rausch after:absolute after:bottom-1.5 after:left-3.5 after:h-px after:w-0 after:transition-all after:duration-300 after:ease-[cubic-bezier(0.16,1,0.3,1)] hover:after:w-[calc(100%-1.75rem)]",
                 )}
@@ -130,20 +130,23 @@ export function SiteHeader() {
           </nav>
 
           <div className="flex items-center gap-2">
-            {/* Deliberately a bare `<a>` and not `Button`: this is the quiet
-                action beside the brand pill, and the height difference (42.5px
-                against the Button's 48px) is what reads as hierarchy. A
-                `variant="ghost"` Button would match its height, add a ring, and
-                need the wrapper below. The `sm:` gate is why the sheet carries
-                its own copy — below 640px this is not in the bar at all. */}
-            <a
-              href={signIn.href}
-              className="text-ink hover:bg-ink/5 hidden rounded-full px-4 py-2.5 text-[0.9375rem] font-medium transition-colors sm:inline-flex"
-            >
-              {signIn.label}
-            </a>
+            {/*
+              Both CTAs are the same control now — same `primary` fill, same
+              magnetic hover, same height. This was a quiet bare `<a>` whose 42.5px
+              height against the Button's 48px was the hierarchy; the brief asks for
+              them to match, so the hierarchy is carried by order and label instead.
+
+              It has to be `Button` rather than a styled `<a>`: the "animation" is
+              the pointer-tracking spring inside that component, not a CSS
+              transition, so it cannot be reproduced with class names.
+            */}
             {/* The wrapper carries the breakpoint: a `hidden` passed into
                 Button would lose to its own `inline-flex` in the cascade. */}
+            <span className="hidden sm:inline-flex">
+              <Button href={signIn.href} arrow={false}>
+                {signIn.label}
+              </Button>
+            </span>
             <span className="hidden sm:inline-flex">
               <Button arrow={false} onClick={() => openWaitlist("header")}>
                 {waitlist.cta}
@@ -185,7 +188,7 @@ export function SiteHeader() {
                       className="size-full object-cover"
                     />
                   </span>
-                  <span className="text-[1.0625rem] font-semibold">
+                  <span className="text-body-lg font-semibold">
                     {brand.name}
                   </span>
                 </span>
@@ -213,7 +216,7 @@ export function SiteHeader() {
                     key={item.href}
                     href={item.href}
                     onClick={() => setOpen(false)}
-                    className="border-hairline-soft border-b py-5 text-[2rem] leading-tight font-semibold tracking-tight"
+                    className="border-hairline-soft text-display-md border-b py-5 font-semibold"
                     variants={{
                       hidden: { opacity: 0, y: 28 },
                       shown: {
@@ -248,9 +251,11 @@ export function SiteHeader() {
                     a cross-document navigation takes the whole overlay with it,
                     where scrolling to `#salon-plans` left the page moving behind
                     an opaque sheet. */}
+                {/* `primary` here too, matching the bar. Two full-width brand pills
+                    stacked is a lot of red — but the sheet's job is to offer both
+                    doors equally, and the brief asks them to look alike. */}
                 <Button
                   href={signIn.href}
-                  variant="ghost"
                   size="lg"
                   arrow={false}
                   className="w-full justify-center"
