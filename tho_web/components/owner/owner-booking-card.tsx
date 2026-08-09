@@ -19,8 +19,22 @@ import { cn, formatNu } from "@/lib/utils";
  * then the name typed at the counter, then a label — `Walk-in` when the booking came from
  * the counter and `Guest` otherwise. A booking always has *someone*; what varies is how
  * much the salon knows about them.
+ *
+ * **`href` is a prop because the staff shell renders this too.** It used to hard-code
+ * `/business/bookings/<id>`, which is inside the owner console — and `getStaffContext`
+ * redirects an owner just as `getOwnerContext` redirects a stylist, so a linked staff
+ * member clicking their own appointment would have been bounced out of their own shell.
+ * Passing `null` renders the name as plain text instead of a link, which is what a surface
+ * with no detail route wants. Same reason `SpecialistCard` takes an optional `href`.
  */
-export function OwnerBookingCard({ booking }: { booking: Booking }) {
+export function OwnerBookingCard({
+  booking,
+  href = `/business/bookings/${booking.id}`,
+}: {
+  booking: Booking;
+  /** Where the card leads. `null` for a card that is not clickable. */
+  href?: string | null;
+}) {
   const dead = booking.status === "cancelled" || booking.status === "no_show";
   const tz = { timeZone: THIMPHU_TZ } as const;
 
@@ -56,12 +70,16 @@ export function OwnerBookingCard({ booking }: { booking: Booking }) {
           />
           <span className="min-w-0 flex-1">
             <h3 className="text-title text-ink truncate font-semibold">
-              <Link
-                href={`/business/bookings/${booking.id}`}
-                className="after:absolute after:inset-0 after:content-['']"
-              >
-                {customerName(booking)}
-              </Link>
+              {href ? (
+                <Link
+                  href={href}
+                  className="after:absolute after:inset-0 after:content-['']"
+                >
+                  {customerName(booking)}
+                </Link>
+              ) : (
+                customerName(booking)
+              )}
             </h3>
             {servicesLine(booking) ? (
               <span className="text-body-sm text-muted block truncate">

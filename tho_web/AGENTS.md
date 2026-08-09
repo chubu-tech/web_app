@@ -28,7 +28,27 @@ upgrade request put back** (3c).
 **All five owner tabs are live and nothing is left of the app's eleven-item drawer.** 2f closed the
 other end of what 3c reads: `place_order` and `request_redemption` were the last two customer-facing
 RPCs in the schema with no caller here, and Norzin's storefront, order inbox and loyalty programme
-now all have a customer on the far side of them. Next: **Phase 4, staff**.
+now all have a customer on the far side of them.
+
+**Phase 4 has started: the staff shell exists.** `/staff` and `/staff/schedule` are the app's
+own two destinations, and `homeForRole('staff')` finally returns a route that exists — before
+this, a linked stylist signed in and landed on customer Discover with no way to reach their own
+book at all. `lib/staff/context.ts` is the gate (a deliberate sibling of `lib/owner/context.ts`,
+not a parameterisation of it), and the scope is an explicit `.eq("staff_member_id", …)` in
+`fetchStaffBookings` — the **fifth** instance of the OR-policy leak, since `bookings_select`
+admits `is_business_member` and a linked stylist is one. Proved by SQL: the shell shows Sonam
+Dorji's 0/23/5, not Norzin's salon-wide 42/10.
+
+**What is left of the staff role is one route**: the booking detail. The app opens
+`BusinessBookingDetailScreen` from the staff list, but its web equivalent lives at
+`/business/bookings/[id]`, which `getOwnerContext` closes to a stylist — so
+`components/staff/staff-bookings.tsx` passes `href={null}` and the cards are not clickable.
+`set_booking_status` would accept the write, so this is a route to add, not a permission to win.
+`PARITY.md` is the full audit and the remaining gap list.
+
+Two shared components took additive changes for this and are worth knowing about:
+`OwnerBookingCard` takes an optional `href` (it hard-coded a console URL), and `AppHeader`'s
+`COLLAPSE` map has an `always` tier, because two destinations have nothing to collapse.
 
 ### Where the web is now ahead of the app
 
@@ -1308,7 +1328,7 @@ npm run test      # ported pure logic
 ```
 
 A clean build, lint and test run is the bar — currently **472 tests across 25 files** and
-**51 routes**. Note `overrides.typescript-eslint` in `package.json` pins 8.65.0: upstream
+**55 routes**. Note `overrides.typescript-eslint` in `package.json` pins 8.65.0: upstream
 published a version depending on `@typescript-eslint/utils@8.66.0`, which does not exist. Remove
 the pin once that is consistent again.
 

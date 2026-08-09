@@ -74,9 +74,28 @@ export function Sheet({
         className={cn(
           "bg-canvas relative flex w-full flex-col outline-none",
           "rounded-t-lg tablet:rounded-lg",
+          /*
+            **Explicit widths, because `max-w-lg` here meant 24px.**
+
+            Tailwind resolves a *named* `max-w-<name>` against the **spacing** namespace
+            when a key of that name exists there, and only falls back to `--container-*`
+            when it does not. `globals.css` defines `--spacing-lg: 24px`, so the compiled
+            rule was `max-width: var(--spacing-lg)` — a 24px-wide dialog on every screen
+            at 744 and up, i.e. **every one of this component's call sites**, with the
+            title and the buttons spilling out beside it. Read straight out of the
+            emitted stylesheet, not inferred.
+
+            Below 744 the variant never applied, so a phone was always correct and the
+            bug was desktop-only.
+
+            `4xl` happened to be right — there is no `--spacing-4xl`, so it fell through
+            to `--container-4xl` — but "right by absence" is not a property to rely on,
+            so it is written out too. Do not reintroduce a named `max-w-*` anywhere in
+            this repo: `sm`, `md`, `lg` and `xl` all collide.
+          */
           fullBleed
-            ? "h-full tablet:h-[85vh] tablet:max-w-4xl"
-            : "max-h-[90vh] tablet:max-h-[85vh] tablet:max-w-lg",
+            ? "h-full tablet:h-[85vh] tablet:max-w-[56rem]"
+            : "max-h-[90vh] tablet:max-h-[85vh] tablet:max-w-[32rem]",
         )}
       >
         <div className="border-hairline-soft px-base gap-md flex min-h-14 shrink-0 items-center border-b">

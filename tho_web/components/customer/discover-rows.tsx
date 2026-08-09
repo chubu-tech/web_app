@@ -1,13 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { CardMedia } from "@/components/ui/card-media";
+import { BusinessCard, MediaChip } from "@/components/ui/business-card";
+import { Carousel } from "@/components/ui/carousel";
 import { CoverImage } from "@/components/ui/cover-image";
 import { categoryIcon, Icons, IconSize } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
 import { formatKm } from "@/lib/discover-logic";
 import type { RankedSalon } from "@/lib/recommendations";
-import { offerEndsLabel, type Business, type Category, type Offer } from "@/lib/types/salon";
+import {
+  cardMetaLine,
+  offerEndsLabel,
+  type Business,
+  type Category,
+  type Offer,
+} from "@/lib/types/salon";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,6 +26,10 @@ import { cn } from "@/lib/utils";
  *
  * Each row renders nothing when it has no items, so Discover does not need to guard
  * — which matters, because today 0 salons have offers and 4 have no cover.
+ *
+ * **Every row is a `Carousel`.** They were each their own `flex overflow-x-auto pb-2`,
+ * which drew a permanent grey scrollbar under all four on Windows and Linux. See that
+ * component for what replaced it and why hiding a scrollbar is only half a change.
  */
 
 /** "Services" — categories as tinted circles. Tapping toggles the category filter. */
@@ -35,12 +46,12 @@ export function ServicesRow({
   return (
     <section>
       <SectionHeader title="Services" className="mb-base" />
-      <ul className="gap-lg flex overflow-x-auto pb-2">
+      <Carousel label="Services">
         {categories.map((c) => {
           const selected = c.id === selectedId;
           const Icon = categoryIcon(c.name);
           return (
-            <li key={c.id}>
+            <li key={c.id} className="snap-start">
               <button
                 type="button"
                 aria-pressed={selected}
@@ -71,44 +82,60 @@ export function ServicesRow({
             </li>
           );
         })}
-      </ul>
+      </Carousel>
     </section>
   );
 }
 
 type ScrollerItem = {
   business: Business;
-  /** The pill over the cover — the reason, the distance, the rating. */
+  /** The pill over the cover's top-left — the reason, the distance, the rating. */
   badge: React.ReactNode;
-  /** The line under the name. */
-  meta?: string | null;
 };
 
 /**
  * One horizontal row of salons.
  *
- * The items are deliberately **not** `BusinessCard`: they carry one coral badge
- * stating why the salon is in *this* row — its rank reason, its distance, its score —
- * where the browse card carries a rating and a heart. What they now share is
- * `CardMedia`, so the two agree on the frame, the radius and the hover zoom while
- * keeping their own semantics. They stay borderless too: a 5-item carousel of
- * lifting, shadowed cards would out-weigh the grid underneath it, which is the
- * section that matters.
+ * **These are `BusinessCard`s now**, where they used to be a near-copy of one. The old
+ * comment gave two reasons for the copy and the redesign dissolved both: the row card
+ * carried a coral badge stating why the salon is in *this* row, which is now just the
+ * card's own top-left `chip` slot; and a carousel of lifting, shadowed cards would have
+ * out-weighed the grid underneath it, which stopped being true when the frame and the
+ * lift came off. One card, one set of measurements, on every surface that shows a salon.
  *
- * `mb-base` is passed to every header rather than left to `SectionHeader`'s own
- * default, which is 0 with an action and 8px without — so a row with a "View all"
- * link used to sit tighter to its cards than its neighbours did.
+ * The badge is `MediaChip` rather than a coral pill — same reason `BusinessCard` gives
+ * for the distance chip. A saturated coral pill in the corner of every cover was the
+ * loudest thing on Discover, competing with five photographs for the same attention.
+ *
+ * `mb-base` is passed to every header rather than left to `SectionHeader`'s own default,
+ * which is 0 with an action and 8px without — so a row with a "View all" link used to sit
+ * tighter to its cards than its neighbours did.
  */
 function SalonScroller({
   title,
   items,
   seeAllHref,
   seeAllLabel = "View all",
+  priority = false,
 }: {
   title: string;
   items: ScrollerItem[];
   seeAllHref?: string;
   seeAllLabel?: string;
+  /**
+   * Eager-load this row's **first** cover.
+   *
+   * Only the top row passes it, and only its first card takes it. Measured on the
+   * production build: Discover's LCP was that card at **1564ms**, and it was
+   * `loading="lazy"` — so the browser could not begin fetching the largest element on
+   * the page until layout had run and told it the card was in view. `priority` makes it
+   * a preload instead.
+   *
+   * Deliberately *not* every row: four eager covers would compete with each other for
+   * the same connection and push the one that matters back down the queue, which is the
+   * failure mode `priority` exists to fix.
+   */
+  priority?: boolean;
 }) {
   if (items.length === 0) return null;
   return (
@@ -127,46 +154,28 @@ function SalonScroller({
           ) : undefined
         }
       />
-      <ul className="gap-lg flex overflow-x-auto pb-2">
-        {items.map(({ business: b, badge, meta }, i) => (
+      <Carousel label={title}>
+        {items.map(({ business: b, badge }, i) => (
           <li
             key={b.id}
-            className="w-[240px] shrink-0 motion-safe:animate-card-in tablet:w-[264px]"
+            className="w-[240px] shrink-0 snap-start motion-safe:animate-card-in tablet:w-[264px]"
             style={{ "--i": i, animationDelay: "calc(var(--i) * 45ms)" } as React.CSSProperties}
           >
-            <article className="group relative">
-              <CardMedia
-                label={b.name}
-                imageUrl={b.coverUrl}
-                sizes="264px"
-                className="rounded-lg"
-                badge={
-                  <span className="bg-rausch-cta text-on-primary text-caption-sm px-sm py-xxs shadow-card inline-flex items-center gap-1 rounded-full font-medium">
-                    {badge}
-                  </span>
-                }
-              />
-              <h3 className="text-title text-ink mt-md truncate font-semibold">
-                <Link
-                  href={`/salon/${b.id}`}
-                  className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
-                >
-                  {b.name}
-                </Link>
-              </h3>
-              {meta ? (
-                <p className="text-caption-sm text-muted mt-xxs truncate">{meta}</p>
-              ) : null}
-              {/* The focus indicator, on the article rather than on the name — same
-                  reason as `BusinessCard`, where the whole story is written down. */}
-              <span
-                aria-hidden
-                className="outline-ink pointer-events-none absolute -inset-2 rounded-lg outline-0 outline-offset-0 group-has-[a:focus-visible]:outline-2"
-              />
-            </article>
+            <BusinessCard
+              id={b.id}
+              name={b.name}
+              subtitle={b.addressText}
+              meta={cardMetaLine(b)}
+              imageUrl={b.coverUrl}
+              avgRating={b.avgRating}
+              reviewCount={b.reviewCount}
+              chip={<MediaChip>{badge}</MediaChip>}
+              sizes="264px"
+              priority={priority && i === 0}
+            />
           </li>
         ))}
-      </ul>
+      </Carousel>
     </section>
   );
 }
@@ -178,17 +187,20 @@ function SalonScroller({
 export function RecommendedRow({
   ranked,
   limit = 5,
+  priority = false,
 }: {
   ranked: RankedSalon[];
   limit?: number;
+  /** The top row on Discover, so its first cover is the page's LCP. */
+  priority?: boolean;
 }) {
   return (
     <SalonScroller
+      priority={priority}
       title="Recommended for you"
       items={ranked.slice(0, limit).map((r) => ({
         business: r.business,
         badge: r.reason,
-        meta: r.business.addressText,
       }))}
     />
   );
@@ -224,13 +236,13 @@ export function NearbyRow({
         badge: (
           <>
             <Icons.location
+              className="text-rausch-cta shrink-0"
               style={{ width: IconSize.xxs, height: IconSize.xxs }}
               aria-hidden
             />
             {formatKm(km)}
           </>
         ),
-        meta: business.addressText,
       }))}
     />
   );
@@ -249,11 +261,11 @@ export function OffersRow({ offers }: { offers: Offer[] }) {
     <section>
       <SectionHeader title="Offers" className="mb-base" />
       {/* The one row that keeps its own cover geometry: a 92px banner in a 260px card
-          is nothing like 16:10, and with 0 offers live platform-wide there is no way
-          to look at a change here before shipping it. Spacing only. */}
-      <ul className="gap-lg flex overflow-x-auto pb-2">
+          is nothing like the browse ratio, and with 0 offers live platform-wide there is
+          no way to look at a change here before shipping it. Spacing only. */}
+      <Carousel label="Offers">
         {offers.map((o) => (
-          <li key={o.id} className="w-[260px] shrink-0">
+          <li key={o.id} className="w-[260px] shrink-0 snap-start">
             <article className="border-hairline-soft shadow-card relative overflow-hidden rounded-md border">
               <CoverImage
                 label={o.businessName ?? o.title}
@@ -284,7 +296,7 @@ export function OffersRow({ offers }: { offers: Offer[] }) {
             </article>
           </li>
         ))}
-      </ul>
+      </Carousel>
     </section>
   );
 }
@@ -299,14 +311,13 @@ export function TopRatedRow({ businesses }: { businesses: Business[] }) {
         badge: (
           <>
             <Icons.star
+              className="text-star shrink-0 fill-current"
               style={{ width: IconSize.xxs, height: IconSize.xxs }}
-              className="fill-current"
               aria-hidden
             />
             {business.avgRating?.toFixed(1)}
           </>
         ),
-        meta: business.addressText,
       }))}
     />
   );

@@ -9,7 +9,7 @@ import { Icons, IconSize } from "@/components/ui/icons";
 import { RatingPill } from "@/components/ui/rating";
 import { formatKm, kmTo, type Coords } from "@/lib/discover-logic";
 import { mapCenter, nearestTo, resolveLocation, THIMPHU_CENTER } from "@/lib/geo";
-import { hasLocation, type Business } from "@/lib/types/salon";
+import { cardMetaLine, hasLocation, type Business } from "@/lib/types/salon";
 import { cn } from "@/lib/utils";
 
 /**
@@ -190,11 +190,18 @@ export function MapView({ salons }: { salons: Business[] }) {
                 imageUrl={selected.coverUrl}
                 avgRating={selected.avgRating}
                 reviewCount={selected.reviewCount}
+                meta={cardMetaLine(selected)}
                 sizes="(min-width: 744px) 560px, 100vw"
                 // Keeps this preview's 150px banner. The browse ratio would make the
-                // cover alone 350px tall at 560px wide, and this card floats over the
+                // cover alone 373px tall at 560px wide, and this card floats over the
                 // map it is describing.
                 compact
+                /* The one caller that keeps the border, the fill and the shadow. Every
+                   other salon card is now bare image-and-text on the page canvas, which
+                   is right on a page — and wrong here, where "the page" is a map: the
+                   name and address would sit straight on the tiles with roads running
+                   through them. */
+                framed
               />
             </div>
           </div>

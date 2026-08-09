@@ -18,6 +18,7 @@ import {
   fetchStaffPhotos,
   isFollowingStaff,
 } from "@/lib/api/staff";
+import { jsonLdScript, stylistSchema } from "@/lib/seo";
 import { createClient } from "@/lib/supabase/server";
 import type { Review } from "@/lib/types/salon";
 
@@ -66,9 +67,26 @@ export async function generateMetadata({
   const { id } = await params;
   const data = await load(id).catch(() => null);
   if (!data) return { title: "Stylist" };
+
+  const description = `${data.staff.displayName} at ${data.business.name}. See reviews and book a chair.`;
+  const path = `/stylist/${data.staff.id}`;
+
   return {
     title: data.staff.displayName,
-    description: `${data.staff.displayName} at ${data.business.name}. See reviews and book a chair.`,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      type: "profile",
+      title: data.staff.displayName,
+      description,
+      url: path,
+      // The stylist's own photo where there is one, else the salon's cover — a share
+      // card with no image is a share card nobody clicks. `staff_photos` has 2 rows
+      // platform-wide, so the fallback is the normal path.
+      ...(data.staff.photoUrl || data.business.coverUrl
+        ? { images: [{ url: (data.staff.photoUrl ?? data.business.coverUrl)! }] }
+        : {}),
+    },
   };
 }
 
@@ -90,6 +108,16 @@ export default async function StylistPage({
 
   return (
     <div>
+      {/* A `Person` whose `worksFor` carries the salon's own `@id`, so a crawler reading
+          both pages joins them into one graph instead of two unrelated entities that
+          share a name. That link is the whole reason this is worth emitting. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLdScript(stylistSchema({ staff, business })),
+        }}
+      />
+
       {/* The salon's cover behind the stylist's own avatar — a specialist has no cover
           of their own in the schema, and the app borrows the salon's the same way. */}
       <div className="relative">

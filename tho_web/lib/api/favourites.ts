@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Business } from "../types/salon";
+import { BUSINESS_PUBLIC_SELECT } from "./discovery";
 import { toBusiness, withRating } from "./mappers";
 
 /**
@@ -26,9 +27,14 @@ export async function fetchMyFavouriteIds(
 export async function fetchMyFavourites(
   supabase: SupabaseClient,
 ): Promise<Business[]> {
+  // The same projection the public reads use, not `businesses(*)`. This one never broke
+  // — `favorites_select` needs a session and a guest session is still the `authenticated`
+  // role, which holds table-level SELECT — but an embedded star has the identical failure
+  // waiting in it the moment another column is withheld, and `/saved` renders
+  // `BusinessCard`, which reads none of the withheld three. See `BUSINESS_PUBLIC_SELECT`.
   const { data } = await supabase
     .from("favorites")
-    .select("businesses(*)")
+    .select(`businesses(${BUSINESS_PUBLIC_SELECT})`)
     .order("created_at", { ascending: false });
 
   // `favorites → businesses` is a to-one FK, so PostgREST returns an object.

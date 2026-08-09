@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { BrandLockup } from "@/components/ui/brand-lockup";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
@@ -42,23 +42,13 @@ export default function NotFound() {
   return (
     <div data-shell="customer" className="bg-canvas flex min-h-full flex-col">
       <header className="border-hairline-soft px-base tablet:px-lg flex h-[var(--header-height)] shrink-0 items-center border-b">
-        {/* The same lockup `CustomerHeader` renders. It is duplicated rather than shared
-            because this boundary sits outside the customer layout (see above), and a 404
-            wearing a different logo from every other page reads as the wrong site. */}
-        <Link
-          href="/"
-          className="gap-sm flex shrink-0 items-center"
-          aria-label="Tho — home"
-        >
-          <Image
-            src="/tho-logo.jpg"
-            alt=""
-            width={36}
-            height={36}
-            className="size-9 shrink-0 rounded-md object-cover"
-          />
-          <span className="text-display-md text-rausch-cta font-bold">Tho</span>
-        </Link>
+        {/* The same lockup `CustomerHeader` renders, and now literally the same component.
+            It was duplicated here on the reasoning that this boundary sits outside the
+            customer layout (see above) — true of the *layout*, and no reason to copy the
+            markup. The two had already drifted: this copy's tile did not tilt on hover.
+
+            No `priority`: the mark on an error page is not worth a preload hint. */}
+        <BrandLockup />
       </header>
       <main className="flex-1">
         <div className="px-base py-xxl tablet:px-lg mx-auto w-full max-w-[560px]">

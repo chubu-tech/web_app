@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { AppHeader } from "@/components/ui/app-header";
+import { BrandLockup } from "@/components/ui/brand-lockup";
 import {
   CollapseNavButton,
   CollapseNavPanel,
@@ -12,6 +12,7 @@ import {
   useCollapseNav,
 } from "@/components/ui/collapse-nav";
 import { Icons, IconSize } from "@/components/ui/icons";
+import { NavLink } from "@/components/ui/nav-link";
 import { cn } from "@/lib/utils";
 import {
   hiddenUnread,
@@ -25,17 +26,17 @@ import { useInboxCounts } from "./use-inbox-counts";
 /**
  * The customer shell's navigation.
  *
- * **One header at every width; no bottom tab bar.** This used to be two components — a top
+ * **One header at every width; no bottom tab bar.** This used to be two components â€” a top
  * nav from 744 up and a fixed bottom tab bar below it, ported from
  * `tho/app/lib/ui/widgets/app_nav_bar.dart`. The bar is gone: a thumb-reachable strip glued
  * to the bottom of the viewport is a phone-app idiom, and on a desktop browser it was the
  * clearest tell that this was a port rather than a website.
  *
- * Responsive per `../tho/DESIGN.md:518-537` — *always reduce columns, never reflow rows*:
+ * Responsive per `../tho/DESIGN.md:518-537` â€” *always reduce columns, never reflow rows*:
  *
- * - **<744** wordmark · bell · menu. The menu holds all nine destinations in two groups.
- * - **744–1127** the five `TABS` come inline; the menu keeps `SECONDARY`.
- * - **≥1128** `SECONDARY` joins the header as icon buttons and the menu disappears.
+ * - **<744** wordmark Â· bell Â· menu. The menu holds all nine destinations in two groups.
+ * - **744â€“1127** the five `TABS` come inline; the menu keeps `SECONDARY`.
+ * - **â‰¥1128** `SECONDARY` joins the header as icon buttons and the menu disappears.
  *
  * ## Two things collapsing the two components fixed for free
  *
@@ -46,7 +47,7 @@ import { useInboxCounts } from "./use-inbox-counts";
  * **A real bell instead of a proxy dot.** The old bar had five fixed slots and no room for
  * one, so the Profile tab wore a dot standing in for anything unread beneath it. The bell
  * is now on screen at every width with its own count, and the menu's dot means only the one
- * thing the header cannot show — see `hiddenUnread`.
+ * thing the header cannot show â€” see `hiddenUnread`.
  *
  * Selection is carried by colour and stroke weight, matching the app: the free stroke icon
  * sets have no filled variant to swap in.
@@ -66,43 +67,19 @@ export function CustomerHeader({ signedIn }: { signedIn: boolean }) {
     <>
       <AppHeader
         label="Main"
-        tone="editorial"
-        left={
-          /*
-            The mark plus the wordmark, matching the marketing site's lockup — a visitor
-            arriving from bhutansalons.com should meet the same logo, which is the whole point
-            of the shared editorial layer.
-
-            `alt=""` because the wordmark beside it is the accessible name, and the link already
-            carries `aria-label`. Two copies of "Tho" to a screen reader is worse than none.
-
-            `rounded-md` (14px), not the editorial `slab` radius: 2rem on a 36px box is a
-            circle. This tile is chrome, so it takes the product radius scale.
-          */
-          <Link
-            href="/"
-            className="gap-sm flex shrink-0 items-center"
-            aria-label="Tho — home"
-          >
-            <Image
-              src="/tho-logo.jpg"
-              alt=""
-              width={36}
-              height={36}
-              priority
-              className="size-9 shrink-0 rounded-md object-cover"
-            />
-            <span className="text-display-md text-rausch-cta font-bold">Tho</span>
-          </Link>
-        }
+        /* The mark plus the wordmark, matching the marketing site's lockup â€” a visitor
+           arriving from bhutansalons.com should meet the same logo, which is the whole point
+           of the shared editorial layer. It was written out here; it is a component now,
+           because the root 404 had a copy and the owner console needed a third. */
+        left={<BrandLockup priority />}
         nav={
           /*
             Scrolls inside itself. Five destinations with labels are wider than 744, so
             without this the whole page scrolled sideways at exactly the tablet breakpoint.
-            Overflow belongs to the strip that has too much in it, never to the body — the
+            Overflow belongs to the strip that has too much in it, never to the body â€” the
             same rule the salon page's action row and the inbox filter chips follow.
           */
-          <ul className="gap-xs flex min-w-0 items-center overflow-x-auto">
+          <ul className="gap-xs mx-auto flex w-max items-center">
             {tabs.map((d) => (
               <li key={d.href} className="shrink-0">
                 <TopLink
@@ -261,28 +238,14 @@ function TopLink({
   current: boolean;
   count: number;
 }) {
-  const Icon = d.icon;
   return (
-    <Link
-      href={d.href}
-      aria-current={current ? "page" : undefined}
-      className={cn(
-        "text-title px-md gap-sm flex min-h-11 items-center rounded-full font-medium",
-        current ? "text-rausch-cta bg-rausch/10" : "text-muted hover:text-ink",
-      )}
-    >
-      <Icon
-        style={{ width: IconSize.xs, height: IconSize.xs }}
-        strokeWidth={current ? 2.2 : 1.8}
-        aria-hidden
-      />
-      {d.label}
+    <NavLink href={d.href} label={d.label} icon={d.icon} current={current}>
       {count > 0 ? <CountBadge count={count} label={d.label} /> : null}
-    </Link>
+    </NavLink>
   );
 }
 
-/** An icon-only header affordance — the bell, and the secondary set from 1128 up. */
+/** An icon-only header affordance â€” the bell, and the secondary set from 1128 up. */
 function IconLink({
   destination: d,
   current,

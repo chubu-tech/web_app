@@ -163,6 +163,34 @@ export const BUSINESS_TYPES: { value: BusinessType; label: string }[] = [
   { value: "mobile", label: "Mobile / I travel" },
 ];
 
+/**
+ * The browse card's third line: what the place is, and how many have rated it.
+ *
+ * **Not `BUSINESS_TYPES`' labels**, and the fourth row is why: *"Mobile / I travel"* is
+ * written for an owner picking their own type out of a radio group, where the first
+ * person is the point. On a customer's card it is a salon describing itself in a voice
+ * that is not its own. Same value, different audience, so a second table rather than a
+ * shared one that reads wrong on one of the two screens.
+ *
+ * The count is omitted rather than shown as "0 reviews" — an unrated salon shows no
+ * rating beside its name either, and the two have to agree.
+ */
+const CARD_TYPE_LABEL: Record<BusinessType, string> = {
+  salon: "Salon",
+  barber: "Barber shop",
+  home_based: "Home salon",
+  mobile: "Mobile salon",
+};
+
+export function cardMetaLine(
+  b: Pick<Business, "businessType" | "reviewCount">,
+): string {
+  const type = CARD_TYPE_LABEL[b.businessType];
+  if (b.reviewCount === 0) return type;
+  const reviews = `${b.reviewCount.toLocaleString("en-US")} review${b.reviewCount === 1 ? "" : "s"}`;
+  return `${type} · ${reviews}`;
+}
+
 /** `services.gender` and `service_catalog.gender`, with the label each one shows. */
 export const SERVICE_GENDERS: { value: string; label: string }[] = [
   { value: "female", label: "Women" },

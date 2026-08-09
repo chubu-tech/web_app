@@ -11,6 +11,46 @@ import { toBusiness, toBusinessHour, toCategory, withRating } from "./mappers";
  * active, non-deleted salons, so browsing needs no session.
  */
 
+/**
+ * The columns a **public** read of `businesses` may name — and it is a list rather than
+ * `*` for a reason that took the whole signed-out site down.
+ *
+ * `anon` does not hold table-level SELECT on `businesses`; it holds it per column, and
+ * three columns are withheld: `monthly_revenue_goal`, `reviewed_by` and
+ * `rejection_reason`. That is **correct** — a salon's revenue target and an operator's
+ * reason for rejecting it are not public — but `select *` demands SELECT on *every*
+ * column, so a single withheld one made every anonymous read of this table fail with
+ *
+ *   42501  permission denied for table businesses
+ *   hint:  Grant the required privileges to the current role with:
+ *          GRANT SELECT ON public.businesses TO anon;
+ *
+ * The hint is what makes this expensive to diagnose: it reads as "nothing is granted"
+ * when in fact almost everything is. `select=id,name` returns 200 against the same
+ * table in the same request. **Do not act on that hint** — granting those columns to
+ * `anon` would publish every salon's revenue goal to the open web.
+ *
+ * `authenticated` still holds the table-level privilege, which is why this only ever
+ * broke signed-out visitors — Discover, `/map`, `/salon/[id]`, `/q/[id]`, the booking
+ * page and `/stylist/[id]`, i.e. every page a search result or a printed QR code lands
+ * on. Signed in, all of it worked, which is the worst possible failure signature.
+ *
+ * `monthly_revenue_goal` is deliberately absent here rather than fetched and dropped:
+ * `toBusiness` maps it through `numOrNull`, so it arrives `null`, and the only reader is
+ * the owner console's settings form — which resolves its salon through
+ * `fetchMyBusinesses` (`./owner.ts`), a read that runs as `authenticated` and still
+ * names `*`. Keep it that way; the owner needs the column and is entitled to it.
+ *
+ * Ordering and filtering are unaffected: PostgREST lets you filter and sort on a column
+ * you can read but did not project, and `anon` can read `status`, `deleted_at` and
+ * `is_active` perfectly well.
+ */
+export const BUSINESS_PUBLIC_SELECT =
+  "id, name, description, address_text, phone, cover_url, timezone, " +
+  "cancellation_window_hours, is_active, lat, lng, plan, business_type, " +
+  "service_radius_km, whatsapp_phone, queue_enabled, queue_join_mode, " +
+  "reminder_channel, rebooking_enabled, rebooking_days";
+
 export type SalonSort = "name" | "rating";
 
 export type BusinessQuery = {
@@ -67,7 +107,9 @@ export async function fetchBusinesses(
   const byService = serviceGenders != null || minPrice != null || maxPrice != null;
 
   const select = [
-    "*",
+    // Not `*` — see `BUSINESS_PUBLIC_SELECT`. An embedded join does not rescue it
+    // either: `*, services!inner(...)` still expands the star over the parent table.
+    BUSINESS_PUBLIC_SELECT,
     categoryId != null ? "business_categories!inner(category_id)" : null,
     byService ? "services!inner(gender, price)" : null,
   ]
@@ -134,12 +176,26 @@ export async function fetchBusinessById(
   supabase: SupabaseClient,
   id: string,
 ): Promise<Business | null> {
-  const { data } = await supabase.from("businesses").select("*").eq("id", id).maybeSingle();
+  // `BUSINESS_PUBLIC_SELECT`, not `*`: every caller of this is a customer route that an
+  // anonymous visitor can reach — `/salon/[id]`, `/q/[id]`, `/salon/[id]/book`,
+  // `/stylist/[id]`, `/bookings/[id]` and the cart.
+  const { data } = await supabase
+    .from("businesses")
+    .select(BUSINESS_PUBLIC_SELECT)
+    .eq("id", id)
+    .maybeSingle();
   if (!data) return null;
 
   const ratings = await ratingsFor(supabase, [id]);
   const r = ratings.get(id);
-  return withRating(toBusiness(data as Record<string, unknown>), r?.avg ?? null, r?.count ?? 0);
+  // Widened through `unknown` for the same reason `fetchBusinesses` does it above: the
+  // select is a const rather than an inline literal, so supabase-js's string parser cannot
+  // infer the row and types `data` as `GenericStringError`.
+  return withRating(
+    toBusiness(data as unknown as Record<string, unknown>),
+    r?.avg ?? null,
+    r?.count ?? 0,
+  );
 }
 
 export async function fetchCategories(supabase: SupabaseClient): Promise<Category[]> {

@@ -105,6 +105,12 @@ export type RatingPillProps = {
   rating: number | null;
   count: number;
   onDark?: boolean;
+  /**
+   * The `(12)` after the average. Off on the browse card, where the count has its own
+   * line — *"Salon · 12 reviews"* — and repeating it beside the star would state the
+   * same number twice in two notations, two rows apart.
+   */
+  showCount?: boolean;
   className?: string;
 };
 
@@ -117,6 +123,7 @@ export function RatingPill({
   rating,
   count,
   onDark = false,
+  showCount = true,
   className,
 }: RatingPillProps) {
   const Star = Icons.star;
@@ -149,14 +156,16 @@ export function RatingPill({
       >
         {rating.toFixed(1)}
       </span>
-      <span
-        className={cn(
-          "text-body-sm",
-          onDark ? "text-on-primary/85" : "text-muted",
-        )}
-      >
-        ({count})
-      </span>
+      {showCount ? (
+        <span
+          className={cn(
+            "text-body-sm",
+            onDark ? "text-on-primary/85" : "text-muted",
+          )}
+        >
+          ({count})
+        </span>
+      ) : null}
     </span>
   );
 }

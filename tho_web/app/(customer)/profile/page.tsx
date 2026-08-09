@@ -70,7 +70,9 @@ export default async function ProfilePage() {
             </Link>
           }
         />
-        <div className="mt-lg mx-auto max-w-sm">
+        {/* Written out rather than `max-w-sm`, which resolves to `--spacing-sm` — 8px,
+            which is narrower than the button's own text. See `components/ui/sheet.tsx`. */}
+        <div className="mt-lg mx-auto max-w-[24rem]">
           <SignOutButton />
         </div>
         <About />
@@ -116,7 +118,8 @@ export default async function ProfilePage() {
         ))}
       </ul>
 
-      <div className="mt-lg max-w-sm">
+      {/* `max-w-sm` again — see above. */}
+      <div className="mt-lg max-w-[24rem]">
         <SignOutButton />
       </div>
 

@@ -191,7 +191,7 @@ export function CartView({
             className="border-hairline-soft p-sm gap-md flex items-center rounded-md border"
           >
             <span className="size-13 shrink-0 overflow-hidden rounded-sm">
-              <CoverImage label={line.name} imageUrl={line.photoUrl} sizes="52px" />
+              <CoverImage label={line.name} imageUrl={line.photoUrl} sizes="52px" className="size-full" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="text-title text-ink block truncate font-medium">{line.name}</span>

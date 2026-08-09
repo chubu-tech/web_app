@@ -37,7 +37,10 @@ export default function AuthLayout({
               aria-hidden
             />
           </Link>
-          <p className="text-display-xl text-ink mt-lg font-bold">Tho</p>
+          {/* "THO", matching the header lockup and the marketing site's `brand.name`. This
+              is the page the marketing site's "Sign in" lands on, so it is the one place a
+              second spelling would be seen back-to-back with the first. */}
+          <p className="text-display-xl text-ink mt-lg font-bold tracking-tight">THO</p>
         </div>
         {children}
       </div>

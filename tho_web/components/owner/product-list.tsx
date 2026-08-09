@@ -123,7 +123,7 @@ export function ProductList({
                 <span
                   className={`size-13 shrink-0 overflow-hidden rounded-sm ${soldOut ? "opacity-55" : ""}`}
                 >
-                  <CoverImage label={p.name} imageUrl={p.photoUrl} sizes="52px" />
+                  <CoverImage label={p.name} imageUrl={p.photoUrl} sizes="52px" className="size-full" />
                 </span>
 
                 <span className={`min-w-0 flex-1 ${soldOut ? "opacity-55" : ""}`}>

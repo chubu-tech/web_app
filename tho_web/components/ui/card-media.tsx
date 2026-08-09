@@ -2,26 +2,37 @@ import { CoverImage } from "./cover-image";
 import { cn } from "@/lib/utils";
 
 /**
- * The photo half of a salon card: a fixed-ratio, edge-to-edge cover with three
- * overlay slots and a hover zoom.
+ * The photo half of a salon card: a fixed-ratio, edge-to-edge cover with two overlay
+ * slots and a hover zoom.
  *
  * It exists because three surfaces draw the same picture — the browse card
- * (`BusinessCard`), the Discover carousels (`SalonScroller`) and the map preview —
- * and before this they each owned a height, a radius and a badge position. Two of
- * them had already drifted: 150px against 110px, and a rating pill in a white disc
- * against a coral pill, on cards that sit on the same screen.
+ * (`BusinessCard`), the Discover carousels and the map preview — and before this they
+ * each owned a height, a radius and a badge position. Two of them had already drifted:
+ * 150px against 110px, and a rating pill in a white disc against a coral pill, on cards
+ * that sit on the same screen. All three go through `BusinessCard` now, so this has one
+ * caller; it stays a component because the frame, the ratio and the zoom are one idea and
+ * inlining them would put a magic aspect ratio in a layout file.
+ *
+ * ## 3:2, which is a change from 16:10
+ *
+ * Fresha's covers are about 1.44:1 and this was 1.6:1 — noticeably letterboxed beside
+ * them. 3:2 is the nearest ratio that is a ratio rather than a measurement, and it is 15%
+ * more photograph per card at the same width.
  *
  * ## The slots are named by position, because their treatment depends on it
  *
- * - `badge` is **bottom-left**, where the frame meets whatever is under it.
- * - `chip` is **top-left.** There is no scrim at the top of the frame, and adding a
- *   second one would box the photo in from both ends.
- * - Both carry their own background. White copy straight on the gradient is the
- *   better-looking option and does not survive a light cover — the arithmetic is in
- *   `BusinessCard`, at the badge that used to do it.
- * - `action` is **top-right** and is the only interactive thing over the image, so it
- *   is also the only slot that gets a stacking order — the card's own link spreads an
+ * - `chip` is **top-left** — a distance, or the row's reason for showing this salon.
+ *   Fresha's "Featured" corner.
+ * - `action` is **top-right** and is the only interactive thing over the image, so it is
+ *   also the only slot that gets a stacking order — the card's own link spreads an
  *   `::after` across the whole surface and would otherwise swallow the press.
+ * - `chip` carries its own background. White copy straight on a photograph is the
+ *   better-looking option and does not survive a light cover — the arithmetic is on
+ *   `MediaChip` in `business-card.tsx`.
+ *
+ * **There is no bottom-left slot and no scrim any more.** Both existed to carry the
+ * rating over the photograph; the rating sits beside the salon's name now, so a gradient
+ * across the bottom of every cover would be dimming pictures to hold nothing.
  *
  * ## The zoom scales the clipping box, not the image
  *
@@ -41,8 +52,6 @@ export function CardMedia({
   priority = false,
   chip,
   action,
-  badge,
-  scrim = false,
   className,
 }: {
   label: string;
@@ -53,20 +62,11 @@ export function CardMedia({
   chip?: React.ReactNode;
   /** Top-right, above the card's own link overlay. */
   action?: React.ReactNode;
-  /** Bottom-left. */
-  badge?: React.ReactNode;
-  /**
-   * The bottom gradient. Off by default: it earns its place where the frame's bottom
-   * edge butts into a card body — it grounds the photograph there instead of letting it
-   * stop dead — and only dims the picture where the frame ends on open canvas, which is
-   * the carousels.
-   */
-  scrim?: boolean;
-  /** Sizes the frame. Defaults to 16:10; pass a height to override the ratio. */
+  /** Sizes the frame. Defaults to 3:2; pass a height to override the ratio. */
   className?: string;
 }) {
   return (
-    <div className={cn("relative w-full overflow-hidden aspect-[16/10]", className)}>
+    <div className={cn("relative w-full overflow-hidden aspect-[3/2]", className)}>
       <CoverImage
         label={label}
         imageUrl={imageUrl}
@@ -81,14 +81,6 @@ export function CardMedia({
         )}
       />
 
-      {scrim ? (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 via-black/25 to-transparent"
-        />
-      ) : null}
-
-      {badge ? <span className="left-md bottom-md absolute">{badge}</span> : null}
       {chip ? <span className="left-md top-md absolute">{chip}</span> : null}
       {action ? <span className="right-md top-md absolute z-10">{action}</span> : null}
     </div>

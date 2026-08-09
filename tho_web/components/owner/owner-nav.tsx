@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { AppHeader } from "@/components/ui/app-header";
+import { BrandLockup } from "@/components/ui/brand-lockup";
 import {
   CollapseNavButton,
   CollapseNavPanel,
@@ -11,23 +12,41 @@ import {
   useCollapseNav,
 } from "@/components/ui/collapse-nav";
 import { Icons, IconSize } from "@/components/ui/icons";
+import { NavLink } from "@/components/ui/nav-link";
 import { isCurrent } from "@/lib/nav";
 import type { Business } from "@/lib/types/salon";
-import { cn } from "@/lib/utils";
 import { readyOwnerTabs } from "./destinations";
-import { SalonSwitcher } from "./salon-switcher";
 
 /**
- * The owner console's navigation — the mirror of `components/customer/customer-nav.tsx`,
+ * The owner console's navigation â€” the mirror of `components/customer/customer-nav.tsx`,
  * and a port of `business_home.dart`'s `AppBar` + `AppNavBar`.
  *
- * **The header never hides.** The customer's used to be `hidden tablet:block`, but this one
- * holds the salon switcher, and the seeded owner runs nine salons — switching has to work on
- * a phone at the till, not only on a desktop.
+ * **The header never hides**, and at 1024 it collapses rather than dropping anything.
+ *
+ * ## The wordmark is here and the salon switcher is not
+ *
+ * This header used to open with the switcher â€” salon name over `Owner Â· Growth plan`, with a
+ * chevron â€” where every other nav in the product opens with the logo. Two things were wrong
+ * with that, and they compound:
+ *
+ * - **A dropdown is not chrome.** Which salon the console is showing is *page context*: it
+ *   changes what every figure on the screen means. Parking it in the bar put a control that
+ *   reloads the entire console beside five plain links, at the size and weight of a title.
+ * - **The console was the one shell with no logo.** A customer arriving from
+ *   bhutansalons.com meets the same lockup on the marketing site and on Discover; an owner
+ *   met a salon name and no indication of whose software this is.
+ *
+ * So the wordmark takes the slot (`BrandLockup`, the same component the customer header and
+ * the 404 render) and the switcher gets a row of its own directly beneath, in
+ * `app/business/layout.tsx`. It scrolls away with the page, which is right for context and
+ * wrong for chrome, and it is no longer competing with the destinations for width â€” which is
+ * what pushed this header's collapse out to 1024 in the first place.
+ *
+ * The logo points at `/business`, not `/`: `/` only redirects an owner back here.
  *
  * ## One row, and one collapse, at 1024
  *
- * - **≥1024** all five destinations inline, and **no hamburger at all** — not hidden, not
+ * - **â‰¥1024** all five destinations inline, and **no hamburger at all** â€” not hidden, not
  *   disabled, not rendered. The panel it opens is not rendered either.
  * - **<1024** the destinations come out of the header entirely and the hamburger appears in
  *   its place, on the right, opening the same five as a menu.
@@ -35,15 +54,19 @@ import { SalonSwitcher } from "./salon-switcher";
  * This replaced a second header row: a 44px horizontally-scrollable strip that carried all
  * five below 744, on the reasoning that an owner works one-handed at a till and a tap plus an
  * overlay is the wrong toll for the things they touch all day. That reasoning was sound and
- * the strip is still gone, because it only ever covered *below 744* — between 744 and 1024
+ * the strip is still gone, because it only ever covered *below 744* â€” between 744 and 1024
  * the tabs were inline and cramped against the switcher, which is the range this now fixes.
  * If the toll turns out to matter, the strip is the thing to bring back, at this breakpoint
  * rather than the old one.
  *
  * **1024 is not one of DESIGN.md's four tiers**, and it is a real addition rather than a
- * rounding of `tablet`: five labelled tabs plus a nine-salon switcher plus a bell do not fit
- * at 744, so the tier that suits the customer's five leaves this header overflowing. See
- * `--breakpoint-console` in `globals.css`, which is where the number lives.
+ * rounding of `tablet`: five labelled tabs plus a nine-salon switcher plus a bell did not fit
+ * at 744, so the tier that suits the customer's five left this header overflowing. See
+ * `--breakpoint-console` in `globals.css`, which is where the number lives. The switcher has
+ * since moved out from under the bar, which reclaimed up to 320px â€” so this tier is now wider
+ * than it strictly has to be. **Left at 1024 deliberately**: it is the same number
+ * `CollapseNavPanel`'s `closeAbove` is given below, and moving it means moving both together
+ * or shipping a menu that covers a nav it cannot close. Re-measure before touching it.
  *
  * **The panel is now the navigation, not just the account.** It used to hold sign-out alone,
  * because the destinations were always on screen somewhere. They are not any more below 1024,
@@ -52,10 +75,10 @@ import { SalonSwitcher } from "./salon-switcher";
  * would have no way out again, which is the exact defect the panel was added to fix.
  *
  * A separate component from the customer nav rather than one parameterised by a list. The
- * two differ in the header (a switcher, not a wordmark), in what they badge, in where they
- * collapse, and in having no "Sign in" call to action; unifying them would mean a component
- * that is mostly conditionals. What they genuinely share — how a path maps to a destination,
- * and the overlay behaviour — is `lib/nav.ts` and `components/ui/collapse-nav.tsx`.
+ * two differ in what they badge, in where they collapse, and in having no "Sign in" call to
+ * action; unifying them would mean a component that is mostly conditionals. What they
+ * genuinely share is now four things, not two â€” `lib/nav.ts`, `components/ui/collapse-nav.tsx`,
+ * `NavLink` and, since the switcher moved out of the bar, `BrandLockup`.
  */
 
 /**
@@ -67,12 +90,15 @@ import { SalonSwitcher } from "./salon-switcher";
 const CONSOLE_NAV = 1024;
 export function OwnerHeader({
   active,
-  businesses,
   unreadNotifications = 0,
   unreadMessages = 0,
 }: {
+  /**
+   * Only for the panel's closing line. The roster it used to need went with the switcher
+   * â€” `SalonSwitcher` is rendered by the layout now, so this header no longer takes
+   * `businesses` and no longer re-renders when a salon is added.
+   */
   active: Business | null;
-  businesses: Business[];
   unreadNotifications?: number;
   unreadMessages?: number;
 }) {
@@ -87,36 +113,31 @@ export function OwnerHeader({
     <>
       <AppHeader
         label="Owner"
-        tone="console"
         navFrom="console"
-        left={<SalonSwitcher active={active} businesses={businesses} />}
+        left={<BrandLockup href="/business" label="Tho for salons â€” console" priority />}
         nav={
           /* Still scrolls inside itself, never the body — the same rule the customer header
-             follows. It matters less now that the row only exists from 1024, but a nine-salon
-             switcher can take 320px of that and the guard costs nothing. */
-          <ul className="gap-xs flex items-center justify-end overflow-x-auto">
+             follows. It matters less now that the row only exists from 1024 and the switcher
+             has left the bar, but the guard costs nothing and the alternative failure is the
+             *body* scrolling sideways. The scroll moved up to the nav region in `AppHeader`;
+             see the note on `COLLAPSE` for why it has to be there and not here.
+
+             Centred, like the marketing site's, not pinned right. `justify-end` left 439px of
+             dead canvas on the left while the five tabs crowded the bell — measured at 1920.
+             `w-max mx-auto` centres while it fits and collapses to a normal scroll when it
+             does not. */
+          <ul className="gap-xs mx-auto flex w-max items-center">
             {tabs.map((d) => {
               const current = isCurrent(d, pathname);
-              const Icon = d.icon;
               const badge = badgeFor(d.href);
               return (
                 <li key={d.href} className="shrink-0">
-                  <Link
-                    href={d.href}
-                    aria-current={current ? "page" : undefined}
-                    className={cn(
-                      "text-title px-md gap-sm flex min-h-11 items-center rounded-full font-medium",
-                      current ? "text-rausch-cta bg-rausch/10" : "text-muted hover:text-ink",
-                    )}
-                  >
-                    <Icon
-                      style={{ width: IconSize.xs, height: IconSize.xs }}
-                      strokeWidth={current ? 2.2 : 1.8}
-                      aria-hidden
-                    />
-                    {d.label}
+                  {/* The same `NavLink` the customer header uses. This was a copy of that
+                      header's class string; the two are one component now, so the
+                      marketing site's underline treatment reaches both shells at once. */}
+                  <NavLink href={d.href} label={d.label} icon={d.icon} current={current}>
                     {badge > 0 ? <Badge count={badge} /> : null}
-                  </Link>
+                  </NavLink>
                 </li>
               );
             })}
@@ -156,7 +177,7 @@ export function OwnerHeader({
               Below 1024 only. `console:hidden` rather than a `matchMedia` in JavaScript: a
               media query hook has no answer during the server render, so it would ship a
               header that either flashes a hamburger on desktop or has none on a phone until
-              hydration. `display: none` is not a weaker "do not render" than that — it takes
+              hydration. `display: none` is not a weaker "do not render" than that â€” it takes
               the button out of the accessibility tree and out of the tab order, which is
               every way a user can reach it.
             */}
@@ -168,8 +189,8 @@ export function OwnerHeader({
       {/*
         The five destinations, and then the way out.
 
-        Until this panel existed the console had **no sign-out anywhere** — not in the header,
-        not in the salon switcher, not in the settings hub — so an owner's only way out was to
+        Until this panel existed the console had **no sign-out anywhere** â€” not in the header,
+        not in the salon switcher, not in the settings hub â€” so an owner's only way out was to
         know that the customer `/profile` route existed and type it. It is no longer the only
         one: above 1024 this whole panel is closed and unreachable, so `/business/settings`
         carries the same action. Two surfaces, one route handler. See

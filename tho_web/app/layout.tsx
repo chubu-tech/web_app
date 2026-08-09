@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 /**
@@ -44,15 +45,37 @@ const inter = Inter({
   display: "swap",
 });
 
+const title = "Tho — book a salon in Bhutan";
+const description =
+  "Book your chair or join the walk-in queue at salons and barbers across Bhutan.";
+
+/**
+ * **`metadataBase` is the one that unlocks the rest.** Without it Next resolves every
+ * relative `openGraph.images` and `alternates.canonical` against nothing and logs a
+ * warning, so a canonical is a bare path — which a crawler reads as no canonical at all —
+ * and an `og:image` never resolves. Nothing else here works until it is set, which is why
+ * `lib/site.ts` exists and why it is documented as build-time-inlined.
+ *
+ * `openGraph` and `twitter` are declared here rather than per-page so every route inherits
+ * a share card, and the three routes with their own `generateMetadata` override only the
+ * fields that differ. Before this, a salon link pasted into WhatsApp — which is how this
+ * product is actually shared in Bhutan — unfurled as a bare URL.
+ */
 export const metadata: Metadata = {
-  title: {
-    default: "Tho — book a salon in Bhutan",
-    template: "%s · Tho",
-  },
-  description:
-    "Book your chair or join the walk-in queue at salons and barbers across Bhutan.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: title, template: "%s · Tho" },
+  description,
   applicationName: "Tho",
   formatDetection: { telephone: false },
+  openGraph: {
+    type: "website",
+    siteName: "Tho",
+    locale: "en_BT",
+    title,
+    description,
+    url: "/",
+  },
+  twitter: { card: "summary_large_image", title, description },
 };
 
 export const viewport: Viewport = {

@@ -44,7 +44,7 @@ export function ReviewSheet({
   const fileInput = useRef<HTMLInputElement>(null);
 
   // Preview URLs still on screen, so unmount can release them. Mutated only in
-  // handlers, never during render. See the same note in `booking-extras-sheet.tsx`.
+  // handlers, never during render. See the same note in `booking-confirm-step.tsx`.
   const previews = useRef<string[]>([]);
   useEffect(
     () => () => {

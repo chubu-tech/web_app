@@ -16,6 +16,7 @@ import {
   toStaffMember,
   toWorkingHour,
 } from "./mappers";
+import { STAFF_PUBLIC_SELECT } from "./salon";
 
 /**
  * Everything the owner console **sets up** — services, staff, hours, the salon itself.
@@ -196,10 +197,14 @@ export async function createStaff(
     // `role` is named because `Api.createStaff` names it and the column is in the INSERT
     // grant. Nothing reads it for authorization — it is the subtitle on the salon page.
     .insert({ business_id: businessId, display_name: displayName, role: "staff" })
-    .select()
+    // Named columns, because a bare `.select()` is `RETURNING *` — and no client role holds
+    // table-level SELECT on `staff_members`, so the star failed the whole statement and
+    // adding a stylist raised 42501 *after* the INSERT check had passed. See
+    // `STAFF_PUBLIC_SELECT`.
+    .select(STAFF_PUBLIC_SELECT)
     .single();
   if (error) throw error;
-  return toStaffMember(data as Record<string, unknown>);
+  return toStaffMember(data as unknown as Record<string, unknown>);
 }
 
 /**

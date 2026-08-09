@@ -26,7 +26,7 @@ export function BookingConfirmedSheet({
   open,
   bookingId,
   business,
-  service,
+  services,
   staff,
   start,
   onDone,
@@ -34,7 +34,15 @@ export function BookingConfirmedSheet({
   open: boolean;
   bookingId: string;
   business: Business;
-  service: ServiceItem;
+  /**
+   * The basket, which is why this is a list and not one `service`.
+   *
+   * A customer can book several services in one appointment now, and a confirmation
+   * that named only the first would be the one screen in the flow that disagreed with
+   * what was bought. Joined with a middle dot rather than listed on separate rows: this
+   * is a receipt line, and the itemisation with prices was on the previous screen.
+   */
+  services: ServiceItem[];
   staff: StaffMember;
   start: Date;
   onDone: () => void;
@@ -65,7 +73,11 @@ export function BookingConfirmedSheet({
         </div>
 
         <dl className="border-hairline-soft divide-hairline-soft mt-lg divide-y border-y">
-          <Row icon={Icons.haircut} label="Service" value={service.name} />
+          <Row
+            icon={Icons.haircut}
+            label={services.length === 1 ? "Service" : "Services"}
+            value={services.map((s) => s.name).join(" · ")}
+          />
           <Row icon={Icons.person} label="Stylist" value={staff.displayName} />
           <Row icon={Icons.salon} label="Salon" value={business.name} />
           {business.addressText ? (

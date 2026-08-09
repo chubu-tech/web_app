@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
 import { fetchMyFavourites } from "@/lib/api/favourites";
 import { createClient } from "@/lib/supabase/server";
+import { cardMetaLine } from "@/lib/types/salon";
 
 export const metadata: Metadata = { title: "Saved salons" };
 
@@ -58,6 +59,7 @@ export default async function SavedPage() {
                 id={b.id}
                 name={b.name}
                 subtitle={b.addressText ?? b.description}
+                meta={cardMetaLine(b)}
                 imageUrl={b.coverUrl}
                 avgRating={b.avgRating}
                 reviewCount={b.reviewCount}

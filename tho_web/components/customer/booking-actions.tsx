@@ -59,7 +59,7 @@ export function BookingActions({
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   /** A fresh number per opening, used as the sheet's `key` so its form starts empty.
-   *  Same reasoning as the extras sheet in `booking-flow.tsx`. */
+   *  Same reasoning as the photo picker in `booking-confirm-step.tsx`. */
   const [reviewSession, setReviewSession] = useState<number | null>(null);
 
   const active = booking.status === "pending" || booking.status === "confirmed";

@@ -141,18 +141,21 @@ export type GuestAction = keyof typeof GUEST_ACTIONS;
  * and `owner` at `/business` before either was built, which meant the one caller had
  * to second-guess it — and the fallback it used (`/?tools=app`) was read by nothing,
  * so the "note instead of a 404" it promised never rendered and an owner silently
- * landed on Discover. 3a builds `/business`, so that branch is now true; `staff`
- * stays on the customer side until Phase 4 builds its console, and this is the single
- * line that changes when it does.
+ * landed on Discover. 3a builds `/business`, so that branch is now true, and Phase 4
+ * builds `/staff` — which was the single line this comment said would change when it
+ * did. Before it, a linked stylist signed in and landed on customer Discover with no
+ * route to their own book at all: the app's whole staff role had no web equivalent.
  *
  * This is a **landing** decision, not an authorisation one. Scoping is
- * `businesses.owner_id` and RLS; `profiles.role` only decides where someone is sent.
+ * `businesses.owner_id`, `staff_members.profile_id` and RLS; `profiles.role` only
+ * decides where someone is sent.
  */
 export function homeForRole(role: Role): string {
   switch (role) {
     case "owner":
       return "/business";
     case "staff":
+      return "/staff";
     case "admin":
     case "customer":
       // Admins use the separate operator console; there is nothing for them

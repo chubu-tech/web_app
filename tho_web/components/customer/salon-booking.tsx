@@ -6,71 +6,70 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SelectTile } from "@/components/ui/select-tile";
 import { SectionHeader } from "@/components/ui/section-header";
-import type { ServiceItem, StaffMember } from "@/lib/types/salon";
+import { bookableServices } from "@/lib/booking-basket";
+import type { ServiceItem } from "@/lib/types/salon";
 import { formatDuration, formatNu } from "@/lib/utils";
 
 /**
- * Choosing a service and a stylist, ported from `_servicesTab` in
- * `tho/app/lib/customer/business_detail_screen.dart:577`.
+ * The salon page's rail: pick a service, then go and book it.
  *
- * This selection belongs to the **salon page**, not the booking screen — the app
- * makes the same choice, and it is why `Book Appointment` is disabled until both
- * are picked (`business_detail_screen.dart:412`). 2b's booking screen is entered
- * with both already known.
+ * ## The stylist picker moved into the flow, and this is what is left
  *
- * The CTA renders twice — in the desktop rail and in the mobile sticky bar — driven
- * by this one piece of state, so they can never disagree. The radio inputs render
- * once, since two groups sharing a `name` would fight.
+ * This was two pickers — a service *and* a stylist — because `/salon/[id]/book` could not
+ * be entered without both and 404'd on a pair `service_staff` did not carry. The flow
+ * chooses both now, on its own steps, with "Any professional" as a real option that this
+ * rail could never offer. Keeping a second stylist picker here would mean two places to
+ * make one choice, and the one on this page would be the one that could not say
+ * "whoever is free".
+ *
+ * What stays is the shortcut: tick a service, press Book, arrive at step 1 with it
+ * already in the basket. `?service=` *seeds* the flow rather than fixing it, so this is
+ * a head start and not a commitment.
+ *
+ * The CTA renders twice — in the desktop rail and in the mobile sticky bar — driven by
+ * this one piece of state, so they can never disagree. The radio inputs render once,
+ * since two groups sharing a `name` would fight.
  */
 export function SalonBooking({
   salonId,
   services,
-  staff,
   staffByService,
+  initialServiceId = null,
 }: {
   salonId: string;
   services: ServiceItem[];
-  staff: StaffMember[];
   /**
-   * Who performs what, from `service_staff`.
+   * The service the price list handed over, from `?service=`.
    *
-   * The two lists are **not** independent: `create_booking` refuses a pair that isn't
-   * in this table, so offering every stylist for every service would let a customer
-   * build a booking the server will reject — and on live data that is 2 of Norzin's 5
-   * services, whose stylists perform none of them. The app has this gap; the fix is to
-   * show only the stylists who can actually do the chosen service.
+   * **Validated by the caller, not trusted here** — the page checks it against
+   * `staffByService` before passing it, so a hand-edited id cannot preselect a service
+   * this salon does not perform and leave the stylist list empty with no explanation.
+   *
+   * It is an *initial* value: once the rail is on screen the radio group owns the
+   * selection, and the page remounts this component when the parameter changes (see the
+   * `key` at the call site). Reading the URL on every render instead would fight the
+   * visitor — picking a different service in the rail would be undone by the parameter
+   * that is still in the address bar.
+   */
+  initialServiceId?: string | null;
+  /**
+   * Who performs what, from `service_staff` — the authority on what is bookable.
+   *
+   * Used here only to drop services nobody performs, which on live data is 2 of Norzin's
+   * 5. The *stylist* half of this table is the flow's business now.
    */
   staffByService: Record<string, string[]>;
 }) {
-  const [serviceId, setServiceId] = useState<string | null>(null);
-  const [staffId, setStaffId] = useState<string | null>(null);
+  const [serviceId, setServiceId] = useState<string | null>(initialServiceId);
 
   /** Only services someone can actually perform are offered at all. */
-  const bookable = services.filter((s) => (staffByService[s.id]?.length ?? 0) > 0);
+  const bookable = bookableServices(services, staffByService);
   const unbookable = services.length - bookable.length;
 
-  const eligible = serviceId
-    ? staff.filter((s) => staffByService[serviceId]?.includes(s.id))
-    : staff;
-
-  /** Changing service can invalidate the stylist — clear it rather than carry a pair
-   *  the server would refuse. Done in the handler, not an effect. */
-  function pickService(next: string) {
-    setServiceId(next);
-    if (staffId && !staffByService[next]?.includes(staffId)) setStaffId(null);
-  }
-
-  const ready = serviceId != null && staffId != null;
-  const href = ready
-    ? `/salon/${salonId}/book?service=${serviceId}&staff=${staffId}`
-    : null;
-  const missing = !serviceId
-    ? staffId
-      ? "Choose a service to continue"
-      : "Choose a service and a stylist to continue"
-    : !staffId
-      ? "Choose a stylist to continue"
-      : null;
+  // No stylist in the href: the flow asks for one, and it can offer "any professional",
+  // which is not a value this rail could produce.
+  const href = serviceId ? `/salon/${salonId}/book?service=${serviceId}` : null;
+  const missing = serviceId ? null : "Choose a service to continue";
 
   return (
     <>
@@ -88,7 +87,7 @@ export function SalonBooking({
               <ServiceGroups
                 services={bookable}
                 selectedId={serviceId}
-                onSelect={pickService}
+                onSelect={setServiceId}
               />
               {unbookable > 0 ? (
                 <p className="text-caption-sm text-muted mt-sm">
@@ -97,33 +96,6 @@ export function SalonBooking({
                 </p>
               ) : null}
             </>
-          )}
-        </section>
-
-        <section>
-          <SectionHeader title="Choose a stylist" as="h3" />
-          {eligible.length === 0 ? (
-            <p className="text-body-sm text-muted">
-              {staff.length === 0
-                ? "No stylists listed yet."
-                : "No stylist here performs that service — pick another."}
-            </p>
-          ) : (
-            <ul className="gap-sm flex flex-col">
-              {eligible.map((s) => (
-                <li key={s.id}>
-                  <SelectTile
-                    name="staff"
-                    value={s.id}
-                    checked={staffId === s.id}
-                    onSelect={setStaffId}
-                    title={s.displayName}
-                    subtitle={s.role}
-                    media={<Avatar name={s.displayName} photoUrl={s.photoUrl} size={40} />}
-                  />
-                </li>
-              ))}
-            </ul>
           )}
         </section>
 

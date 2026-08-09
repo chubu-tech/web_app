@@ -41,9 +41,23 @@ import { cn } from "@/lib/utils";
  * Tailwind scans for whole candidates and a composed `${x}:block` compiles to nothing.
  */
 
+/*
+ * `overflow-x-auto` lives here, on the nav region, and **not** on the destination list
+ * inside it. That pairing is what lets the list centre safely: the list is `w-max mx-auto`,
+ * so while it fits it is centred in this region — the marketing site's proportion, brand
+ * left, destinations in the middle, actions right — and once it does not fit, `w-max`
+ * exceeds the region, `mx-auto` resolves to zero, and this element scrolls from the true
+ * start. Putting `justify-center` on the list instead is the version that breaks: centred
+ * flex content that overflows pushes its first item off the scrollable origin, and the
+ * customer shell's five labelled tabs do overflow at 744.
+ */
 const COLLAPSE = {
-  tablet: "hidden min-w-0 flex-1 tablet:block",
-  console: "hidden min-w-0 flex-1 console:block",
+  tablet: "hidden min-w-0 flex-1 overflow-x-auto tablet:block",
+  console: "hidden min-w-0 flex-1 overflow-x-auto console:block",
+  // The staff shell has **two** destinations, so they fit beside a name and a sign-out at
+  // 390px with room to spare — there is nothing to collapse and therefore no hamburger to
+  // offer them from. A shell that collapsed two items would be hiding them for no reason.
+  always: "min-w-0 flex-1 overflow-x-auto",
 } as const;
 
 export function AppHeader({
@@ -51,7 +65,6 @@ export function AppHeader({
   nav,
   right,
   navFrom = "tablet",
-  tone = "console",
   label,
 }: {
   left: React.ReactNode;
@@ -64,8 +77,6 @@ export function AppHeader({
    * same destinations some other way — both shells use the collapse panel.
    */
   navFrom?: keyof typeof COLLAPSE;
-  /** `editorial` rounds and lifts the condensed row; `console` keeps it square. */
-  tone?: "editorial" | "console";
   label: string;
 }) {
   const [condensed, setCondensed] = useState(false);
@@ -88,14 +99,20 @@ export function AppHeader({
           moment the page scrolls at all. */}
       <div ref={sentinel} aria-hidden className="h-px" />
 
-      <header
-        className={cn(
-          "bg-canvas sticky top-0 z-30",
-          // The border is on the header, not the inner row: it is the seam between chrome
-          // and page, and it should not round with the pill.
-          condensed ? "border-hairline border-b" : "border-b border-transparent",
-        )}
-      >
+      {/*
+        `fixed` and **transparent**, which is `../landing_page`'s strategy exactly.
+
+        This was `sticky` with `bg-canvas` and a bottom hairline, and that is what made the
+        whole header *section* look like it was moving on scroll rather than just the navbar:
+        a sticky element paints its own background, so the cream fill and the seam travelled
+        down the viewport as a full-width band with the pill floating inside it. The pill was
+        never the problem — the bar behind it was.
+
+        Transparent outer means only the condensed pill paints, so page content scrolls
+        visibly past it on both sides and behind its blur, which is the marketing site's look.
+        `fixed` takes it out of flow so no parent background can follow it.
+      */}
+      <header className="fixed inset-x-0 top-0 z-30">
         {/*
           A plain container, not a `<nav>`. The wrapper used to be the labelled `<nav>`,
           which put the whole header — wordmark, bell, sign-in, and the second row's own
@@ -103,12 +120,39 @@ export function AppHeader({
           `nav[aria-label]` match far more than the destinations. Only the destination
           lists are navigation; the rest is chrome.
         */}
-        <div className="px-base tablet:px-lg w-full">
+        {/*
+          Capped and centred at 86rem. `../landing_page`'s own `Section` container is 82rem;
+          this is that plus a small margin, asked for after seeing the two side by side —
+          the condensed pill read narrow against the band it floats on.
+          It was full-bleed, which is why the two headers still read as different chrome even
+          once the links matched: the marketing nav sits in a 1312px column and this one ran
+          to both edges of a 1920px display. The gutters are landing's too (24 → 32), not the
+          16 → 24 this used, which is the other half of "clustered and forced".
+
+          Note this caps the **header only**. Discover's grid stays full-bleed on purpose —
+          that was the fix for the 264px blank band — so above 1312px the wordmark is inset
+          from the filter rail. That is the marketing site's own proportion and the price of
+          matching it.
+        */}
+        <div className="px-lg tablet:px-xl mx-auto w-full max-w-[86rem]">
           <div
             className={cn(
-              "gap-base flex h-16 items-center transition-all duration-[var(--duration-base)]",
-              tone === "editorial" && condensed
-                ? "bg-paper/80 shadow-card my-2 h-12 rounded-full px-4 backdrop-blur-xl"
+              // h-19 is 76px, which is `--header-height`. The two MUST agree: the token is
+              // what `/map` subtracts from `100svh` and what `/salon/[id]`'s sticky rail
+              // offsets by, so a row taller than the token pushes the map off-screen by the
+              // difference and no test would catch it.
+              "gap-base flex h-19 items-center transition-all duration-[var(--duration-base)]",
+              // The floating pill on scroll, for **every** shell. `tone` used to gate this so
+              // the console stayed square, which meant the one piece of chrome the whole
+              // product shares behaved differently depending on who was signed in — the same
+              // split the canvas had, in the same place, for the same unmeasured reason. The
+              // `tone` prop existed only to gate it, so it is gone rather than left dead.
+              // 56px tall inside 10px of margin top and bottom — 76px again, so the outer box
+              // never changes height and nothing shifts when the pill engages. It was 48px
+              // inside 8px, i.e. 64px, which read as a thin strip beside the marketing site's
+              // pill. `px-5` matches landing's condensed horizontal padding.
+              condensed
+                ? "bg-paper/80 shadow-card my-2.5 h-14 rounded-full px-5 backdrop-blur-xl"
                 : null,
             )}
           >
@@ -128,6 +172,21 @@ export function AppHeader({
           </div>
         </div>
       </header>
+
+      {/*
+        The spacer that pays for `fixed`, and the reason this change touched no other file.
+
+        A fixed header occupies no space, so without this every page's first row would start
+        under the chrome. One in-flow div of exactly `--header-height` puts `main` back where
+        `sticky` had it — which is what keeps `/map`'s `100svh` minus the token correct and
+        `/salon/[id]`'s sticky rail offset correct, with neither needing to know the header
+        stopped being sticky. Padding on `main` in three shell layouts would have done the
+        same job in three places instead of one.
+
+        `shrink-0` because both shells are `min-h-full flex flex-col`: a flex child with a
+        height and no shrink guard is a flex child that can be compressed to nothing.
+      */}
+      <div aria-hidden className="h-[var(--header-height)] shrink-0" />
     </>
   );
 }

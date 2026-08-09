@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Booking } from "../types/booking";
 import type { StaffMember } from "../types/salon";
-import { toStaffMember } from "./mappers";
+import { BOOKING_SELECT } from "./booking";
+import { toBooking, toStaffMember } from "./mappers";
+import { STAFF_PUBLIC_SELECT } from "./salon";
 
 /**
  * The specialist (staff) profile's reads and its one write, ported from
@@ -24,13 +27,79 @@ import { toStaffMember } from "./mappers";
  * rather than trusting the shape.
  */
 
+/**
+ * The signed-in user's own staff row, or `null` if no owner has linked them yet.
+ *
+ * A port of `Api.myStaffMember` (`api.dart:812`) including both filters: `profile_id`
+ * matches the caller and `is_active` is true. An owner who deactivates a stylist takes
+ * their shell away rather than leaving them a stale one, which is why `is_active` is part
+ * of the identity read and not a display detail.
+ *
+ * `null` is an ordinary answer, not an error: `link_staff_member` is the owner's action, so
+ * a freshly created staff account has no row to find until they take it. `/staff` draws the
+ * app's "Not linked yet" state for exactly this case.
+ *
+ * **`.limit(1).maybeSingle()`, matching the Dart** — `staff_members` has no unique index on
+ * `profile_id`, so one account linked to two salons would return two rows and a bare
+ * `maybeSingle()` would throw. The app takes the first; so does this.
+ */
+export async function fetchMyStaffMember(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<StaffMember | null> {
+  // `STAFF_PUBLIC_SELECT`, not `*`. This is the read the whole staff shell hangs on — a
+  // stylist with no `staff_members` row gets `_NotLinked` — and `*` made it return null for
+  // *everyone*, because `authenticated` has no table-level SELECT here either. A linked
+  // stylist was shown the "no owner has linked you" state. See `STAFF_PUBLIC_SELECT`.
+  const { data } = await supabase
+    .from("staff_members")
+    .select(STAFF_PUBLIC_SELECT)
+    .eq("profile_id", userId)
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle();
+  return data ? toStaffMember(data as unknown as Record<string, unknown>) : null;
+}
+
+/**
+ * One stylist's own appointments, newest first.
+ *
+ * **The `.eq("staff_member_id", …)` is the scope, not a convenience.** `bookings_select` is
+ * `customer_profile_id = auth.uid() OR private.is_business_member(business_id)`, and
+ * `is_business_member` admits an active `staff_members.profile_id` — so an unfiltered read
+ * hands a linked stylist **every booking in the salon**, including the other stylists' and
+ * every customer's name and phone. That is the fourth instance of the OR-policy leak this
+ * repo has found (see `fetchMyBookings`, `/bookings/[id]`, `fetchMyConversations`,
+ * `fetchMyActiveEntries`), and the fix is the same one every time: pass the id in rather
+ * than trusting the policy to be a filter.
+ *
+ * Ordering matches `Api.myBookings` — descending by start, i.e. newest first, which is the
+ * opposite of the calendar's `bookingsForRange`. The segments do the rest of the work.
+ */
+export async function fetchStaffBookings(
+  supabase: SupabaseClient,
+  staffMemberId: string,
+): Promise<Booking[]> {
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(BOOKING_SELECT)
+    .eq("staff_member_id", staffMemberId)
+    .order("start_ts", { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map(toBooking);
+}
+
 export async function fetchStaffById(
   supabase: SupabaseClient,
   id: string,
 ): Promise<StaffMember | null> {
+  // `/stylist/[id]` is public, so this is the narrow projection — `anon` holds no SELECT
+  // on `commission_pct` or `base_salary_nu`, and `*` therefore 42501'd the whole page for
+  // signed-out visitors. `toStaffMember` substitutes 0 for both, which is the honest
+  // answer on a page that has no business showing either.
   const { data } = await supabase
     .from("staff_members")
-    .select("*")
+    .select(STAFF_PUBLIC_SELECT)
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();

@@ -48,7 +48,7 @@ export function ProductCard({
         className="gap-md -m-xs p-xs hover:bg-surface-soft flex min-w-0 flex-1 items-center rounded-sm text-left"
       >
         <span className="size-13 shrink-0 overflow-hidden rounded-sm">
-          <CoverImage label={product.name} imageUrl={product.photoUrl} sizes="52px" />
+          <CoverImage label={product.name} imageUrl={product.photoUrl} sizes="52px" className="size-full" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="text-title text-ink block truncate font-medium">{product.name}</span>

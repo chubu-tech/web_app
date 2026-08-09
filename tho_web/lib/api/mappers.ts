@@ -158,8 +158,17 @@ export function toStaffMember(m: Row): StaffMember {
     photoUrl: str(m.photo_url),
     businessId: str(m.business_id),
     // Both NOT NULL DEFAULT 0 in the table, so the fallback only covers a select that
-    // named neither column — `fetchStaffById`'s narrow public projection does exactly
-    // that, and 0 is the honest answer there rather than a missing field.
+    // named neither column, and 0 is the honest answer on a page with no business showing
+    // pay. That is now the **default**: `anon` holds no SELECT privilege on either column,
+    // so every public projection omits them (`STAFF_PUBLIC_SELECT` in `./salon.ts`).
+    //
+    // This comment used to claim `fetchStaffById` already had "a narrow public projection".
+    // It did not — it was `select("*")`, which is why `/stylist/[id]` 42501'd for anyone not
+    // signed in. The intent was recorded here and never implemented there.
+    //
+    // **The fallback is therefore a hazard as well as a convenience.** An owner surface that
+    // reads pay must ask for it (`fetchStaff(..., { withPay: true })`); forget, and this
+    // line quietly turns a real salary into 0 that a form will write back.
     commissionPct: numOrNull(m.commission_pct) ?? 0,
     baseSalaryNu: numOrNull(m.base_salary_nu) ?? 0,
   };

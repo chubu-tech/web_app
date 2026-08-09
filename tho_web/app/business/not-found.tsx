@@ -9,8 +9,10 @@ import { Icons } from "@/components/ui/icons";
  *
  * Unlike the customer side, this boundary resolves the way you would expect: `business` is a
  * real URL segment, not a route group, so it is found and it renders **inside**
- * `app/business/layout.tsx` — which means `OwnerHeader`, the salon switcher and the tab strip
- * are all still there. So this file is content only; adding a header would double it.
+ * `app/business/layout.tsx` — which means `OwnerHeader` and the salon switcher's row are both
+ * still there. So this file is content only; adding a header would double it. That is also
+ * what makes the message below honest: the salon it tells the owner to check really is above
+ * this page, which it would not be under the root boundary.
  *
  * Without it, an owner hitting a stale link would fall through to the root boundary and get
  * the *customer* shell — cream canvas, a "Find a salon" button — which is a disorienting

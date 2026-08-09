@@ -1,38 +1,40 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BookingFlow } from "@/components/customer/booking-flow";
-import { HeroCircleButton } from "@/components/ui/detail-bits";
-import { Icons } from "@/components/ui/icons";
+import { Suspense } from "react";
+import { BookingWizard } from "@/components/customer/booking-wizard";
 import { fetchBusinessById } from "@/lib/api/discovery";
 import { fetchServices, fetchServiceStaff, fetchStaff } from "@/lib/api/salon";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
-import { formatDuration, formatNu } from "@/lib/utils";
+import { thimphuToday, toIsoDay } from "@/lib/time";
 
-export const metadata: Metadata = { title: "Choose a time" };
+export const metadata: Metadata = { title: "Book an appointment" };
 
 /**
- * Pick a time for a service and stylist already chosen on the salon page.
+ * The whole booking flow — services, professional, time, confirm.
  *
- * **The pair is validated here, not trusted.** `?service=` and `?staff=` come from a
- * URL, so both must belong to *this* salon and both must be active — otherwise a
- * hand-edited link would reach `create_booking` with a mismatched pair and rely on the
- * RPC to notice. It would, but a 404 is the honest answer to a link that never
- * existed.
+ * **This route no longer requires a service and a stylist to enter.** It used to 404
+ * without both, because choosing them was `/salon/[id]`'s job and this was only the slot
+ * grid. Everything is chosen here now, which is what makes a basket possible at all: a
+ * service picker on the previous page can only hand over one.
+ *
+ * `?service=` is still honoured and is now *repeatable* — it seeds the basket rather than
+ * fixing it, so the salon page's price list can still deep-link a specific service and
+ * the customer can add a second one without going back.
+ *
+ * **Nothing is validated here any more, and that is the point.** The old page checked the
+ * pair against `service_staff` and 404'd on a mismatch, which was right when the pair came
+ * from a URL and there was nowhere to correct it. The wizard re-derives every parameter
+ * against this salon's real services and roster on each render and drops what does not
+ * fit, so a hand-edited link now *lands on the right step with the impossible parts
+ * removed* instead of on a dead end. The server still refuses anything wrong either way —
+ * `create_booking` re-checks the pair — so this is about which failure the customer meets.
+ *
+ * The four reads are the same four the salon page does, and they are all this flow needs:
+ * there is no per-step fetch, so moving between steps costs nothing.
  */
-export default async function BookPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ service?: string | string[]; staff?: string | string[] }>;
-}) {
+export default async function BookPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const query = await searchParams;
-  const serviceId = Array.isArray(query.service) ? query.service[0] : query.service;
-  const staffId = Array.isArray(query.staff) ? query.staff[0] : query.staff;
-  if (!serviceId || !staffId) notFound();
 
   const supabase = await createClient();
   const [business, services, staffList, staffByService, account] = await Promise.all([
@@ -44,48 +46,26 @@ export default async function BookPage({
   ]);
   if (!business) notFound();
 
-  const service = services.find((s) => s.id === serviceId);
-  const staff = staffList.find((s) => s.id === staffId);
-  if (!service || !staff) notFound();
-
-  // Both exist — but do they go together? `compute_availability` and `create_booking`
-  // both require the pair to be in `service_staff` and raise otherwise, so a pair
-  // nobody performs would render a slot grid that can only error. 404 instead: the
-  // link never described a real appointment.
-  if (!staffByService[service.id]?.includes(staff.id)) notFound();
-
   return (
-    // `pb-*` clears `BookingFlow`'s fixed Confirm bar. Was a flat `pb-40` (160px), which
-    // was that bar plus the 62px tab bar that used to sit under it.
-    <div className="px-base py-lg mx-auto w-full max-w-[720px] pb-[calc(var(--cta-clearance)+env(safe-area-inset-bottom))] tablet:px-lg">
-      <div className="gap-md mb-lg flex items-start">
-        <HeroCircleButton
-          icon={Icons.back}
-          label={`Back to ${business.name}`}
-          href={`/salon/${id}`}
+    <div className="px-base py-lg mx-auto w-full max-w-[1240px] pb-[calc(var(--cta-clearance)+env(safe-area-inset-bottom))] tablet:px-lg desktop:pb-lg">
+      {/*
+        `useSearchParams` suspends on the first client render. This route is dynamic, so
+        Next does not *require* the boundary — but without one a slow hydration shows an
+        empty page rather than the chrome, and the fallback costs four lines.
+      */}
+      <Suspense fallback={<div className="min-h-[60vh]" />}>
+        <BookingWizard
+          business={business}
+          services={services}
+          staff={staffList}
+          staffByService={staffByService}
+          // Anonymous and guest both meet the wall; only a registered account passes.
+          isGuest={account.state !== "registered"}
+          // Resolved on the server so the date strip and the availability window cannot
+          // disagree with each other across a midnight boundary mid-session.
+          today={toIsoDay(thimphuToday())}
         />
-        <div className="min-w-0 flex-1">
-          <h1 className="text-display-lg text-ink truncate font-medium">{service.name}</h1>
-          <p className="text-body-sm text-muted">
-            with {staff.displayName} · {formatDuration(service.durationMinutes)} ·{" "}
-            {formatNu(service.price)}
-          </p>
-          <Link
-            href={`/salon/${id}`}
-            className="text-caption text-rausch-cta mt-xxs inline-block font-medium underline"
-          >
-            {business.name}
-          </Link>
-        </div>
-      </div>
-
-      <BookingFlow
-        business={business}
-        service={service}
-        staff={staff}
-        // Anonymous and guest both meet the wall; only a registered account passes.
-        isGuest={account.state !== "registered"}
-      />
+      </Suspense>
     </div>
   );
 }

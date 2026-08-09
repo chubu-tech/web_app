@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BusinessCard } from "@/components/ui/business-card";
 import { Button } from "@/components/ui/button";
+import { Carousel } from "@/components/ui/carousel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -27,7 +28,7 @@ import {
   productFilterToParams,
   type ProductFilter,
 } from "@/lib/product-filter";
-import type { Business, Category, Offer, Product } from "@/lib/types/salon";
+import { cardMetaLine, type Business, type Category, type Offer, type Product } from "@/lib/types/salon";
 import type { WorkingHour } from "@/lib/types/booking";
 import { cn } from "@/lib/utils";
 import { FavouriteButton } from "./favourite-button";
@@ -83,6 +84,17 @@ export function Discover({
   const [searchOpen, setSearchOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [productFilterOpen, setProductFilterOpen] = useState(false);
+  /**
+   * Whether "All salons" is the full grid rather than the single row.
+   *
+   * Local state, not a URL parameter, and that is a deliberate departure from this
+   * file's own rule that the URL is the filter state. A filter changes *which* salons
+   * are on the page and so has to be shareable and reloadable; this changes how many of
+   * the same set are on screen at once. Putting it in the URL would push a history entry
+   * for a layout preference and make the back button undo a press that changed nothing
+   * about what is being shown.
+   */
+  const [expanded, setExpanded] = useState(false);
   const [fix, setFix] = useState<Fix | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const location = fix?.coords ?? null;
@@ -205,6 +217,40 @@ export function Discover({
   const active = filtersActive(filters);
   // Sections show on the default browse view; a live search shows just results.
   const showSections = q.length === 0;
+
+  /**
+   * One salon, rendered identically by the row and by the grid.
+   *
+   * A local closure rather than a module-level component because it reads three things
+   * that belong to this render — the resolved distances, the favourites set and the
+   * heart's client island. Lifting it out would mean threading all three through props
+   * at both call sites to keep them in step, and "keep them in step" is exactly what a
+   * second copy of this JSX would eventually fail to do.
+   */
+  function SalonCard({ b }: { b: Business }) {
+    return (
+      <BusinessCard
+        id={b.id}
+        name={b.name}
+        subtitle={b.addressText ?? b.description}
+        meta={cardMetaLine(b)}
+        imageUrl={b.coverUrl}
+        avgRating={b.avgRating}
+        reviewCount={b.reviewCount}
+        // Only once a fix has resolved, and only for a salon that has coordinates —
+        // `kmTo` returns null otherwise, which means unknown and must not render as
+        // "0.0 km". 2 of the 13 live salons have no location at all.
+        distanceLabel={distanceLabels.get(b.id) ?? null}
+        favourite={
+          <FavouriteButton
+            businessId={b.id}
+            name={b.name}
+            initial={favourites.has(b.id)}
+          />
+        }
+      />
+    );
+  }
 
   return (
     /*
@@ -348,7 +394,9 @@ export function Discover({
                 selectedId={filters.categoryId}
                 onSelect={(id) => apply({ ...filters, categoryId: id })}
               />
-              <RecommendedRow ranked={ranked} />
+              {/* The first row on the page, so its first cover is the LCP element —
+                  see `priority` on `SalonScroller`. */}
+              <RecommendedRow ranked={ranked} priority />
               <NearbyRow nearby={nearby} />
               <OffersRow offers={offers} />
               <TopRatedRow businesses={topRated(inRange)} />
@@ -387,57 +435,90 @@ export function Discover({
           ) : (
             <section>
               {showSections ? (
-                <SectionHeader title="All salons" className="mb-base" />
+                <SectionHeader
+                  title="All salons"
+                  className="mb-base"
+                  action={
+                    /*
+                      "View all" only when there is something the row is not showing.
+                      A control that expands a row into a grid of the same salons is a
+                      control that appears to do nothing, and with 13 live salons and a
+                      rail taking 280px that is a reachable state, not a hypothetical.
+                    */
+                    visible.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => setExpanded((v) => !v)}
+                        aria-expanded={expanded}
+                        className="text-caption text-rausch-cta px-sm hover:bg-rausch/10 inline-flex min-h-11 items-center justify-center rounded-full font-medium transition-colors duration-[var(--duration-fast)]"
+                      >
+                        {expanded ? "Show less" : `View all ${visible.length}`}
+                      </button>
+                    ) : undefined
+                  }
+                />
               ) : null}
-              {/*
-                One auto-fill track at every width, replacing three fixed column
-                counts. The counts are now a consequence of a card's minimum width
-                rather than a list of breakpoints to keep in step with the rail, and
-                that is what makes the brief's targets reachable: a 268px floor puts 1
-                card per row below 768, 2-3 through the tablet band and 4 at 1280 on a
-                full-width grid, rising to 6 at 1920 — without a `min-` variant for
-                either of the two widths the brief names, neither of which is a
-                breakpoint this project has.
 
-                **This grid lands one column short of those numbers**, and the rail is
-                the whole reason: it takes 280px plus a 32px gap out of the row, so at
-                1280 there is 920px left and 3 cards is what fits at a premium size. 4
-                would be 218px each. The rail keeping its width was the previous ask,
-                so the column pays instead. `/saved` has no rail and hits the brief
-                exactly.
+              {/*
+                **A single row by default, the full grid on request.**
+
+                This was always the grid, which made Discover four carousels and then a
+                wall — on 13 salons at 1440 that is a fifth section three times taller
+                than the four above it put together, and the sections stop reading as
+                sections. One row matches them, and "View all" is the way to the rest,
+                so nothing is lost and the page has an ending.
+
+                **A search is always the grid.** Results are the whole answer, not a
+                section of a browse page, and a row that hid 8 of 11 matches behind a
+                sideways scroll would be hiding the thing that was asked for. That is
+                what `showSections` already means, so it is the same condition.
               */}
-              <ul className="gap-lg grid grid-cols-[repeat(auto-fill,minmax(268px,1fr))]">
-                {visible.map((b, i) => (
-                  <li
-                    key={b.id}
-                    className="motion-safe:animate-card-in"
-                    style={
-                      { "--i": i, animationDelay: "calc(var(--i) * 45ms)" } as React.CSSProperties
-                    }
-                  >
-                    <BusinessCard
-                      id={b.id}
-                      name={b.name}
-                      subtitle={b.addressText ?? b.description}
-                      imageUrl={b.coverUrl}
-                      avgRating={b.avgRating}
-                      reviewCount={b.reviewCount}
-                      // Only once a fix has resolved, and only for a salon that has
-                      // coordinates — `kmTo` returns null otherwise, which means
-                      // unknown and must not render as "0.0 km". 2 of the 13 live
-                      // salons have no location at all.
-                      distanceLabel={distanceLabels.get(b.id) ?? null}
-                      favourite={
-                        <FavouriteButton
-                          businessId={b.id}
-                          name={b.name}
-                          initial={favourites.has(b.id)}
-                        />
+              {showSections && !expanded ? (
+                <Carousel label="All salons">
+                  {visible.map((b, i) => (
+                    <li
+                      key={b.id}
+                      className="w-[240px] shrink-0 snap-start motion-safe:animate-card-in tablet:w-[264px]"
+                      style={
+                        { "--i": i, animationDelay: "calc(var(--i) * 45ms)" } as React.CSSProperties
                       }
-                    />
-                  </li>
-                ))}
-              </ul>
+                    >
+                      <SalonCard b={b} />
+                    </li>
+                  ))}
+                </Carousel>
+              ) : (
+                /*
+                  One auto-fill track at every width, replacing three fixed column
+                  counts. The counts are now a consequence of a card's minimum width
+                  rather than a list of breakpoints to keep in step with the rail, and
+                  that is what makes the brief's targets reachable: a 268px floor puts 1
+                  card per row below 768, 2-3 through the tablet band and 4 at 1280 on a
+                  full-width grid, rising to 6 at 1920 — without a `min-` variant for
+                  either of the two widths the brief names, neither of which is a
+                  breakpoint this project has.
+
+                  **This grid lands one column short of those numbers**, and the rail is
+                  the whole reason: it takes 280px plus a 32px gap out of the row, so at
+                  1280 there is 920px left and 3 cards is what fits at a premium size. 4
+                  would be 218px each. The rail keeping its width was the previous ask,
+                  so the column pays instead. `/saved` has no rail and hits the brief
+                  exactly.
+                */
+                <ul className="gap-lg grid grid-cols-[repeat(auto-fill,minmax(268px,1fr))]">
+                  {visible.map((b, i) => (
+                    <li
+                      key={b.id}
+                      className="motion-safe:animate-card-in"
+                      style={
+                        { "--i": i, animationDelay: "calc(var(--i) * 45ms)" } as React.CSSProperties
+                      }
+                    >
+                      <SalonCard b={b} />
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
           )}
         </div>

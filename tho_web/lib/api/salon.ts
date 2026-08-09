@@ -40,6 +40,46 @@ export async function fetchServices(
   return (data ?? []).map((m) => toServiceItem(m as Record<string, unknown>));
 }
 
+/**
+ * Every column of `staff_members` that **any** client role may read — and the reason this
+ * is a list rather than `*` is worse here than it is for `businesses`.
+ *
+ * Measured against the live database with `has_column_privilege`:
+ *
+ *   staff_members.commission_pct   anon: false   authenticated: false
+ *   staff_members.base_salary_nu   anon: false   authenticated: false
+ *
+ * **Neither role can read either column**, and `has_table_privilege(…, 'SELECT')` is false
+ * on this table for both — so `select *` failed for *everyone*, not only signed-out
+ * visitors. That is right: pay is written through `set_staff_pay` (SECURITY DEFINER, Pro
+ * only) and read through the `payroll_report` RPC, both of which run as `postgres` where
+ * column privileges do not apply. A table read is not a channel for a salary.
+ *
+ * The two consequences were very different in visibility, which is why this survived:
+ *
+ * - **Public pages threw.** `/salon/[id]`, `/q/[id]`, `/salon/[id]/book` and
+ *   `/queue/[entryId]` surfaced `42501 permission denied for table staff_members`.
+ * - **The owner console lied.** `fetchStaff` destructures only `data` and drops `error`,
+ *   so a refused read became `[]`: `/business/settings` said *"Nobody on the team yet"*
+ *   and `/business/staff` an empty roster, on nine salons that each have **two active
+ *   stylists** — verified by SQL, not by the page. `/business/staff/[id]` was worse
+ *   still: an empty roster means `roster.find()` misses and the route answered
+ *   `notFound()`, so every stylist's edit page was a 404.
+ *
+ * **Do not add the pay columns back under a flag.** The first attempt at this fix gave
+ * `fetchStaff` a `withPay` option for the editor, which would have moved the 42501 from
+ * the public pages onto `/business/staff/[id]` — `authenticated` is refused too, and the
+ * privilege check above is what caught it.
+ *
+ * `toStaffMember` substitutes 0 for both, so `StaffEditor`'s inputs start at 0 rather than
+ * at the stored figure. That is a **real limitation, not a fix**: a client cannot read
+ * stored pay at all. It costs nothing on live data — `set_staff_pay` refuses any salon
+ * that is not `pro` and no salon is, so the editor renders its locked card everywhere —
+ * but if a Pro salon ever appears, the prefill needs `payroll_report`, not this read.
+ */
+export const STAFF_PUBLIC_SELECT =
+  "id, business_id, profile_id, display_name, role, is_active, photo_url";
+
 export async function fetchStaff(
   supabase: SupabaseClient,
   businessId: string,
@@ -47,13 +87,13 @@ export async function fetchStaff(
 ): Promise<StaffMember[]> {
   let q = supabase
     .from("staff_members")
-    .select("*")
+    .select(STAFF_PUBLIC_SELECT)
     .eq("business_id", businessId)
     .is("deleted_at", null);
   if (activeOnly) q = q.eq("is_active", true);
 
   const { data } = await q.order("display_name", { ascending: true });
-  return (data ?? []).map((m) => toStaffMember(m as Record<string, unknown>));
+  return (data ?? []).map((m) => toStaffMember(m as unknown as Record<string, unknown>));
 }
 
 /**

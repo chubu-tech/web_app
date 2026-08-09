@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Discover } from "@/components/customer/discover";
 import {
@@ -42,6 +43,22 @@ import { createClient } from "@/lib/supabase/server";
  * anonymous visitor can already read, and bouncing them off those would be a
  * regression with no security value. The nav simply never offers the way in.
  */
+
+/**
+ * **The canonical is the whole point of this block**, and this page needs one more than
+ * any other in the app: the URL *is* the filter state, so `?gender=`, `?category=`,
+ * `?price=`, `?q=`, `?tab=products` and every combination of them is a distinct URL over
+ * substantially the same content. That is the textbook duplicate-content shape, and
+ * without a canonical those variants compete with each other and dilute the one page
+ * that should rank for "book a salon in Bhutan".
+ *
+ * Pointing it at bare `/` is deliberate and is the right call *because* the filters are
+ * server-side: every variant is a subset of this page's own list, not a different
+ * document. `metadataBase` in the root layout is what makes it absolute.
+ */
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 export default async function DiscoverPage({
   searchParams,
 }: {

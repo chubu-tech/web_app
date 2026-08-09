@@ -26,7 +26,21 @@ export type CoverImageProps = {
   sizes?: string;
   /** Load this one eagerly — the hero above the fold, never a card in a row. */
   priority?: boolean;
-  /** Applies to the wrapper, which is `relative` and must be given a size. */
+  /**
+   * Applies to the wrapper, which is `relative` and **must be given a size here** — not
+   * on an element around it.
+   *
+   * This component has no height of its own and fills itself with either a `next/image`
+   * `fill` (which is `position: absolute`) or an `h-full w-full` gradient. Both measure
+   * against *this* div, so a sized grandparent is no help: five call sites wrapped it in
+   * a sized `<span>` and left this div at `w × 0`, which rendered every photo-backed
+   * thumbnail in the cart, the product lists, the service list and the catalogue as an
+   * empty gap — and every monogram fallback 12px short of its box, because the initial's
+   * own line box was the only thing giving the div a height.
+   *
+   * Measured, not inferred: `44 × 0` inside a `44 × 44` span. Pass `size-full` when a
+   * wrapper owns the dimensions, or a height directly when nothing else does.
+   */
   className?: string;
 };
 

@@ -109,7 +109,7 @@ export function CatalogueList({
                 className="border-hairline-soft p-sm gap-md flex items-center rounded-md border"
               >
                 <span className="size-14 shrink-0 overflow-hidden rounded-sm">
-                  <CoverImage label={c.name} imageUrl={c.defaultImageUrl} sizes="56px" />
+                  <CoverImage label={c.name} imageUrl={c.defaultImageUrl} sizes="56px" className="size-full" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="text-title text-ink block truncate font-medium">{c.name}</span>

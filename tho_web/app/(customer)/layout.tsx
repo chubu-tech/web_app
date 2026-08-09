@@ -2,6 +2,7 @@ import type { Viewport } from "next";
 import { CartBar } from "@/components/customer/cart-bar";
 import { CustomerHeader } from "@/components/customer/customer-nav";
 import { InLineBar } from "@/components/customer/in-line-bar";
+import { SiteFooter } from "@/components/customer/site-footer";
 import { getAccount } from "@/lib/session";
 
 /**
@@ -47,6 +48,20 @@ export default async function CustomerLayout({
           and the bar reads as a notice about *this* session, not part of the site. */}
       <InLineBar />
       <main className="flex-1">{children}</main>
+      {/*
+        `main` is `flex-1` inside a `min-h-full` column, so on a short page — an empty
+        `/saved`, a 404 — the footer is pushed to the bottom of the viewport rather than
+        floating under three lines of content. That is the whole reason it goes here and
+        not at the end of each page.
+
+        `signedIn` decides whether it offers a way in; the year is resolved here because
+        the footer is a client component and evaluating it there would be evaluated twice.
+        It renders nothing on the four routes that own their viewport — see the component.
+      */}
+      <SiteFooter
+        signedIn={account.state === "registered"}
+        year={new Date().getFullYear()}
+      />
       {/*
         In the shell rather than on the two pages that fill the cart, because a customer who adds
         something and then wanders to `/bookings` should still be able to find it. The app has to

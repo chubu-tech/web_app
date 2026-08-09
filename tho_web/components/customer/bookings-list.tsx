@@ -32,13 +32,15 @@ export function BookingsList({ bookings }: { bookings: Booking[] }) {
 
   return (
     <div>
+      {/* The cap is written out rather than `max-w-md`, which resolves to
+          `--spacing-md` — 12px. See the note in `components/ui/sheet.tsx`. */}
       <SegmentedControl
         label="Filter bookings by status"
         labels={LABELS}
         counts={counts}
         index={tab}
         onChange={setTab}
-        className="max-w-md"
+        className="max-w-[28rem]"
       />
 
       {shown.length === 0 ? (

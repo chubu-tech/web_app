@@ -64,7 +64,7 @@ export function JoinQueueForm({
   const [error, setError] = useState<string | null>(null);
   const [wallOpen, setWallOpen] = useState(false);
 
-  /** Bumped per opening of the wall so its form starts empty — as in `booking-flow`. */
+  /** Bumped per opening of the wall so its form starts empty — as in the guest wall's other callers. */
   const [wallSession, setWallSession] = useState(0);
   /** Set when the wall was opened by pressing Join, so an upgrade resumes the join. */
   const resumeAfterWall = useRef(false);

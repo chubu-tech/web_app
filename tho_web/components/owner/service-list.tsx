@@ -94,7 +94,7 @@ export function ServiceList({
                 className="border-hairline-soft p-sm gap-md flex items-center rounded-md border"
               >
                 <span className="size-13 shrink-0 overflow-hidden rounded-sm">
-                  <CoverImage label={s.name} imageUrl={s.imageUrl} sizes="52px" />
+                  <CoverImage label={s.name} imageUrl={s.imageUrl} sizes="52px" className="size-full" />
                 </span>
 
                 <span className="min-w-0 flex-1">

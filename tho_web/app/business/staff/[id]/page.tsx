@@ -40,6 +40,10 @@ export default async function OwnerStaffDetailPage({
   if (!active) return <NoSalonYet />;
 
   const supabase = await createClient();
+  // This route used to answer `notFound()` for **every** stylist, and nothing here was
+  // wrong: `fetchStaff` named `*` on a table no client role holds table-level SELECT on,
+  // swallowed the 42501, returned `[]`, and the `find` below missed. See `fetchStaff` for
+  // why the pay columns cannot be part of that read even for an owner.
   const roster = await fetchStaff(supabase, active.id, { activeOnly: false });
   const member = roster.find((s) => s.id === id);
   if (!member) notFound();

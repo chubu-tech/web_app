@@ -98,7 +98,27 @@
   --radius-lg: 20px;
   --radius-xl: 32px;
 
-  /* --- Spacing (4px base, 2px micro-step) ------------------------------- */
+  /* --- Spacing (4px base, 2px micro-step) -------------------------------
+
+     **These names collide with Tailwind's width scale. Never write a named
+     `max-w-*` or `w-*` in this repo — always an arbitrary value.**
+
+     A named size resolves against the **spacing** namespace first and only falls
+     through to `--container-*` when there is no spacing key of that name. So with
+     `--spacing-lg` declared here, `max-w-lg` compiles to `max-width:
+     var(--spacing-lg)` — 24px, not 32rem. Read out of the emitted stylesheet.
+
+     It cost a broken booking flow: `Sheet` was `tablet:max-w-lg`, so every dialog in
+     the app was a 24px sliver at 744 and up, with its title and buttons spilling out
+     beside it. Phones were fine, because the variant never applied there, which is
+     why it survived so long. `max-w-sm` (8px) and `max-w-md` (12px) were wrong at
+     three more call sites for the same reason; `4xl` was accidentally correct only
+     because no `--spacing-4xl` exists.
+
+     Renaming these was the alternative and it is the wrong trade: they are the
+     project's spacing vocabulary at hundreds of call sites, and `p-lg` / `gap-lg`
+     have to keep meaning 24px. An arbitrary width is four characters longer and
+     cannot be misread. */
   --spacing-xxs: 2px;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -355,8 +375,15 @@
 --------------------------------------------------------------------------- */
 :root {
   /* One top bar, at every width. Constant on purpose: the header condenses
-     visually *inside* a fixed box, so nothing has to re-measure it on scroll. */
-  --header-height: 64px;
+     visually *inside* a fixed box, so nothing has to re-measure it on scroll.
+
+     76px, not 64px — matching `../landing_page`'s expanded header (a 36px lockup
+     inside 20px of vertical padding). At 64px the same content read as clustered
+     next to the marketing site's, which is the whole complaint this closes. Every
+     consumer reads the token, so `/map`'s height subtraction and `/salon/[id]`'s
+     sticky rail offset followed without either being touched — which is the reason
+     it is a token and not a literal in eight files. */
+  --header-height: 76px;
 
   /* Clearance for a fixed CTA footer: p-base twice + min-h-12 + a note line.
      A floor rather than a measurement, the same trade the map page states. */
@@ -389,8 +416,26 @@
    And never add `@theme inline` to this file: it substitutes declared values
    into utilities instead of `var()`, which would make this entire block a no-op.
 --------------------------------------------------------------------------- */
-[data-shell="customer"],
-body:has([data-shell="customer"]) {
+/* ---------------------------------------------------------------------------
+   Every shell, not just the customer's.
+
+   This selector used to be `[data-shell="customer"]` alone, on the reasoning that
+   "a dense operational console loses legibility on an editorial canvas". That was
+   asserted, never measured, and it left the product visibly split down the middle:
+   a customer arriving from bhutansalons.com saw one continuous design language and
+   an owner saw a different one, on the same domain, from the same nav.
+
+   It is now attribute-*presence*, so any shell that declares itself gets the
+   editorial layer — `customer`, `owner`, `staff`. The attribute still records which
+   shell is rendering, because `not-found.tsx` and the layouts read as documentation
+   and a bare `data-shell` would say less.
+
+   Nothing about the mechanism changed, which is the point: every colour utility
+   resolves through `var()`, so this re-skins the console with **no class strings
+   touched** in 26 routes' worth of components. It is also one line to revert.
+--------------------------------------------------------------------------- */
+[data-shell],
+body:has([data-shell]) {
   --color-canvas: #f6f3ee;
   --color-surface-soft: #efe9e1; /* canvas-deep: a tint OF cream, not of white */
   --color-surface-strong: #e6ded2; /* sand */
@@ -472,6 +517,24 @@ body:has([data-shell="customer"]) {
 /* Scrim behind sheets and dialogs — black at 50%, as applied at render time. */
 @utility scrim {
   background-color: rgb(0 0 0 / 0.5);
+}
+
+/* A scroll container with no visible scrollbar.
+   Two declarations because no single one is supported everywhere: `scrollbar-width`
+   is the standard and is Firefox's only lever, `::-webkit-scrollbar` is what Chrome
+   and Safari read. Neither has a Tailwind utility, which is the whole reason this is
+   here rather than in a class string.
+
+   **The scrolling itself is untouched** — this hides the indicator, not the overflow.
+   Wheel, trackpad, touch swipe, keyboard and `scrollBy` all still work; see
+   `components/ui/carousel.tsx`, which is the only thing that should use this, because
+   hiding a scrollbar without replacing the affordance it provided is how a row of
+   cards becomes a row of cards nobody knows is scrollable. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* --- The map ----------------------------------------------------------------
