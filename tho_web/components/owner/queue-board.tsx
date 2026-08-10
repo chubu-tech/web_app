@@ -151,10 +151,26 @@ export function QueueBoard({
     }
   }
 
+  /*
+    The heading lives here rather than on the page, in **both** branches, because this component
+    owns the width container — a page-level `h1` outside it would not line up with the board.
+
+    It was missing from both until a route sweep read the `h1` of all 61 routes across the three
+    roles and found this the only one with none: the board opened on `SummaryStrip` and the locked
+    state on
+    an `EmptyState`, whose title is a `<p>`. Every other console route has a visible `h1`, so this
+    was a hole in the heading outline rather than a deliberate exception, and a screen reader
+    landing here had nothing naming the page.
+  */
+  const heading = (
+    <h1 className="text-display-lg text-ink mb-xs font-medium">Walk-in queue</h1>
+  );
+
   /* ------------------------------------------------------------ locked ---- */
   if (!runsQueue) {
     return (
       <div className="px-base py-lg mx-auto w-full max-w-[1128px] tablet:px-lg">
+        {heading}
         <QueueLocked business={business} />
       </div>
     );
@@ -163,6 +179,7 @@ export function QueueBoard({
   /* ------------------------------------------------------------- board ---- */
   return (
     <div className="px-base py-lg gap-base mx-auto flex w-full max-w-[1128px] flex-col tablet:px-lg">
+      {heading}
       <SummaryStrip summary={summary} />
 
       <div className="gap-sm flex">

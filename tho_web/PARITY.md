@@ -1,221 +1,305 @@
 # Feature parity — THO app (`../tho`) vs THO Web (`tho_web`)
 
-Audited 2026-08-06 against `../tho/app/lib` (160 Dart files) and `tho_web` (53 routes).
+Audited **2026-08-10** against `../tho/app/lib` (183 Dart files, `Api` with 152 methods and 5
+getters) and `tho_web` (70 route entries, 559 tests across 28 files).
 
-**Method.** Every Flutter screen, sheet and `Api` method was enumerated and matched to a
-web route, component or `lib/api` function. Nothing was taken on trust — including
-`AGENTS.md`'s own parity claims. Two checks did the real work:
+Supersedes the 2026-08-06 audit, which was a batch behind: between 2026-08-07 and 2026-08-09
+upstream landed six commits and ~30 migrations (`20260807000002` … `20260807000036`) that
+introduced a whole moderation, legal and account-deletion layer plus a staff-invite consent
+handshake. Eight of that audit's rows are now wrong, and §7 lists every correction — including
+two figures the audit itself got wrong before anything changed.
 
-1. **Screen-level.** Every `*_screen.dart` / `*_tab.dart` / `*_sheet.dart` against
-   `app/**/page.tsx` and `components/{customer,owner}`.
-2. **API-level.** All 137 `Api` methods against the ~190 exports in `lib/api/`. A
-   capability with no web caller is a gap even when a screen looks equivalent.
+## The measure that does the work
 
-Then each candidate gap was checked for **reachability in Flutter** — because a method
-with no caller in the app is dead code, not a missing feature. That test removed two
-false positives (below), which is exactly why it matters.
+Screen-by-screen matching is how the 2026-08-06 audit was built, and it is the weaker test: a
+web page can look equivalent and call nothing. **The sharp test is the RPC diff** — every
+`.rpc(...)` in `../tho/app/lib/data/api.dart` against every `.rpc(...)` in `tho_web/lib`. That
+is what found the eleven-RPC hole the last audit opened with, and it is reproducible in one
+command.
+
+The app calls **54** distinct RPCs. `tho_web` calls **48** of them. All six of the rest are
+accounted for:
+
+| RPC | Status |
+| --- | --- |
+| `link_staff_member` | **Retired, correctly.** `ee413c6` replaced it with the invite handshake; it has no caller in the app either. Calling it would let an owner convert a stranger's account into their stylist without asking — the defect that commit removed. |
+| `record_payment` | **A real gap, and its premise changed.** See §5. |
+| `register_device` | Push notifications, deferred by decision — the in-app inbox is the channel. Delivery needs a Firebase web config and an `FCM_SERVICE_ACCOUNT` that exist for no platform. |
+| `admin_content_reports`, `admin_resolve_report`, `admin_remove_reported_content` | The app ships an **in-app admin moderation queue** (`moderation/admin_reports_screen.dart`, reachable from `profile_screen.dart:192`). Not a gap here: this repo sends `admin` users to `../admin`. Worth knowing it exists, because the last audit filed all `admin_*` RPCs as "belong to `../admin`" without noticing three of them have a Flutter screen. |
+
+Reproduce:
+
+```bash
+grep -ohE "rpc\('[a-z_]+'" ../tho/app/lib/data/api.dart | sed "s/rpc('//;s/'//" | sort -u > /tmp/app
+grep -rohE 'rpc\("[a-z_]+"' lib/ | sed 's/rpc("//;s/"//' | sort -u > /tmp/web
+comm -23 /tmp/app /tmp/web
+```
 
 ---
 
-## ✅ Already implemented — parity confirmed
+## 1. Closed since 2026-08-06
 
-### Customer (25 routes)
+Every gap the audit found. Nothing on this list is outstanding.
 
-| Feature | Flutter | Web |
+### Safety, consent and compliance (Batch 1)
+
+| # | Capability | Where it lives |
 | --- | --- | --- |
-| Discover / browse salons | `customer_home.dart` | `/` |
-| Filters (gender, category, rating, distance, price) | `filter_screen.dart` | filter rail + sheet on `/` |
-| Salon detail | `business_detail_screen.dart` | `/salon/[id]` |
-| Booking flow | `booking_screen.dart` | `/salon/[id]/book` |
-| Booking confirmation | `booking_confirmed_sheet.dart` | `booking-confirmed-sheet.tsx` |
-| My bookings + detail | `booking_detail_screen.dart` | `/bookings`, `/bookings/[id]` |
-| Reschedule | `reschedule_screen.dart` | `/bookings/[id]/reschedule` |
-| Cancel / check in / reminders | `booking_detail_screen.dart` | `booking-actions.tsx`, `reminder-toggle.tsx` |
-| Review a booking | `review_sheet.dart` | `review-sheet.tsx` |
-| Saved salons | `saved_screen.dart` | `/saved` |
-| Map | `map_tab.dart` | `/map` |
-| Stylist profile + follow | `staff_profile_screen.dart` | `/stylist/[id]` |
-| Profile + edit | `profile_screen.dart` | `/profile`, `profile-editor.tsx` |
-| Notifications | `notifications_screen.dart` | `/notifications` |
-| Messages | `chat_list_screen.dart`, `chat_thread_screen.dart` | `/messages`, `/messages/[id]` |
-| Join a walk-in queue | `join_queue_sheet.dart` | `/q/[id]` |
-| Watch your place in line | `your_turn_screen.dart` | `/queue/[entryId]` |
-| Products browse (cross-salon) | `products_browse.dart` | `/?tab=products` |
-| Salon shop tab | `salon_shop_tab.dart` | `salon-shop.tsx` |
-| Product detail | `product_sheet.dart` | `product-sheet.tsx` |
-| Cart | `cart_sheet.dart` | `/cart` |
-| My orders + detail + cancel | `my_orders_screen.dart` | `/orders`, `/orders/[id]` |
-| Loyalty / rewards | `my_rewards_screen.dart` | `/rewards` |
-| Redemption code | `redemption_code_screen.dart` | `/rewards/[id]` |
-| Sign in / sign up / guest | `email_sign_in_screen.dart`, `guest_wall.dart` | `/sign-in`, `/sign-up`, guest sheet |
+| M1 | Staff **invite** — send, pending state, revoke | `lib/api/staff-invites.ts`, `components/owner/staff-link-card.tsx` |
+| M2 | **Accept / decline** an invite to a chair | `components/customer/staff-invite-prompt.tsx`, mounted on `app/(customer)/page.tsx` |
+| M3 | **Delete your account** — typed confirm, retention disclosure | `lib/api/account.ts`, sheets on `/profile` and `/business/settings` |
+| M4 | **Blocked / suspended** terminal screen and session end | `app/account/blocked/page.tsx`, the gate in `lib/session.ts` |
+| M5 | **Terms gate** before a first review and a first message | `components/ui/terms-gate.tsx`, called at both write sites |
+| M6 | **Report** content — all five targets | `components/ui/report-sheet.tsx`, `report-button.tsx` |
+| M7 | **Block / unblock**, and a blocked-users list | `components/customer/thread-safety-menu.tsx`, `/profile/blocked` |
+| M8 | Terms, Privacy, Content policy, Help | `app/(customer)/legal/{terms,privacy,content-policy}`, `/help` |
+| P1 | `link_staff_member` **removed** | `lib/api/owner-setup.ts` — see the RPC table above |
 
-### Owner (26 routes)
+**One deviation from the plan, deliberate.** The plan called for a route at `/staff/invite`.
+The prompt is a component on Discover instead: a pending invite belongs where the person
+already is, and a customer who has been invited has no reason to know a `/staff` URL exists.
+There is no `app/staff/invite/page.tsx` and that is not an omission.
 
-Calendar and today's book · booking detail and full lifecycle · walk-in queue board with
-Call next · counter walk-in · services · service catalogue · staff roster and editor ·
-stylist hours · salon opening hours (incl. copy-to-days) · salon profile and map pin ·
-create salon · insights (all nine cards) · peak heatmap · client book and client detail ·
-client notes · product orders and detail · storefront / products · offers · loyalty
-settings, rewards, redemption counter, adjust points · payroll · tax estimate · plan &
-billing with paywall · salon message inbox · owner notification bell · sign out.
+### The role gaps (Batch 2)
 
-All of `adjust_points_sheet`, `client_note_sheet`, `copy_to_days_sheet`,
-`reward_edit_sheet`, `product_edit_sheet`, `queue_qr_sheet`, `paywall_sheet` and
-`add_walk_in_sheet` have web equivalents. Verified individually — these were candidate
-gaps until the component list was checked.
+| # | Capability | Where |
+| --- | --- | --- |
+| M9 | Staff **booking detail** — complete / no-show / cancel / note / photos / call / WhatsApp | `app/staff/bookings/[id]/page.tsx`, `fetchStaffBookingById` |
+| M10 | Notification **paging** past the first 100 | `lib/api/notifications.ts`, `notification-list.tsx` |
+| P6 | Staff pay **prefills** what is saved | `app/business/staff/[id]/page.tsx` reads `payroll_report` |
 
-### Where web is ahead (do not "fix" back)
+`fetchStaffBookingById` carries an explicit `.eq("staff_member_id", …)` — the **sixth**
+instance of "an OR-matched policy is never a scope". `bookings_select` admits
+`is_business_member`, and `private.is_business_member` admits an active
+`staff_members.profile_id`, so a linked stylist is a member of the whole salon.
 
-Five analytics cards the app comments out · the plan-upgrade request the app deleted for
-App Store 3.1.1 · an owner notification feed · locked plan states four app screens don't
-draw · a cart that survives a closed tab and re-prices · a redemption code that polls
-instead of asking for a manual refresh.
+`components/owner/booking-detail.tsx` is the shared body, rendered by both
+`/business/bookings/[id]` and `/staff/bookings/[id]`. The old audit's "this is a route to add,
+not a permission to win" was right.
 
----
+### Ergonomics and list routes (Batch 3)
 
-## ❌ Missing features
+| # | Capability | Where |
+| --- | --- | --- |
+| P2 | **Inline booking actions** on the owner cards | `components/owner/inline-booking-actions.tsx` |
+| P3 | **Payments ledger** on the owner booking detail | `components/owner/booking-money.tsx` |
+| P4 | **Adjust points** reachable from a booking | same |
+| P5 | Queue rows **link to the client record** | `components/owner/queue-board.tsx` |
+| P7 | `setBusinessCategories` through the **atomic RPC** | `lib/api/owner-setup.ts` |
+| M11 | **`/recommended`** | `app/(customer)/recommended`, `components/customer/recommended-list.tsx` |
+| M12 | **`/top-rated`** | `app/(customer)/top-rated` |
+| M13 | In-app **QR scanner** | `app/(customer)/scan`, `components/customer/qr-scanner.tsx`, `lib/queue-deep-link.ts` |
 
-### 1. Staff role — the whole shell — ✅ IMPLEMENTED 2026-08-06
+Both list routes run **the same functions unbounded** — the same `rank()` call with the same
+inputs, and `topRated(businesses, businesses.length)` — rather than an approximation. That is
+what makes the new `seeAllHref` links truthful, and it was verified by the first five ids on
+`/recommended` matching Discover's row exactly.
 
-**Shipped**, with one piece left (below). `/staff` and `/staff/schedule` now exist, and
-`homeForRole('staff')` returns `/staff`.
+**M13 carried a caveat and it still stands.** The Flutter app **disables its own scanner on
+web** (`customer_home.dart:72-75`, `_explainScanUnavailable:184-230`) and says *"Scanning needs
+the app"* — so before this, `tho_web` matched Flutter-web exactly. A phone camera opens
+`/q/<id>` directly, so most arrivals never pass through `/scan`. It was built as decided and it
+works; it is the least load-bearing thing in that batch.
 
-| Built | Where |
-| --- | --- |
-| `fetchMyStaffMember`, `fetchStaffBookings` | `lib/api/staff.ts` |
-| The gate (redirects, `cache`d single read) | `lib/staff/context.ts` |
-| Shell + header, two destinations, no hamburger | `app/staff/layout.tsx`, `components/staff/{staff-nav,destinations}` |
-| Bookings, segmented Upcoming/Completed/Cancelled | `app/staff/page.tsx`, `components/staff/staff-bookings.tsx` |
-| Schedule — profile, read-only weekly hours, portfolio | `app/staff/schedule/page.tsx` |
-| "Not linked yet" state | `components/staff/not-linked.tsx` |
+Two defects surfaced while building P3, both now fixed and neither in the original audit:
 
-Reused rather than rebuilt: `bookingTab()` (the same status→segment mapping `_tabOf` uses),
-`SegmentedControl`, `OwnerBookingCard`, `Avatar`, `PhotoStrip`, `SectionHeader`,
-`fetchStaffWorkingHours`, `fetchStaffPhotos`, `SignOutButton`, `isCurrent`, `DAY_NAMES`.
-Two small shared-component changes, both additive: `OwnerBookingCard` gained an optional
-`href` (it hard-coded a console URL a stylist cannot open), and `AppHeader`'s `COLLAPSE`
-map gained an `always` entry (two destinations need no collapse tier).
+- **`fetchBookingPayments` read the `payments` table directly**, and `payments_select_owner`
+  is the only policy on it — so the ledger worked for the salon and returned `[]` for the
+  person who had paid, silently, because the read dropped `error`. Now routed through
+  `booking_payments`, which authorises the salon **or** the payer. This is the defect
+  `20260807000033` exists to fix.
+- **`Payment.kind` was typed against a vocabulary the CHECK forbids.** The doc comment named
+  `'payment'`; the constraint allows `deposit | balance | full | refund`. Tests asserted with
+  the forbidden value. Nothing caught it because `payments` has zero rows.
 
-**Verified against SQL, not against itself.** Signed in as the seeded
-`staff@bhutansalons.test` (linked to Norzin's *Sonam Dorji*): landed on `/staff`, header
-read "Sonam Dorji", segments read **Upcoming 0 · Completed 23 · Cancelled 5**. SQL over
-`bookings` grouped by stylist returns Sonam 0/23/5 and Tashi 0/19/5 — so the numbers are
-exactly Sonam's, **not** Norzin's salon-wide 42/10. That check could have failed and
-didn't, which is what proves the `.eq("staff_member_id", …)` scope. The gate was checked
-in both directions: staff → `/staff`, and an owner opening `/staff` is bounced to
-`/business`. At 512px both tabs stay visible with no hamburger and no overflow.
+### Logic re-sync (Batch 3b)
 
-**Still outstanding — the booking detail route.** The app opens
-`BusinessBookingDetailScreen` from the staff list, with its status actions. That screen's
-web equivalent is `/business/bookings/[id]`, inside the console, which `getOwnerContext`
-closes to a stylist — so the cards render with `href={null}` for now. A stylist sees the
-time, customer, services, total and status on the card; what they cannot yet do is open a
-booking to mark it completed or no-show. `set_booking_status` would permit it
-(`is_business_member` admits an active linked stylist), so this is a route to add, not a
-permission to obtain.
+The 2026-08-07 batch changed server *rules*, so ported pure logic could offer what the server
+refuses. All five re-synced, each with tests, and **all five confirmed live on the database
+first** (`pg_get_functiondef` over the six functions) rather than trusted from the local
+checkout.
 
-<details>
-<summary>Original gap description</summary>
+| Rule | What was out of step | Fix |
+| --- | --- | --- |
+| `cancellation_window` (`…032`) | The page rendered *"Free cancellation has closed"* **and a working Cancel button beneath it** — the exact defect the migration names, carried verbatim. Reschedule too. | `cancellationWindow()` in `lib/booking-guards.ts`, shared by `/bookings/[id]` and its reschedule route; both actions **disabled, not hidden**; the route refuses so the button is not URL-bypassable |
+| `merge_touching_working_hours` (`…034`) | `addStretch` used `start = rows.last.endMin`, the shape that amputates the day. `bookingsOutsideHours` judged raw segments, so it would warn about bookings that fit the day once saved. | `bookableStretches()` — the SQL's gaps-and-islands merge, running maximum and all; the "+" button leaves a 60-minute break |
+| `bookable_window_midnight` (`…036`) | The editor clamped a stretch's end to 23:59 **on display**, so a stored `24:00:00` showed as 23:59 and the next keystroke wrote that back. | `endInputValue` / `endMinutesFromInput` carry midnight as `00:00` losslessly, with a visible note |
+| `reject_past_start` (`…035`) | No client reading; P0016 fell through to *"the slot may have just been taken"* — plausible and wrong. | `"pastStart"` in `blockForSlot`, checked first as the server checks it first; `now` passed in |
+| `reminders_require_plan` (`…024`) | In step, with one inversion: `canRemind` read a **null** plan as Basic and hid a working control. | `canRemind` moved to `lib/types/booking.ts`; a null plan offers the switch and the server refuses if that guess was wrong |
 
-**Description.** `auth_gate.dart:84` routes `profiles.role = 'staff'` to `StaffHome`
-(`staff/staff_home.dart`, 267 lines). A linked stylist gets a two-tab shell:
-
-- **Bookings** — their own appointments only, segmented Upcoming / Completed / Cancelled,
-  each opening the business booking detail with its status actions.
-- **Schedule** — their avatar and name, their read-only weekly working hours, and their
-  portfolio photos.
-- An unlinked staff account gets a *"Not linked yet — ask your manager"* state with a
-  "Check again" retry.
-
-**Web today:** nothing. `homeForRole` (`lib/auth.ts:155`) returns `/` for `staff`, so a
-stylist signs in and lands on the customer Discover page with no way to see their day.
-There is no `/staff` route, no `components/staff/`, and no `fetchMyStaffMember` in
-`lib/api/staff.ts`.
-
-**Reuse available:** `bookingTab()` already implements the exact status→segment mapping
-`_tabOf` uses; `SegmentedControl`, `OwnerBookingCard`, `hours-editor`'s display path,
-`AppHeader`, `CollapseNavPanel` and the sign-out route all exist. The read is
-`staff_members` filtered on `profile_id` + `is_active`, then `bookings` with an explicit
-`.eq("staff_member_id", …)` — the scope must be the explicit filter, not RLS, because
-`bookings_select` OR-matches `is_business_member` and would otherwise return the whole
-salon's book (this repo's most repeated bug, four instances so far).
-
-</details>
-
-### 2. Customer multi-service booking
-
-**Description.** `booking_screen.dart` takes `List<ServiceItem> services` and submits
-`serviceIds: _serviceIds` — a customer can book several services in one appointment, and
-the sheet shows a basket. The web flow books exactly one service at a time.
-
-**Web today:** the owner side already has this (`owner/walk-in-form.tsx` builds a
-basket); the customer side does not. `AGENTS.md` names this as the real remaining gap.
-`create_booking` already accepts an array, so this is client work only.
-
-### 3. Record a payment
-
-**Description.** `payments/record_payment_sheet.dart` records a payment against a
-booking. `Api.recordPayment` → the `record_payment` RPC.
-
-**Web today:** `fetchBookingPayments` exists (the receipt reads payments) but there is
-**no writer** — zero matches for `recordPayment` anywhere in `tho_web`. Pro-gated, and no
-salon is on Pro, so it raises `P0001` for every live account and has no observable case
-without an admin flipping a plan.
-
-### 4. "Recommended for you" — full list
-
-**Description.** `RecommendedScreen` (reachable from `customer_home.dart:834`) is a
-dedicated screen showing the complete ranked list, beyond the home row's first few.
-
-**Web today:** `RecommendedRow` renders a horizontal strip with **no** `seeAllHref` —
-only `NearbyRow` has one (→ `/map`). Verified in `discover-rows.tsx:178`.
-
-**Wrinkle worth knowing:** `rank()` needs the GPS fix, which only exists client-side, so
-this cannot be a plain server-rendered route the way `/saved` is.
-
-### 5. "Top rated" — full list
-
-**Description.** `TopRatedScreen` (reachable from `customer_home.dart:863`), the complete
-rating-sorted list.
-
-**Web today:** `TopRatedRow` (`discover-rows.tsx:293`) has no `seeAllHref` either.
-Unlike Recommended, `topRated()` is a pure rating sort with no location input, so this one
-is server-renderable.
-
-### 6. First-run onboarding
-
-**Description.** `onboarding_screen.dart` (216 lines), shown from `app_root.dart:145` when
-`startup.needOnboarding` — an intro carousel before first use.
-
-**Web today:** nothing; zero matches for "onboarding".
-
-### 7. In-app QR scanner
-
-**Description.** `queue/scan_screen.dart` opens a camera scanner from Discover
-(`customer_home.dart:108`) to read a salon's printed queue QR.
-
-**Web today:** no scanner. `/q/[id]` handles the *destination* and `needsScan` is mapped,
-but there is no way to scan from inside the site.
+`lib/api/booking-errors.ts` was missing **four** codes the app has had all along — P0013
+(suspended), P0014 (idempotency mismatch), P0015, P0016 — so each rendered as its generic
+fallback. The table now mirrors `bookingFailureMessage` in `booking_guards.dart`.
 
 ---
 
-## Deliberately not ported — valid platform reasons, verified
+## 2. Implemented and confirmed at parity
 
-| App feature | Why not, and the evidence |
+**Customer.** Discover, shared search, all five filter facets, product filters, category chips,
+offers row, nearby row, map, favourites, salon detail with all five tabs, message / WhatsApp /
+call / directions / share, walk-in card, gallery, loyalty card, stylist profile and follow,
+**multi-service booking** (4 steps, URL-persisted, plus an `ANY_STAFF` option the app lacks),
+notes, reference photos, hairstyle, retry-safe confirm, confirmation sheet, my bookings with
+segments, cancel, reschedule, check-in, reminders, receipt with deposits and outstanding,
+cancellation deadline, queue join / watch / leave, deep link, shop, cart, orders, rewards,
+redemption code, saved, profile edit, sign in / up / guest upgrade, notifications with filters
+and mark-read, the four legal pages, report, block, blocked list, delete account, `/scan`,
+`/recommended`, `/top-rated`.
+
+**Owner.** All eleven of the app's drawer items are reachable and all five tabs are live:
+calendar day / week / list with the week paywall, booking detail and the full lifecycle plus
+inline actions, the payments ledger, queue board with Call next, counter walk-in, services,
+catalogue, products, staff roster and editor, staff invites, stylist hours, salon opening
+hours, salon profile and pin, gallery, create salon, insights with all nine cards, client book
+and detail, product orders, offers, loyalty and its redemption counter, payroll, tax estimate,
+plans with the upgrade request, bell, inbox, salon switcher, sign out, delete account.
+
+**Staff.** Shell, own-bookings segments (scope proved by SQL), schedule, booking detail.
+
+Every sheet in the app has an equivalent: `adjust_points_sheet`, `client_note_sheet`,
+`copy_to_days_sheet`, `reward_edit_sheet`, `product_edit_sheet`, `queue_qr_sheet`,
+`paywall_sheet`, `add_walk_in_sheet`, `report_sheet`, `block_sheet`, `delete_account_sheet`,
+`staff_invite_prompt`.
+
+---
+
+## 3. Where the web is ahead — do not "fix" any of these back
+
+Nine places, each because upstream removed or never built something a browser can carry.
+
+1. **Five analytics cards.** `insights_tab.dart` comments out New vs returning, Top services,
+   Staff leaderboard, Completion & no-shows and Peak hours (THO-55). `analytics_dashboard`
+   returns all of it on every call, so the app pays for the data and discards it.
+2. **The plan-upgrade request.** `bddb23f` deleted `Api.requestUpgrade` citing App Store
+   Guideline 3.1.1. A website is bound by neither store's rules.
+3. **An owner notification feed, in an owner's voice.** `booking_created` means opposite things
+   to a customer and to a salon.
+4. **Locked plan states four app screens don't draw.** `ClientBookScreen`, `PayrollScreen`,
+   `TaxReportScreen` and `LoyaltySettingsScreen` have no plan check, so on an unentitled salon
+   they call the RPC and render *"Couldn't load"* — a plan limit dressed as a network fault.
+5. **A cart that outlives the tab and re-prices itself.**
+6. **A redemption code that polls** instead of asking the customer to press Refresh at the till.
+7. **The salon opening-hours editor** (`/business/hours`). `api.dart` reads `business_hours` in
+   four places and has **no writer** — there is no `setBusinessHours` anywhere in `../tho`, so
+   **neither** upstream client can edit a salon's opening hours. The 2026-08-06 audit filed
+   this under "implemented parity"; it is a web-only capability.
+8. **`deleteStaffPhoto`.**
+9. **`fetchActiveEntryForBusiness`**, which corrects a cross-salon bug in the app's
+   `myActiveQueueEntry`.
+
+---
+
+## 4. Deliberately not ported — reasons verified, not assumed
+
+| App feature | Why not |
 | --- | --- |
-| `settings_screen.dart` | Two `SharedPreferences` switches (`notif_reminders`, `notif_promos`). Grepped: **the only reads and writes of both keys are inside that one file** — nothing consumes them, and the screen's own copy admits "Push notifications are not switched on yet". Porting would ship two controls that change nothing. Its two *facts* are on `/profile` as an About block. |
-| Push notifications (`registerDevice`) | Deferred by decision; the in-app inbox is the channel. Delivery needs a Firebase web config and an `FCM_SERVICE_ACCOUNT` that exist for no platform yet. |
+| `settings_screen.dart` | Two `SharedPreferences` switches (`notif_reminders`, `notif_promos`). The only reads and writes of both keys are inside that one file, and its own copy admits *"Push notifications are not switched on yet"*. Its two **facts** are an About block on `/profile`. |
+| First-run onboarding (`onboarding_screen.dart`, 216 lines) | Declined: it would block first paint for search arrivals and QR scans, the two ways people reach a website, and bhutansalons.com already orients. |
+| Promo "Claim" | Fake in Flutter — a SnackBar that persists nothing. |
+| Push notifications (`register_device`) | Deferred by decision. If it lands, register through the **RPC**, never a direct `devices` insert — it deletes another profile's claim on the same token, which is what stops a resold handset receiving the previous owner's appointments. |
+| The in-app admin moderation queue | `admin` users are sent to `../admin`. |
 | Bottom tab bars | A thumb strip glued to the viewport is a phone idiom; replaced by one sticky header plus a collapse nav. |
-| Dev quick-login chips | Deliberately not shipped to a public website. |
+| Dev quick-login chips | Not shipped to a public website. |
 
-## False positives — candidate gaps that are dead code in the app
+### Dead code in the app — building any of these would build something the app does not offer
 
-Both have an `Api` method and **no caller anywhere in `../tho`**, so neither is a
-user-facing feature:
+**Eight** `Api` methods have no caller anywhere in `../tho`, transitively included:
+`sendOtp`, `verifyOtp` (phone OTP; the only auth screen is email), `earliestSlotsFor`
+(referenced by a *comment* in `recommendations.dart:124`), `deleteBookingPhotos`,
+`myBusiness`, `setStaffActive`, `linkStaffMember` (superseded), and `analyticsPeakHeatmap`
+(whose only reference is a **commented-out** line, `insights_tab.dart:88`).
 
-- **`sendOtp` / `verifyOtp`** — phone OTP sign-in. Defined at `api.dart:106-109`, called
-  by nothing; the only auth screen is email.
-- **`earliestSlotsFor`** — defined at `api.dart:377`, referenced only by a *comment* in
-  `recommendations.dart:124`.
+---
 
-Implementing either would be building something the app does not offer.
+## 5. What genuinely remains
+
+**`record_payment` — a writer, and the reason to skip it has expired.**
+`payments/record_payment_sheet.dart:50` records a payment against a booking; `tho_web` reads
+payments and cannot write one. This was skipped on the grounds that it is Pro-gated with zero
+rows and therefore unexercisable. **Norzin Salon & Spa is now `pro`** — one live salon, so the
+editable branch has a real example for the first time. `payments` is still 0 rows, so anything
+built here must create its own first row. Re-deciding this is a scoping call, not a technical
+one; nothing about it is blocked.
+
+**A1-08 — the cancellation rule is shown on no screen in the booking flow.** Upstream's own
+argument for *blocking* a late cancellation rather than charging for one is that the customer is
+never shown the window before committing: it first appears **after** the booking exists. On
+`tho_web` that is still true — `booking-confirmed-sheet.tsx` states it at confirmation, which is
+after. Not one of the five re-synced rules and not in any batch, but now that the rule bites it
+is a better-founded gap than it was.
+
+---
+
+## 6. Live data, as of 2026-08-10
+
+Verification depends on these, and several changed under this project.
+
+- **17 businesses, 14 approved.** Plans across all 17: **basic 13 / growth 3 / pro 1**;
+  across the approved 14: basic 10 / growth 3 / pro 1.
+- **Norzin Salon & Spa is on `pro`.** It was `growth` for most of this project's life. That
+  single row is the only live example on the far side of every Pro gate — `payroll_report`,
+  `tax_estimate`, `set_staff_pay`, the hairstyle picker — all of which previously raised
+  `P0001` for every account that existed.
+- `owner@bhutansalons.test` owns **nine** salons, which is what makes the salon switcher
+  load-bearing rather than theoretical.
+- **`payments` is still 0 rows.** Rows created during Batch 3's verification were removed with
+  the rest of that run's state; do not assume a live example exists.
+- **`review_photos` has 1 row** (created 2026-08-05, by another client — the database has other
+  people on it). The review photo strip is no longer without a live case.
+- Still zero: `offers`, `staff_time_off`, `loyalty_redemptions`, `content_reports`,
+  `user_blocks`, `staff_invites`. The whole Batch 1 moderation surface has **no live rows**, so
+  its empty states are the normal path and its populated states were proved by writing and
+  restoring.
+- 29 profiles, 34 services, 21 active stylists, 22 reviews, 84 bookings, 11 queue entries (all
+  terminal: done 9 / left 1 / no_show 1), 92 notifications, 16 `business_categories`, 74
+  `business_hours`, 108 `staff_working_hours`, 2 `staff_photos`, 3 `follows`.
+- `customer@bhutansalons.test`: **39 notifications, 7 unread, 3 conversations**, and four
+  active bookings — three at Basic salons and one at Norzin. That split is what makes the
+  reminder-toggle gate falsifiable on one page.
+- **Not one day in `staff_working_hours` holds more than a single segment**, so the touching-pair
+  merge rewrote nothing and governs future writes only.
+- 24 of 34 services have no `gender`; `services.category` is filled on **3**; 12 of the 14
+  approved salons have coordinates; 5 have no cover; `city` contradicts `address_text` on 12.
+- **Nine Basic salons have two active stylists**, so the seed is over the client-side Basic cap
+  and `staff_insert` has no count check.
+
+---
+
+## 7. Corrections to the 2026-08-06 audit
+
+Recorded because that document was trusted while stale, and two of its errors were arithmetic
+rather than drift.
+
+1. **"137 `Api` methods" → 152** (plus 5 getters). It was already wrong at 147 when re-counted
+   mid-project; the 2026-08-07 batch added the rest.
+2. **"Two false positives" → eight**, not ten. The mid-project figure of ten included
+   `allBusinessHours` and `allBusinessCategories`, which are **reachable** — `recommendedForYou`
+   calls both, and `customer_home.dart:404` calls it. Counting callers outside `api.dart` and
+   stopping there is what produced the over-count.
+3. **The salon opening-hours editor** was filed under implemented parity. It is a place the web
+   is ahead: `../tho` has no writer for `business_hours` at all (§3.7).
+4. **"Staff booking detail is outstanding"** — shipped (M9).
+5. **"Customer multi-service booking is a gap"** — it was already shipped when the audit was
+   written; the web flow takes a basket and adds an `ANY_STAFF` option the app lacks.
+6. **"Recommended / Top rated have no `seeAllHref`"** — both rows link to real routes now.
+7. **"No in-app QR scanner"** — `/scan` exists, with the deep-link parser ported and 12 tests.
+8. **"`record_payment` is unexercisable"** — Norzin is Pro (§5).
+9. **The `admin_*` RPCs were filed wholesale as belonging to `../admin`.** Three of them have a
+   reachable Flutter screen. The conclusion is unchanged; the reasoning was wrong.
+10. **"51 routes / 27 test files / 486 tests"** → 70 route entries, 28 test files, 559 tests.
+    An earlier report of "69 routes" was a miscount of the same tree.
+
+---
+
+## 8. Known blocker, unrelated to this work
+
+**Every public route 500s for `anon`.** `has_table_privilege('anon', …, 'SELECT')` is **false**
+for `public.businesses` **and** `public.staff_members` — the live database is missing both
+grants, and the error surfaces as `42501 permission denied for table businesses`. Every other
+table a public page needs (`services`, `reviews`, `review_photos`, `business_hours`,
+`business_categories`, `categories`, `products`, `offers`) is granted.
+
+Two consequences: no signed-out path can be exercised at all, and `/stylist/[id]` and the salon
+page's team tab would still fail on `staff_members` after `businesses` is fixed. Earlier notes
+named only `businesses`; both are missing. This needs a `GRANT` upstream — **never write SQL in
+this repo.**

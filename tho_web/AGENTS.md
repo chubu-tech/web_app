@@ -10,7 +10,7 @@ The Bhutan Salons product in a browser: customers book chairs and join walk-in
 queues, owners run their salon, staff see their day. Next.js 16 (App Router),
 React 19, Tailwind 4, TypeScript.
 
-**Status: Phase 2f (the customer shop) — Phase 2 is complete and both roles are done.** The
+**Status: all three roles complete, and current with `../tho` as of 2026-08-10.** The
 customer role works end to end — browse, sign in, book, reschedule, cancel, review, take a place in
 a walk-in line, read notifications, message a salon, find a shop on the map, read a stylist's
 profile, edit your own, and now **buy things**: a cross-salon products browse, a salon's Shop tab, a
@@ -30,21 +30,26 @@ other end of what 3c reads: `place_order` and `request_redemption` were the last
 RPCs in the schema with no caller here, and Norzin's storefront, order inbox and loyalty programme
 now all have a customer on the far side of them.
 
-**Phase 4 has started: the staff shell exists.** `/staff` and `/staff/schedule` are the app's
-own two destinations, and `homeForRole('staff')` finally returns a route that exists — before
-this, a linked stylist signed in and landed on customer Discover with no way to reach their own
-book at all. `lib/staff/context.ts` is the gate (a deliberate sibling of `lib/owner/context.ts`,
-not a parameterisation of it), and the scope is an explicit `.eq("staff_member_id", …)` in
-`fetchStaffBookings` — the **fifth** instance of the OR-policy leak, since `bookings_select`
-admits `is_business_member` and a linked stylist is one. Proved by SQL: the shell shows Sonam
-Dorji's 0/23/5, not Norzin's salon-wide 42/10.
+**Phase 4 is done: the staff role is complete.** `/staff`, `/staff/schedule` and
+`/staff/bookings/[id]` are all three destinations the app has, and `homeForRole('staff')`
+returns a route that exists — before this, a linked stylist signed in and landed on customer
+Discover with no way to reach their own book at all. `lib/staff/context.ts` is the gate (a
+deliberate sibling of `lib/owner/context.ts`, not a parameterisation of it), and the scope is an
+explicit `.eq("staff_member_id", …)` in **both** `fetchStaffBookings` and
+`fetchStaffBookingById` — the **fifth and sixth** instances of the OR-policy leak, since
+`bookings_select` admits `is_business_member` and a linked stylist is one. Proved by SQL: the
+shell shows Sonam Dorji's 0/23/5, not Norzin's salon-wide 42/10.
 
-**What is left of the staff role is one route**: the booking detail. The app opens
-`BusinessBookingDetailScreen` from the staff list, but its web equivalent lives at
-`/business/bookings/[id]`, which `getOwnerContext` closes to a stylist — so
-`components/staff/staff-bookings.tsx` passes `href={null}` and the cards are not clickable.
-`set_booking_status` would accept the write, so this is a route to add, not a permission to win.
-`PARITY.md` is the full audit and the remaining gap list.
+The booking detail is a **shared body**, not a second implementation:
+`components/owner/booking-detail.tsx` takes `{ booking, photoUrls, back, afterBill }` and is
+rendered by `/business/bookings/[id]` and `/staff/bookings/[id]` alike. The console route was
+never reachable by a stylist (`getOwnerContext` closes it), which is why this needed a route
+rather than a permission.
+
+**Phase 5 closed the 2026-08-07 upstream batch** — moderation, legal, account deletion, the
+staff-invite consent handshake, the role gaps, the ergonomics gaps, and a re-sync of ported
+logic against five changed server rules. `PARITY.md` is the audit: what shipped, what is
+deliberately not ported, and the two things that genuinely remain.
 
 Two shared components took additive changes for this and are worth knowing about:
 `OwnerBookingCard` takes an optional `href` (it hard-coded a console URL), and `AppHeader`'s
@@ -58,7 +63,9 @@ Six places, each because upstream removed or never built something a browser can
 1. **Five analytics cards.** `insights_tab.dart` comments out New vs returning, Top services,
    Staff leaderboard, Completion & no-shows and Peak hours (THO-55), calling them *"working
    features expected back"*. `analytics_dashboard` returns all of that data on **every** call and
-   `analytics_peak_heatmap` had no caller in either client, so the app pays for it and discards it.
+   `analytics_peak_heatmap`'s only reference in `../tho` is a **commented-out** line
+   (`insights_tab.dart:88`), so the app pays for the payload and discards it while `tho_web` is
+   the only client that draws the heatmap.
 2. **The upgrade request.** `bddb23f` deleted `Api.requestUpgrade` and the paywall CTA citing App
    Store Guideline 3.1.1. A website is bound by neither store's rules;
    `plan_change_requests` had no writer at all. See `components/owner/plan-cards.tsx`.
@@ -457,7 +464,51 @@ a day, and it is reached from the calendar.
   it.
 - **The confirmation sheet stays until dismissed.** It replaced a snackbar that
   vanished while the screen was being popped. Do not regress it to a toast.
-- Errors are mapped by `errcode`, not message text — see `lib/api/booking-errors.ts`.
+- Errors are mapped by `errcode`, not message text — see `lib/api/booking-errors.ts`. The table
+  mirrors `bookingFailureMessage` in `../tho/app/lib/customer/booking_guards.dart`; keep them in
+  step, because a code that is only in one of them renders as a generic fallback in the other.
+
+### Five server rules the client has to agree with
+
+The 2026-08-07 batch changed *rules*, not just schema, so ported pure logic could offer what the
+server refuses. All five were out of step here and all five are re-synced, each with tests. **The
+five function bodies were read off the live database first** (`pg_get_functiondef`) — the local
+`../tho` checkout drifts in both directions, and wiring a client to a rule that is not deployed
+is the mirror image of the bug being fixed.
+
+- **P0015 — the cancellation window closes self-service.** `businesses.cancellation_window_hours`
+  was enforced *nowhere* before `20260807000032`; both clients rendered *"Free cancellation has
+  closed for this booking"* and put a **working Cancel button directly beneath it**. Now
+  `cancel_booking` *and* `reschedule_booking` refuse — and for reschedule the window is measured
+  against the **current** start, the commitment being broken, not the new one. `cancellationWindow`
+  in `lib/booking-guards.ts` is the one client reading, shared by `/bookings/[id]` and its
+  reschedule route so they cannot disagree, and it **fails open** on a salon that would not load
+  because disabling on a failed read would strand somebody who could legitimately cancel. Both
+  actions are **disabled, not hidden**: a control that vanishes reads as a bug, and the note above
+  it is what turns a dead button into an explanation. Check-in stays available — turning up is
+  exactly what somebody inside the window should do.
+- **P0016 — a start that has already passed.** `create_booking` and `reschedule_booking` both
+  accepted a past start until `20260807000035`; only `compute_availability` ever filtered. A salon
+  member is **exempt**, because back-filling this morning's walk-in at lunchtime is ordinary shop
+  work. `blockForSlot` checks it **first**, as the server does: told "you already have a booking
+  that day", somebody cancels it and then finds the slot was never available.
+- **Touching working-hours stretches are one stretch.** `is_bookable_window` needs a booking to
+  fit inside **one** row, so `09:00–18:00` + `18:00–19:00` is not a 9-to-7 day — and the owner's
+  own "+" button used to create exactly that. `bookableStretches` in `lib/hours.ts` ports the
+  SQL's gaps-and-islands merge, and the **running maximum** is the part that matters: comparing
+  with the previous row's end gets the two-segment case right and a nested one wrong. A strict gap
+  survives, which is the whole lunch mechanism.
+- **A day can close at midnight.** `24:00:00` is a valid Postgres `time` and `hmsFromMinutes(1440)`
+  writes it, but `<input type="time">` cannot hold it. The editor used to clamp the *display* to
+  23:59 and write that back — one minute, and it is the minute that stops a 22:30–24:00 booking
+  fitting. The end field carries midnight as `00:00` (`endInputValue` / `endMinutesFromInput`) with
+  a visible note, because a convention nobody states is a trap.
+- **Reminders are Growth+ and the server says so now.** `set_booking_reminders` raises P0001 when
+  *enabling* at a salon whose plan does not send reminders; muting is allowed at every plan,
+  because only the promise is gated, never the withdrawal of one. `canRemind`
+  (`lib/types/booking.ts`) hides the switch — and a **null** plan offers it, because null means
+  "the query did not embed one", not "Basic". `hasFeature` maps null to `basic` and would hide a
+  working control.
 
 ## The walk-in queue
 
@@ -728,15 +779,30 @@ to that policy**: it exists only on the live database, applied out of band, so a
 ### The Basic stylist cap is client-side only
 
 `maxActiveStylists` is a `Feature`-derived gate in both clients and `staff_insert` has no count
-check — so the seed itself is over it: **all eight Basic salons have two active stylists.** The
+check — so the seed itself is over it: **all nine Basic salons have two active stylists.** The
 roster names the cap rather than saying "upgrade", and the paywall stops a *new* stylist rather
 than undoing an existing one.
 
-### No salon is on Pro
+### Exactly one salon is on Pro, and this section used to say none was
 
-`set_staff_pay` refuses anything else in SQL, so the staff editor's pay block renders its locked
-card on every live salon. The editable branch is reachable and correct — proved by flipping the
-plan inside a rolled-back transaction — and has no live example.
+**Norzin Salon & Spa is `pro`.** It was `growth` for most of this repo's life, and this heading
+read *"No salon is on Pro"* — which is why five surfaces were described here as having no live
+example. They have one now: `set_staff_pay`, `payroll_report`, `tax_estimate`, `record_payment`
+and the hairstyle picker all raised `P0001` for every account that existed, and on Norzin they
+do not.
+
+Two consequences worth acting on:
+
+- **The staff editor's pay block renders its editable branch on Norzin.** That is where
+  `20260807000003_pay_and_private_columns` bites: `STAFF_PUBLIC_SELECT` no longer returns the pay
+  columns, so the form opened at 0 and **Save wrote 0 back over a real salary**. It reads through
+  `payroll_report` for exactly this reason — see `app/business/staff/[id]/page.tsx`.
+- **Check a plan gate on Norzin *and* on a Basic salon.** One salon on the unlocked side of every
+  Pro gate means the locked branch is still the majority path, and a check that only ever sees
+  one side proves nothing about the gate.
+
+`payments` is nonetheless **still 0 rows**, so `record_payment` remains the one Pro surface with
+no live data — and it has no writer here. `PARITY.md` §5 has the standing decision.
 
 ### Owner photo paths differ from the app's, deliberately
 
@@ -934,6 +1000,75 @@ every claim, and the bell is the path that actually reaches them.
 possible to create a redemption at all, since `loyalty_redemptions` had 0 rows platform-wide. So the
 owner's bell quotes the code the customer is holding up rather than pointing at the page that would
 show it. Still the same rule: say what the row can support, and nothing else.
+
+## Safety, consent and moderation
+
+The 2026-08-07 batch added this whole layer and it is the least guessable part of the schema.
+`lib/api/moderation.ts`, `lib/api/account.ts` and `lib/api/staff-invites.ts` are the five-, one-
+and five-function wrappers; what follows is what measurement taught, not what the migrations say.
+
+- **A block makes the thread 404 for BOTH sides.** `private.blocked_with` is symmetric, and
+  `private.conversation_blocked` is a conjunct in `conversations_select` **and**
+  `messages_select` — so blocking does not hide a thread, it stops it existing for either party.
+  That is why `ThreadSafetyMenu` navigates to `/messages` after a block rather than refreshing:
+  staying put would render a page whose own read now fails.
+- **`report_content` is idempotent per (reporter, target)** and refuses guests with `42501`.
+  Five target types, nine reasons. Pressing Report twice does not file two reports, so the sheet
+  does not need to guard against it.
+- **The report control is visible to signed-out visitors and the guest refusal only lands on
+  Send.** That is upstream's behaviour and it is left in place, but it is unverified — the anon
+  grant is missing (see below), so no signed-out path can be exercised at all.
+- **Terms are a precondition for user-generated content, not a signup step.** Without
+  `accept_terms` a customer's first review and first message fail with a bare `P0004`. The gate is
+  called at the **write site** (`booking-actions.tsx`, `chat-thread.tsx`), which is the only place
+  that knows a post is about to happen, and the typed content is held while the sheet is open so
+  agreeing does not cost somebody what they had already written.
+- **A staff invite is a handshake, and `link_staff_member` is retired.** It let an owner convert
+  a stranger's account into their stylist with no consent — `ee413c6` removed it upstream and
+  `lib/api/owner-setup.ts` no longer calls it. The accept surface is a **component on Discover**
+  (`staff-invite-prompt.tsx`), not a `/staff/invite` route: a pending invite belongs where the
+  person already is, and an invited customer has no reason to know a `/staff` URL exists.
+- **`/profile/blocked` is a route, not a section of `/profile`.** The block sheet promises
+  "Blocked accounts in your profile", and that promise has to land somewhere reachable —
+  including when the list is empty, which is the normal state (0 `user_blocks` platform-wide).
+  The list **re-reads after every unblock**, because the server is the authority on who is
+  blocked.
+
+### The client/server boundary is load-bearing, and the build will not catch it
+
+Adding `"use client"` to a module makes its **non-component exports** arrive at a server
+component as client *references* rather than functions — so the server render throws at runtime,
+`npm run build` passes, and the only symptom is Next's error page.
+
+This has happened once, and expensively: `owner-booking-card.tsx` became a client component when
+it grew inline actions, and the `customerName` helper it exported broke **four** server surfaces
+(both booking-detail routes, `booking-detail.tsx`, `today-snapshot.tsx`). `customerName` now lives
+in `lib/types/booking.ts`. Two rules follow:
+
+- **Pure helpers go in `lib/`, never beside a component that might become a client one.**
+- **Function props cannot cross server → client; index-aligned serializable data can.**
+  `PhotoStrip` needed a per-photo report target and takes `(ReportRef | null)[]` for exactly this
+  reason, as `queue-board.tsx` takes `clientProfileIds: string[]` rather than a predicate.
+
+### `payments` is owner-only, so read it through the RPC
+
+`payments_select_owner` is the **only** policy on the table, so a direct read works for the salon
+and returns `[]` for the person who paid — silently, if the destructure drops `error`. That was
+live: a customer could not see a deposit on their own receipt. `fetchBookingPayments` goes through
+`booking_payments`, which authorises the salon **or** the payer. Ignore the RPC's `total_paid`
+column; it counts a refund as positive.
+
+And **`payments_kind_check` allows `deposit | balance | full | refund`** — not `'payment'`, which
+an earlier doc comment named and the tests asserted with. Nothing caught it because the table has
+no rows. The union in `lib/types/booking.ts` is now the constraint, and `paymentLine` is the one
+formatter both the customer receipt and the owner ledger use.
+
+### Offset paging is unstable across inserts
+
+`fetchNotifications` pages with `.range(offset, offset + limit - 1)`, so a row inserted while
+somebody reads can shift the window and repeat an id. `NotificationList` **de-duplicates by id on
+append** rather than trusting the offset. The flat `INBOX_LIMIT = 100` it replaced made the 101st
+notification unreachable for good — the exact bug upstream fixed in `notifications_screen.dart`.
 
 ## The inbox
 
@@ -1212,12 +1347,16 @@ that the console must not *appear* to have switched.
 
 ## Live data is messier than it looks
 
-Check assumptions against it before trusting a column:
+**Counted 2026-08-10, and several of these moved during Phase 5.** The database is shared and
+has other people on it, so re-count rather than trusting a figure here that a decision depends
+on. Check assumptions against it before trusting a column:
 
-- **`businesses.city` contradicts `address_text` on 8 of 13 live salons**
+- **17 businesses, 14 approved.** Plans across all 17: **basic 13 · growth 3 · pro 1**; across
+  the approved 14: basic 10 · growth 3 · pro 1. Earlier notes said 13 salons and no Pro.
+- **`businesses.city` contradicts `address_text` on 12 of the 14 approved salons**
   ("Norzin Lam, Thimphu" filed under Paro). `addressText` is the field owners
   actually maintain; the mapper deliberately omits `city`.
-- 24 of 31 services have no `gender`; 4 salons have no cover; 1 has a gallery;
+- 24 of 34 services have no `gender`; 5 approved salons have no cover; 1 has a gallery;
   0 have offers; 0 are `home_based`/`mobile`, so the coverage-line branch has no
   live example and is covered by unit tests instead.
 - Two rows named `Test 01`/`Test 2` are live and approved, so they appear in the
@@ -1225,20 +1364,24 @@ Check assumptions against it before trusting a column:
   here.
 - **Norzin lists 5 services but its stylists perform 3.** `service_staff` is the
   authority on what is bookable, not `services`.
-- No salon is on **Pro** (10 basic, 3 growth), so the Pro-gated hairstyle picker never
-  appears on live data. Its gate is covered by unit tests instead.
-- **Only Norzin can actually run a queue.** Three salons are on Growth, but `Test 01`
-  and `Zhiwaling Spa & Hair` have 0 staff and 0 services, so their join form has nothing
-  to pick — it says so rather than offering an unsubmittable form. And every salon is
-  `queue_join_mode = 'anywhere'`, so `queueLockState`'s `needs_scan` branch has no live
-  example either; unit tests are its only coverage.
-- **The inbox is the best-seeded surface in the app.** `customer@bhutansalons.test` has 35
-  notifications across 9 event types with 5 unread, and 3 conversations — one of which was
+- **One salon is on Pro** — Norzin — so the Pro-gated hairstyle picker, payroll, the tax
+  estimate and staff pay all have exactly one live example each, and the locked branch is still
+  what the other sixteen render. See **Exactly one salon is on Pro** above.
+- **Only Norzin can actually run a queue**, and it is no longer one of the Growth salons. Three
+  salons are on Growth, but `Test 01` and `Zhiwaling Spa & Hair` have 0 staff and 0 services, so
+  their join form has nothing to pick — it says so rather than offering an unsubmittable form.
+  And every salon is `queue_join_mode = 'anywhere'`, so `queueLockState`'s `needs_scan` branch
+  has no live example either; unit tests are its only coverage.
+- **The inbox is the best-seeded surface in the app.** `customer@bhutansalons.test` has **39
+  notifications across 9 event types with 7 unread**, and 3 conversations — one of which was
   opened and never written in, which is the live example for "an empty thread is never
-  unread". Two of the notifications are `booking_no_show`, the rows the app mislabels.
-- **No `payments`, `offers` or `review_photos` rows exist at all**, so the receipt's
-  payments block, the offers section and the review photo strip have no live example — all
-  three are covered by unit tests instead.
+  unread". Two of the notifications are `booking_no_show`, the rows the app mislabels. The count
+  grows whenever a booking is completed during verification; 92 notifications exist platform-wide.
+- **`payments` and `offers` are still 0 rows; `review_photos` now has 1.** So the receipt's
+  payments block and the offers section have no live example and are covered by unit tests, while
+  the review photo strip has one real row (created 2026-08-05 by another client — see *The
+  database has other people on it* below). Payments rows created during verification were removed
+  with the rest of that run's state; do not assume one is there.
 - **Only Norzin has a storefront, and it is unusually well seeded for it.** 4 products, one
   (`Beard Grooming Kit`) **sold out**, prices 280/320/450 so a price-range filter has three
   distinguishable values; 3 orders, one **`new`** (cancellable) and one **`ready`** (not) side by
@@ -1249,7 +1392,7 @@ Check assumptions against it before trusting a column:
 - **`loyalty_redemptions` starts at 0 rows and only the customer can create one.** So the owner's
   redemption counter had no live example until 2f, and its payload (`code`, `reward`) was
   unobservable — which is why `ownerNotificationText` could not use it before.
-- **11 of the 13 approved salons have coordinates.** The two without are on Discover and
+- **12 of the 14 approved salons have coordinates.** The two without are on Discover and
   absent from the map, which is what its "once they add a location" copy is for. `Test 01`
   and `Test 2` are **6 m apart**, so their bubbles overlap at every zoom and they are the
   live example of `nearestTo`'s tie-break.
@@ -1257,7 +1400,7 @@ Check assumptions against it before trusting a column:
   `staff_photos` has **2 rows platform-wide** and `follows` has **3**, so both empty states
   are the normal path. `Sonam Dorji` at Norzin is the only full example — 3 reviews, 1
   follower, 1 photo.
-- **1 of 17 profiles has an avatar and 2 have a phone**, both seeded. The app cannot set a
+- **2 of 29 profiles have an avatar and 2 have a phone.** The app cannot set a
   phone at all, which is why every notification fails with "no deliverable channel".
 - **The local `../tho` checkout can drift behind the live schema.** Two migrations were applied
   on 2026-08-03 (`register_device_rpc`, `booking_reminder_mute`) before either had a file
@@ -1266,13 +1409,14 @@ Check assumptions against it before trusting a column:
   fetch brought, the old note here was wrong about two:
   - **Final launch pricing is already mirrored** — `lib/plans.ts` carries Nu 399 / 699 / 1,499
     and the no-free-tier rule, matching `plans_config.dart`.
-  - **Multi-service bookings are mirrored on the owner side only** —
-    `components/owner/walk-in-form.tsx` builds a basket. (Not `add-walk-in-sheet.tsx`, which is
-    the *queue* walk-in and single-service by design, because `join_queue` takes one
-    `p_service_id`.) The **customer** flow still books one service at a time. That is the real
-    gap, and it is the next slice.
+  - **Multi-service bookings are mirrored on both sides now.**
+    `components/owner/walk-in-form.tsx` builds a basket, and so does the customer wizard — four
+    steps, URL-persisted, with an `ANY_STAFF` option the app lacks. (Not
+    `add-walk-in-sheet.tsx`, which is the *queue* walk-in and single-service by design, because
+    `join_queue` takes one `p_service_id`.) This bullet used to name the customer flow as the
+    next slice; it shipped.
   - **FCM push is upstream and absent here**, deliberately — see the Web Push note.
-- **`services.category` is filled on 2 of 33 rows**, so it cannot carry a taxonomy;
+- **`services.category` is filled on 3 of 34 rows**, so it cannot carry a taxonomy;
   `business_categories` has 16 rows across 9 salons and is the only populated one. Anything
   grouping services by category on live data would file everything under "Other".
 - **`services_select` says nothing about the business** — it is
@@ -1280,33 +1424,48 @@ Check assumptions against it before trusting a column:
   `select services` returns services belonging to **pending and inactive** salons. Join
   `businesses!inner` and filter it. Second instance of this shape after `staff_select` on
   `/stylist/[id]`.
-- **Every active booking is on a *basic* salon** (4 of them, all `confirmed`), and reminders are
-  Growth+. So the customer reminder toggle has **no live example**: its gate correctly renders
-  nothing everywhere, and the editable branch is proved by RPC inside a rolled-back transaction
-  instead.
-- **`owner@bhutansalons.test` owns NINE salons**, not one — Norzin Salon & Spa on **growth**
-  and eight on **basic**. That is a live example on both sides of every plan gate, and it is
+- **The customer's four active bookings now straddle the reminder gate** — three at Basic salons
+  and one at Norzin, which is Pro. This bullet used to say the toggle had *no* live example,
+  because every active booking sat on a Basic salon; it now has both answers **on one page**,
+  which is what makes `canRemind` falsifiable rather than merely absent. Measured: the switch
+  renders on the Norzin card only, and `set_booking_reminders(basic, true)` raises P0001 while
+  muting the same booking is accepted.
+- **`owner@bhutansalons.test` owns NINE salons**, not one — Norzin Salon & Spa on **pro** and
+  eight on **basic**. That is a live example on both sides of every plan gate, and it is
   what makes the salon switcher load-bearing rather than theoretical.
-- **The growth salon has no present, only a past.** Norzin: 2 staff, 5 services, 6
-  `business_hours` rows, and **52 bookings that are all terminal** (completed 42 · cancelled 5 ·
-  no_show 5) — **0 confirmed**. All four of the owner's `confirmed` bookings sit on *basic*
-  salons, and only one is in the future. So the owner calendar has to be checked across two
-  salons: week view unlocked on Norzin against May–June history, and a live day on a basic salon
-  where week is locked.
+- **Norzin now has a present as well as a past**, and this bullet used to say otherwise. 2 staff,
+  5 services, 6 `business_hours` rows, and **56 bookings: completed 42 · cancelled 7 · no_show 5
+  · confirmed 2**. The "0 confirmed" it reported was true when written. The owner calendar still
+  has to be checked across two salons — week view unlocked on Norzin against May–June history,
+  and a live day on a Basic salon where week is locked — but Norzin is no longer the salon with
+  nothing live in it.
 - **Sunday is how "closed" is spelled.** `business_hours` has no `is_closed` flag and no row for
   Norzin's Sunday, so `openMinutesForWeekday` returns null and `% booked` is *omitted* rather
   than shown as 0.
 - **Norzin has 5 active services and only 3 are mapped to any staff.** `Blow Dry & Style` and
   `Hair Coloring` are mapped to nobody, so `compute_availability` rejects them — the live
   negative case for "the walk-in picker is deliberately not narrowed by `service_staff`".
-- **The queue's live default is empty.** All 9 `queue_entries` on the platform are terminal
-  (done 7 · left 1 · no_show 1) and belong to Norzin, and **not one has ever had a
-  `booking_id`** — so check-in has never been exercised by anything.
+- **The queue's live default is empty.** All **11** `queue_entries` on the platform are terminal
+  (done 9 · left 1 · no_show 1) and belong to Norzin, and **not one has ever had a
+  `booking_id`** — so check-in has never been exercised by anything. The two added since this was
+  first written are verification entries that were run through to `done` rather than deleted.
 - **`staff_time_off` has 0 rows platform-wide and no Dart file references it**, though
   `compute_availability` honours it. An owner cannot mark a holiday on any platform.
-- **No salon is on Pro**, so `record_payment`, `payroll_report`, `tax_estimate` and
-  `set_staff_pay` raise `P0001` for every account that exists. With **0 `payments` rows**, the
-  whole money surface is unverifiable without an admin flipping a plan first.
+- **The money surface has exactly one live example, and it did not before.** Norzin is Pro, so
+  `payroll_report`, `tax_estimate` and `set_staff_pay` succeed there and raise `P0001` on the
+  other sixteen salons. `record_payment` is the exception: it still has **0 `payments` rows** and
+  no writer in `tho_web`, so the ledger is read-only here and the only way to see a row is to
+  create one. This bullet used to read *"No salon is on Pro… unverifiable without an admin
+  flipping a plan first"* — that flip has happened.
+- **Every public route 500s for `anon`, and it is a missing GRANT, not a policy.**
+  `has_table_privilege('anon', …, 'SELECT')` is **false** for `public.businesses` **and**
+  `public.staff_members`; it is true for `services`, `reviews`, `review_photos`, `business_hours`,
+  `business_categories`, `categories`, `products` and `offers`. The error surfaces as
+  `42501 permission denied for table businesses`, so earlier notes named only that one — fixing it
+  alone would move the failure to `/stylist/[id]` and the salon page's team tab. **No signed-out
+  path can be exercised until both are granted**, which means the anonymous account state, the
+  guest wall's "before" side and the report control's guest refusal are all unverified. Needs a
+  `GRANT` upstream; **never write SQL here.**
 - **The database has other people on it.** During 3a's verification someone else created and
   cancelled a booking through another client, adding rows to `bookings`,
   `booking_status_events`, `booking_items` and `notifications` mid-run. Capture a `now()` marker
@@ -1327,8 +1486,35 @@ npm run lint
 npm run test      # ported pure logic
 ```
 
-A clean build, lint and test run is the bar — currently **472 tests across 25 files** and
-**55 routes**. Note `overrides.typescript-eslint` in `package.json` pins 8.65.0: upstream
+A clean build, lint and test run is the bar — currently **559 tests across 28 files** and **70
+route entries** in the build tree. Count routes with the tree itself
+(`npm run build | sed -n '/^Route (app)/,/(Dynamic)/p'`) rather than by eye: a loose grep over
+that output has produced 66, 69 and 70 for the same build.
+
+**A green gate cannot catch a broken route, so sweep them.** Adding `"use client"` to a module
+makes its non-component exports arrive at a server component as client *references*, so the page
+throws at render while build, lint, tsc and every test stay clean — the only symptom is Next's
+error page. The sweep is two passes per role over a route list **derived from
+`find app/ -name page.tsx`**, never from memory: `fetch` each route from inside a signed-in page
+and read `res.status`, then navigate and read the `<h1>`. Both halves are needed — a 200 that
+renders the 404 boundary is not a working page, and `notFound()` is the right answer on some
+routes, so the heading is what separates "refused on purpose" from "broke".
+
+Two things that sweep will tell you, and one it told us:
+
+- **A null `h1` is usually `EmptyState`, not a failure.** Its title is a `<p>`, so `/q/[id]`,
+  `/queue/[entryId]` and any empty list legitimately have no `h1`. Reading an `h1` and concluding
+  "the page is broken" is a mistake this repo has already made once.
+- **`/sign-in` and `/sign-up` return an opaque redirect** for a signed-in user. Expected.
+- It found `/business/queue` as the **only** route of 61 with no `h1` at all. Fixed in
+  `queue-board.tsx`, in both the board and locked branches.
+
+**Do not background `npm run dev` with a redirect to a path you have not checked.** A dev server
+whose stdout write fails serves correctly for a while and then 404s **every route but `/`**,
+which reads exactly like a routing regression. Fixed by restarting it; diagnosed by noticing
+that `/` alone still answered.
+
+Note `overrides.typescript-eslint` in `package.json` pins 8.65.0: upstream
 published a version depending on `@typescript-eslint/utils@8.66.0`, which does not exist. Remove
 the pin once that is consistent again.
 
