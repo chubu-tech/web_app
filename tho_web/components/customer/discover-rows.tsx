@@ -183,6 +183,13 @@ function SalonScroller({
 /**
  * "Recommended for you" — the recommendation engine's order, each card carrying its
  * `reason` so the ranking is legible rather than mysterious.
+ *
+ * **The "View all" is honest now, and it took a route to make it so.** This used to have none,
+ * and the reason was sound: the ranking is computed *in this browser* from a GPS fix and a
+ * favourites set, so a link to any server-rendered list would have shown a different order under
+ * a heading promising more of these. `/recommended` closes that by running the identical `rank()`
+ * call on the identical inputs with no `slice` — see `recommended-list.tsx`. The link is a
+ * promise the route can keep, rather than one the row had to decline to make.
  */
 export function RecommendedRow({
   ranked,
@@ -198,6 +205,10 @@ export function RecommendedRow({
     <SalonScroller
       priority={priority}
       title="Recommended for you"
+      // Only when the row is actually holding something back. With 9 rated salons and a rail
+      // taking 280px, "View all 5 of 5" is a reachable state, not a hypothetical — the same
+      // test "All salons" already applies to its own control.
+      seeAllHref={ranked.length > limit ? "/recommended" : undefined}
       items={ranked.slice(0, limit).map((r) => ({
         business: r.business,
         badge: r.reason,
@@ -220,14 +231,15 @@ export function NearbyRow({
     <SalonScroller
       title="Nearby salons"
       /*
-        The only one of the three rows with a truthful "View all", and the reason is
-        worth stating so nobody adds the other two out of symmetry. This row is the 5
-        nearest salons and `/map` is every located salon around you, so it really is
-        the same list unbounded. "Recommended for you" has no route that ranks — the
-        ranking is computed in this browser from a GPS fix and a favourites set — and
-        `topRated` applies no rating floor at all, it just sorts and takes 5, so a link
-        to a rating filter would quietly show a *different* set of salons under a
-        heading that promised more of these.
+        All three rows have a truthful "View all" now, and each leads somewhere that is the
+        *same rule unbounded* rather than an approximation of it. This one is the 5 nearest
+        salons and `/map` is every located salon around you.
+
+        This comment used to explain why the other two could not have one, and both reasons
+        were real: Recommended is ranked in the browser from a GPS fix, and `topRated` applies
+        no rating floor so a link to a rating *filter* would have shown a different set. The
+        answer was two routes that run the same functions — `/recommended` and `/top-rated` —
+        not a link to something adjacent. Do not repoint either at a filtered Discover view.
       */
       seeAllHref="/map"
       seeAllLabel="View map"
@@ -301,11 +313,24 @@ export function OffersRow({ offers }: { offers: Offer[] }) {
   );
 }
 
-/** "Top rated salons" — rated salons only, best first. */
-export function TopRatedRow({ businesses }: { businesses: Business[] }) {
+/**
+ * "Top rated salons" — rated salons only, best first.
+ *
+ * `total` is the count of *rated* salons in the whole set, which is what decides whether there
+ * is anything behind "View all". The row itself only ever holds `topRated`'s default 5, so it
+ * cannot work that out from `businesses.length`.
+ */
+export function TopRatedRow({
+  businesses,
+  total,
+}: {
+  businesses: Business[];
+  total?: number;
+}) {
   return (
     <SalonScroller
       title="Top rated salons"
+      seeAllHref={(total ?? businesses.length) > businesses.length ? "/top-rated" : undefined}
       items={businesses.map((business) => ({
         business,
         badge: (

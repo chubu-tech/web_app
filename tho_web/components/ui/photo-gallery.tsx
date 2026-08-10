@@ -3,7 +3,9 @@
 import Image from "next/image";
 import { useState } from "react";
 import { Icons, IconSize } from "./icons";
+import { ReportButton } from "./report-button";
 import { Sheet } from "./sheet";
+import type { ReportRef } from "@/lib/api/moderation";
 import { cn } from "@/lib/utils";
 
 /**
@@ -76,20 +78,52 @@ export function PhotoCollage({
   );
 }
 
-/** A horizontal strip of square thumbnails — review photos, booking attachments. */
-export function PhotoStrip({ urls, size = 72 }: { urls: string[]; size?: number }) {
+/**
+ * A horizontal strip of square thumbnails — review photos, booking attachments.
+ *
+ * `reportTargets` is index-aligned with `urls` and optional, which is what keeps the two
+ * kinds of caller apart: a review's photos are public content somebody may need to report,
+ * and a booking's reference photos are a private instruction to one stylist with no
+ * audience to protect. Passing nothing renders exactly what it always did.
+ */
+export function PhotoStrip({
+  urls,
+  size = 72,
+  reportTargets,
+}: {
+  urls: string[];
+  size?: number;
+  /** One per url; `null` for a photo with nothing to report it by. */
+  reportTargets?: (ReportRef | null)[];
+}) {
   if (urls.length === 0) return null;
   return (
     <ul className="gap-sm flex overflow-x-auto">
-      {urls.map((url, i) => (
-        <li
-          key={url + i}
-          className="bg-surface-strong relative shrink-0 overflow-hidden rounded-md"
-          style={{ width: size, height: size }}
-        >
-          <Thumb url={url} sizes={`${size}px`} />
-        </li>
-      ))}
+      {urls.map((url, i) => {
+        const report = reportTargets?.[i] ?? null;
+        return (
+          <li
+            key={url + i}
+            className="bg-surface-strong relative shrink-0 overflow-hidden rounded-md"
+            style={{ width: size, height: size }}
+          >
+            <Thumb url={url} sizes={`${size}px`} />
+            {/* On the photograph rather than beside it: a strip scrolls, so a control in
+                the flow would scroll away from the thing it refers to. */}
+            {report ? (
+              <div className="absolute top-0.5 right-0.5">
+                <ReportButton
+                  target={report.target}
+                  targetId={report.targetId}
+                  label={report.label}
+                  variant="overlay"
+                  className="size-7"
+                />
+              </div>
+            ) : null}
+          </li>
+        );
+      })}
     </ul>
   );
 }

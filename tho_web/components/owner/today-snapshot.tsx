@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Icons, IconSize } from "@/components/ui/icons";
-import { customerName } from "@/components/owner/owner-booking-card";
+import { customerName } from "@/lib/types/booking";
 import { countdownLabel, dayStats } from "@/lib/calendar-logic";
 import type { Booking } from "@/lib/types/booking";
 import { formatMinutesOfDay, thimphuMinutesOfDay } from "@/lib/time";

@@ -14,6 +14,18 @@ export type Conversation = {
   /** Only when the read joined `businesses(name, cover_url)`. */
   businessName: string | null;
   businessCoverUrl: string | null;
+  /**
+   * The salon owner's profile id — **the customer's counterparty in this thread**, and so
+   * the person they can report or block.
+   *
+   * Null when the projection did not select it, and also null when the salon is not
+   * publicly readable: `businesses_select`'s public branch requires `status = 'approved'`,
+   * so a pending salon's embed comes back empty and `businessName` is null for the same
+   * reason. Either way the safety controls that need a person are absent rather than
+   * pointed at nobody — an individual message can still be reported, which is what
+   * `models.dart:367-372` says as well.
+   */
+  businessOwnerId: string | null;
   /** Maintained by `private.touch_conversation` on every message insert. */
   lastMessage: string | null;
   lastMessageAt: Date | null;

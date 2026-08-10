@@ -376,6 +376,13 @@ export function BookingWizard({
 
   const duration = basketDuration(basket);
 
+  /*
+    One clock for both, because they are two sentences about the same instant: a slot 20
+    minutes away is either reachable or already gone, and reading `Date.now()` twice could
+    put those answers either side of a minute boundary.
+  */
+  const now = new Date();
+
   const block =
     selectedStart != null
       ? blockForSlot({
@@ -383,12 +390,11 @@ export function BookingWizard({
           businessId: business.id,
           start: selectedStart,
           durationMin: duration,
+          now,
         })
       : null;
 
-  const travel = selectedStart
-    ? travelWarning({ km, start: selectedStart, now: new Date() })
-    : null;
+  const travel = selectedStart ? travelWarning({ km, start: selectedStart, now }) : null;
 
   /**
    * Who the booking is actually filed against.
@@ -413,7 +419,7 @@ export function BookingWizard({
     // booking. The name comes from the *clashing* booking, which since THO-33 is usually
     // a different salon than this one.
     if (block) {
-      toast.error(bookingBlockMessage(block.reason, block.clash.businessName));
+      toast.error(bookingBlockMessage(block.reason, block.clash?.businessName));
       return;
     }
 
@@ -543,7 +549,7 @@ export function BookingWizard({
   const note =
     step === "confirm" && block ? (
       <Notice kind="error">
-        {bookingBlockMessage(block.reason, block.clash.businessName)}
+        {bookingBlockMessage(block.reason, block.clash?.businessName)}
       </Notice>
     ) : step === "confirm" && travel ? (
       // A warning, not a block: the customer may be about to set off, or may know

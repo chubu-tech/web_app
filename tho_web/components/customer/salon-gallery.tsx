@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { CoverImage } from "@/components/ui/cover-image";
 import { Icons, IconSize } from "@/components/ui/icons";
+import { ReportButton } from "@/components/ui/report-button";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
@@ -39,16 +40,36 @@ import { cn } from "@/lib/utils";
  * `CoverImage` handles the no-photograph case, so the mosaic never renders an empty
  * frame — it renders the seeded monogram gradient, the same one the browse card shows
  * for that salon, which is what makes an unphotographed salon still look deliberate.
+ *
+ * ## Reporting is in the viewer, and only for photographs that have an id
+ *
+ * A salon's gallery is customer-visible content the owner uploaded, so it is one of
+ * `report_content`'s five targets — by `business_photos.id`. The **cover is usually not one
+ * of those rows**: it is `businesses.cover_url`, a column, so there is no id to report and
+ * `reportId` is null for it. A control that could only ever raise `P0002` is worse than no
+ * control, so that photograph simply has none. (When the owner has uploaded the same
+ * picture through both forms — which nothing upstream stops — the caller pairs the deduped
+ * url back to its gallery row and it *is* reportable. See the salon page.)
+ *
+ * The control lives in the full-screen viewer rather than on the mosaic tiles, because a
+ * tile *is* a button that opens the viewer and a second button inside it would be two
+ * targets in one 380px hit area.
  */
 export function SalonGallery({
   name,
-  urls,
+  photos,
 }: {
   name: string;
-  /** Cover first, then the gallery. Already de-duplicated by the caller. */
-  urls: string[];
+  /**
+   * Cover first, then the gallery. Already de-duplicated by the caller.
+   *
+   * `reportId` is the `business_photos` row id, or null when this photograph is not one —
+   * see above.
+   */
+  photos: { url: string; reportId: string | null }[];
 }) {
   const [openAt, setOpenAt] = useState<number | null>(null);
+  const urls = photos.map((p) => p.url);
 
   // No photographs at all: the monogram, at the hero's height. Not a button — there is
   // nothing to open, and a control that opens an empty sheet is worse than no control.
@@ -130,12 +151,27 @@ export function SalonGallery({
         fullBleed
       >
         <ul className="gap-base p-base grid grid-cols-1 tablet:grid-cols-2">
-          {urls.map((url, i) => (
+          {photos.map((photo, i) => (
             <li
-              key={url + i}
+              key={photo.url + i}
               className="bg-surface-strong relative aspect-[3/2] overflow-hidden rounded-md"
             >
-              <Shot url={url} alt="" sizes="(min-width: 744px) 45vw, 90vw" priority={i === openAt} />
+              <Shot
+                url={photo.url}
+                alt=""
+                sizes="(min-width: 744px) 45vw, 90vw"
+                priority={i === openAt}
+              />
+              {photo.reportId ? (
+                <div className="top-sm right-sm absolute">
+                  <ReportButton
+                    target="business_photo"
+                    targetId={photo.reportId}
+                    label="this photo"
+                    variant="overlay"
+                  />
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

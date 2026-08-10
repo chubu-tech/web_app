@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Discover } from "@/components/customer/discover";
+import { StaffInvitePrompt } from "@/components/customer/staff-invite-prompt";
+import { fetchMyStaffInvites } from "@/lib/api/staff-invites";
 import {
   fetchAllBusinessCategories,
   fetchAllBusinessHours,
@@ -100,6 +102,7 @@ export default async function DiscoverPage({
     offers,
     favouriteIds,
     products,
+    staffInvites,
   ] = await Promise.all([
       fetchBusinesses(supabase, {
         categoryId: filters.categoryId,
@@ -123,6 +126,16 @@ export default async function DiscoverPage({
       // this to salons that actually sell — nothing here filters by plan. Decorative in the sense
       // that the salon list must survive it failing.
       fetchProducts(supabase).catch(() => []),
+      /*
+        Invitations to a chair, addressed to whoever is signed in.
+
+        Here because `/` is where a bare sign-in lands a customer, which is exactly where
+        `auth_gate.dart:132` shows the app's prompt — and it is the **only** way a
+        web-only account can become a stylist now that instant linking is gone. The RPC
+        already filters to pending, unexpired and still-unlinked, and it refuses an
+        anonymous caller, so the `catch` covers a visitor rather than an error.
+      */
+      fetchMyStaffInvites(supabase).catch(() => []),
     ]);
 
   // Reconciled against the loaded bounds here rather than in the component: a bound that does not
@@ -134,17 +147,27 @@ export default async function DiscoverPage({
   );
 
   return (
-    <Discover
-      businesses={businesses}
-      categories={categories}
-      hoursByBusiness={hoursByBusiness}
-      categoriesByBusiness={categoriesByBusiness}
-      offers={offers}
-      favouriteIds={[...favouriteIds]}
-      filters={filters}
-      products={products}
-      productFilter={productFilter}
-      tab={tab}
-    />
+    <>
+      {/* Above the browse, because it is about this person rather than about salons —
+          and because accepting replaces the very shell they are looking at. */}
+      {staffInvites.length > 0 ? (
+        <div className="px-base pt-lg tablet:px-lg mx-auto w-full max-w-[1128px]">
+          <StaffInvitePrompt invites={staffInvites} />
+        </div>
+      ) : null}
+
+      <Discover
+        businesses={businesses}
+        categories={categories}
+        hoursByBusiness={hoursByBusiness}
+        categoriesByBusiness={categoriesByBusiness}
+        offers={offers}
+        favouriteIds={[...favouriteIds]}
+        filters={filters}
+        products={products}
+        productFilter={productFilter}
+        tab={tab}
+      />
+    </>
   );
 }

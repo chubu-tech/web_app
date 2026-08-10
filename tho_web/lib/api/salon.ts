@@ -128,9 +128,20 @@ export async function fetchServiceStaff(
 }
 
 /**
+ * The `review_photos` embed both review reads use.
+ *
+ * **`id` is in it because a photo has to be reportable.** `report_content` identifies a
+ * `review_photo` by its own id, so a projection of urls alone gives a strip of
+ * photographs with nothing to report them by — and `ReviewPhoto` would then fall back to
+ * reporting the whole review. One constant, so the two reads cannot drift into disagreeing
+ * about that.
+ */
+const REVIEW_SELECT = "*, review_photos(id, url, sort)";
+
+/**
  * Reviews with their photos.
  *
- * The `review_photos` embed is what populates `photoUrls`; a plain `*` select
+ * The `review_photos` embed is what populates `photos`; a plain `*` select
  * yields none, which renders as no thumbnail strip rather than as an error.
  */
 export async function fetchReviews(
@@ -139,7 +150,7 @@ export async function fetchReviews(
 ): Promise<Review[]> {
   const { data } = await supabase
     .from("reviews")
-    .select("*, review_photos(url, sort)")
+    .select(REVIEW_SELECT)
     .eq("business_id", businessId)
     .order("created_at", { ascending: false });
   return (data ?? []).map((m) => toReview(m as Record<string, unknown>));
@@ -151,7 +162,7 @@ export async function fetchReviewsForStaff(
 ): Promise<Review[]> {
   const { data } = await supabase
     .from("reviews")
-    .select("*, review_photos(url, sort)")
+    .select(REVIEW_SELECT)
     .eq("staff_member_id", staffId)
     .order("created_at", { ascending: false });
   return (data ?? []).map((m) => toReview(m as Record<string, unknown>));

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  END_OF_DAY_MIN,
+  bookableStretches,
   bookingsOutsideHours,
   copyDay,
+  endInputValue,
+  endMinutesFromInput,
   dayHasOverlap,
   dayIsUnavailable,
   emptyWeek,
@@ -340,5 +344,177 @@ describe("enabledSegments", () => {
   it("sorts by start and drops the disabled, which every other reader relies on", () => {
     const d = day(1, [segment(780, 930), segment(510, 660), segment(600, 700, false)]);
     expect(enabledSegments(d).map((s) => s.startMin)).toEqual([510, 780]);
+  });
+});
+
+/*
+  A port of `../tho/supabase/tests/working_hours_merge_test.sql`, whose subject is
+  `set_staff_working_hours`'s gaps-and-islands merge (`20260807000034`). The SQL sends one
+  whole-week payload and reads the stored rows back; here the same shapes go through
+  `bookableStretches` and `weekToPayload`, which is what the client sends and therefore what
+  gets stored.
+
+  The pair on Tuesday is the exact shape the "+" button used to create.
+*/
+describe("bookableStretches — touching runs are one stretch", () => {
+  it("the day-amputating pair becomes the day the owner believed they set", () => {
+    // 09:00–18:00 + 18:00–19:00. Two rows meant a 90-minute service could start no later
+    // than 16:30 and never at all in the second — 17:00 raised P0001 after the grid had
+    // already offered it.
+    const merged = bookableStretches(day(2, [segment(540, 1080), segment(1080, 1140)]));
+    expect(merged).toHaveLength(1);
+    expect(formatSegment(merged[0]!)).toBe("09:00 – 19:00");
+  });
+
+  it("three contiguous stretches collapse to one, min(start) to max(end)", () => {
+    const merged = bookableStretches(
+      day(3, [segment(540, 720), segment(720, 900), segment(900, 1080)]),
+    );
+    expect(merged).toHaveLength(1);
+    expect(formatSegment(merged[0]!)).toBe("09:00 – 18:00");
+  });
+
+  it("a strict gap survives — a break is not a merge candidate", () => {
+    // 09:00–12:00 + 13:00–18:00, the lunch mechanism itself.
+    const merged = bookableStretches(day(4, [segment(540, 720), segment(780, 1080)]));
+    expect(merged.map(formatSegment)).toEqual(["09:00 – 12:00", "13:00 – 18:00"]);
+  });
+
+  it("compares against the running maximum, not the previous row's end", () => {
+    /*
+      The part that is easy to get wrong, and the reason the SQL uses
+      `max(end) over (… unbounded preceding …)` rather than the previous row's end.
+
+      Sorted, these are 09:00–18:00, 10:00–11:00, 15:00–16:40 — the second and third both
+      nested inside the first. Against the running maximum (18:00) all three are one island.
+      Against the immediate predecessor, 15:00 is past 11:00 and would start a second island,
+      giving two stretches for a day that has one. The case is chosen so the two rules
+      disagree: with `segment(660, 720)` as the third row both would merge and this would pass
+      either way.
+    */
+    const merged = bookableStretches(
+      day(2, [segment(540, 1080), segment(600, 660), segment(900, 1000)]),
+    );
+    expect(merged).toHaveLength(1);
+    expect(formatSegment(merged[0]!)).toBe("09:00 – 18:00");
+  });
+
+  it("is order-independent and leaves disabled stretches out entirely", () => {
+    const merged = bookableStretches(
+      day(2, [segment(1080, 1140), segment(540, 1080), segment(1200, 1300, false)]),
+    );
+    expect(merged.map(formatSegment)).toEqual(["09:00 – 19:00"]);
+  });
+
+  it("an unconfigured day has no stretches", () => {
+    expect(bookableStretches(day(0, []))).toEqual([]);
+  });
+
+  it("weekToPayload sends the merged shape, so what is sent is what is stored", () => {
+    const week = withDay(
+      withDay(emptyWeek(), day(2, [segment(540, 1080), segment(1080, 1140)])),
+      day(4, [segment(540, 720), segment(780, 1080)]),
+    );
+    expect(weekToPayload(week)).toEqual([
+      { day: 2, start: "09:00:00", end: "19:00:00" },
+      { day: 4, start: "09:00:00", end: "12:00:00" },
+      { day: 4, start: "13:00:00", end: "18:00:00" },
+    ]);
+  });
+
+  it("the merge never runs one day's last stretch into the next day's first", () => {
+    // What the SQL's `partition by day` guarantees, and the reason its test sends all three
+    // days in one payload: Tuesday ending at 19:00 and Wednesday starting at 09:00 are not
+    // contiguous in any sense a day-blind merge would notice.
+    const week = withDay(
+      withDay(emptyWeek(), day(2, [segment(540, 1140)])),
+      day(3, [segment(540, 1080)]),
+    );
+    expect(weekToPayload(week)).toHaveLength(2);
+  });
+});
+
+/*
+  The client half of `20260807000036_bookable_window_midnight`. `<input type="time">` cannot
+  hold `24:00`, so the end field carries midnight as `00:00` — and the round trip has to be
+  lossless, because 1439 instead of 1440 is exactly the one minute that stops the last slot
+  of a late-closing day fitting.
+*/
+describe("a day that closes at midnight", () => {
+  it("1440 round-trips through the end field as 00:00", () => {
+    expect(endInputValue(END_OF_DAY_MIN)).toBe("00:00");
+    expect(endMinutesFromInput("00:00")).toBe(END_OF_DAY_MIN);
+    expect(endMinutesFromInput(endInputValue(END_OF_DAY_MIN))).toBe(1440);
+  });
+
+  it("every other time is itself", () => {
+    expect(endInputValue(1080)).toBe("18:00");
+    expect(endInputValue(1439)).toBe("23:59");
+    expect(endMinutesFromInput("18:00")).toBe(1080);
+    expect(endMinutesFromInput("23:59")).toBe(1439);
+  });
+
+  it("and reaches the database as the 24:00:00 Postgres accepts", () => {
+    expect(hmsFromMinutes(END_OF_DAY_MIN)).toBe("24:00:00");
+    expect(minutesFromHms("24:00:00")).toBe(END_OF_DAY_MIN);
+    expect(
+      weekToPayload(withDay(emptyWeek(), day(2, [segment(780, END_OF_DAY_MIN)]))),
+    ).toEqual([{ day: 2, start: "13:00:00", end: "24:00:00" }]);
+  });
+
+  it("a 13:00–24:00 day is not inverted and has no gap", () => {
+    const d = day(2, [segment(780, END_OF_DAY_MIN)]);
+    expect(dayHasOverlap(d)).toBe(false);
+    expect(gapsFor(d)).toEqual([]);
+    expect(formatSegment(d.segments[0]!)).toBe("13:00 – 24:00");
+  });
+
+  it("the last slot fits, and one step later does not", () => {
+    /*
+      The two assertions `bookable_window_midnight_test.sql` opens with, in the client's own
+      arithmetic. 2026-08-04 is a Tuesday; 16:30Z is 22:30 Thimphu, so a 90-minute booking
+      runs 22:30–24:00 — an end offset of exactly 1440, which fits a stretch closing at
+      24:00. One slot step later ends at 00:15 the next day, an offset of 1455, which does
+      not.
+    */
+    const week = withDay(emptyWeek(), day(2, [segment(780, END_OF_DAY_MIN)]));
+    const now = new Date("2026-08-01T00:00:00.000Z");
+    expect(
+      bookingsOutsideHours([bk("confirmed", new Date("2026-08-04T16:30:00Z"), 90)], week, now),
+    ).toBe(0);
+    expect(
+      bookingsOutsideHours([bk("confirmed", new Date("2026-08-04T16:45:00Z"), 90)], week, now),
+    ).toBe(1);
+  });
+
+  it("and a booking before opening is still outside", () => {
+    const week = withDay(emptyWeek(), day(2, [segment(780, END_OF_DAY_MIN)]));
+    const now = new Date("2026-08-01T00:00:00.000Z");
+    // 06:00Z is noon Thimphu, before the 13:00 open.
+    expect(
+      bookingsOutsideHours([bk("confirmed", new Date("2026-08-04T06:00:00Z"), 90)], week, now),
+    ).toBe(1);
+  });
+
+  it("a booking spanning a touching pair is not warned about, because the save merges it", () => {
+    /*
+      Why `bookingsOutsideHours` judges the merged shape. 09:00–18:00 + 18:00–19:00 with a
+      booking at 17:30–18:30: it fits neither raw stretch, and it fits the stored one. Judging
+      the raw segments would warn an owner that a confirmed appointment no longer fits the day
+      they are saving — about a day that, once saved, contains it.
+    */
+    const week = withDay(emptyWeek(), day(2, [segment(540, 1080), segment(1080, 1140)]));
+    const now = new Date("2026-08-01T00:00:00.000Z");
+    // 11:30Z == 17:30 Thimphu on Tuesday 2026-08-04.
+    expect(
+      bookingsOutsideHours([bk("confirmed", new Date("2026-08-04T11:30:00Z"), 60)], week, now),
+    ).toBe(0);
+
+    // Still falsifiable: straddling a *real* break is refused, which is the whole point of
+    // the two-row shape.
+    const withLunch = withDay(emptyWeek(), day(2, [segment(540, 720), segment(780, 1080)]));
+    expect(
+      bookingsOutsideHours([bk("confirmed", new Date("2026-08-04T05:30:00Z"), 90)], withLunch, now),
+    ).toBe(1);
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   blockForSlot,
   bookingBlockMessage,
+  cancellationWindow,
   distanceKm,
   distanceLabel,
   isSlotReachable,
@@ -48,18 +49,32 @@ const utc = (y: number, m: number, d: number, h = 0, min = 0) =>
 const plusMin = (d: Date, n: number) => new Date(d.getTime() + n * 60_000);
 const plusHours = (d: Date, n: number) => plusMin(d, n * 60);
 
+/** Long before every slot in this file, so `pastStart` cannot fire in a clash case. */
+const LONG_BEFORE = utc(2026, 1, 1);
+
+/**
+ * `blockForSlot` with the clock supplied.
+ *
+ * `now` is a required argument — the module reads no clock of its own — but it is not what
+ * the clash cases are about, and repeating it fifteen times would bury the shape they port
+ * from `booking_guards_test.dart`. The past-start group below calls `blockForSlot` directly,
+ * so the real signature is still exercised.
+ */
+const blockFor = (args: Omit<Parameters<typeof blockForSlot>[0], "now">) =>
+  blockForSlot({ ...args, now: LONG_BEFORE });
+
 describe("blockForSlot — overlap", () => {
   const noon = utc(2026, 8, 14, 6); // 12:00 Bhutan
 
   it("no existing bookings means nothing blocks", () => {
     expect(
-      blockForSlot({ existing: [], businessId: "b1", start: noon, durationMin: 30 }),
+      blockFor({ existing: [], businessId: "b1", start: noon, durationMin: 30 }),
     ).toBeNull();
   });
 
   it("an overlapping booking at ANOTHER salon still blocks", () => {
     // You can't be in two chairs at once, whoever owns them.
-    const block = blockForSlot({
+    const block = blockFor({
       existing: [bk({ start: noon, businessId: "other" })],
       businessId: "b1",
       start: plusMin(noon, 15),
@@ -74,7 +89,7 @@ describe("blockForSlot — overlap", () => {
       businessId: "other",
       businessName: "Lhaki Hair Studio",
     });
-    const block = blockForSlot({
+    const block = blockFor({
       existing: [existing],
       businessId: "b1",
       start: plusMin(noon, 15),
@@ -82,8 +97,8 @@ describe("blockForSlot — overlap", () => {
     });
     // The caller needs the CLASHING booking, not the one being attempted — the
     // only way the message can name the right salon.
-    expect(block?.clash.id).toBe(existing.id);
-    expect(block?.clash.businessName).toBe("Lhaki Hair Studio");
+    expect(block?.clash?.id).toBe(existing.id);
+    expect(block?.clash?.businessName).toBe("Lhaki Hair Studio");
   });
 
   it("back-to-back is not an overlap", () => {
@@ -91,7 +106,7 @@ describe("blockForSlot — overlap", () => {
     // ranges: touching is not overlapping. The day rule catches it instead — and
     // the overlap check runs FIRST, so getting the day reason here is precisely
     // what proves the range comparison is half-open.
-    const block = blockForSlot({
+    const block = blockFor({
       existing: [bk({ start: noon, minutes: 30, businessId: "other" })],
       businessId: "b1",
       start: plusMin(noon, 30),
@@ -105,7 +120,7 @@ describe("blockForSlot — overlap", () => {
     // starts, and they fall on different local days — so neither rule fires.
     const lateNight = utc(2026, 8, 14, 17, 45); // 23:45 Bhutan
     expect(
-      blockForSlot({
+      blockFor({
         existing: [bk({ start: lateNight, minutes: 15, businessId: "other" })],
         businessId: "b1",
         start: plusMin(lateNight, 15), // 00:00 Bhutan, 15th
@@ -117,7 +132,7 @@ describe("blockForSlot — overlap", () => {
   it("a cancelled booking never blocks", () => {
     // Rebooking after a cancellation is precisely when people book again.
     expect(
-      blockForSlot({
+      blockFor({
         existing: [bk({ start: noon, status: "cancelled" })],
         businessId: "b1",
         start: noon,
@@ -128,7 +143,7 @@ describe("blockForSlot — overlap", () => {
 
   it("a completed booking never blocks", () => {
     expect(
-      blockForSlot({
+      blockFor({
         existing: [bk({ start: noon, status: "completed" })],
         businessId: "b1",
         start: noon,
@@ -138,7 +153,7 @@ describe("blockForSlot — overlap", () => {
   });
 
   it("a pending booking blocks like a confirmed one", () => {
-    const block = blockForSlot({
+    const block = blockFor({
       existing: [bk({ start: noon, status: "pending", businessId: "other" })],
       businessId: "b1",
       start: noon,
@@ -153,7 +168,7 @@ describe("blockForSlot — one booking per day, any salon", () => {
     const morning = utc(2026, 8, 14, 3); // 09:00 Bhutan
     const afternoon = utc(2026, 8, 14, 9); // 15:00 Bhutan
     expect(
-      blockForSlot({
+      blockFor({
         existing: [bk({ start: morning })],
         businessId: "b1",
         start: afternoon,
@@ -164,7 +179,7 @@ describe("blockForSlot — one booking per day, any salon", () => {
 
   it("the same salon on a different day is fine", () => {
     expect(
-      blockForSlot({
+      blockFor({
         existing: [bk({ start: utc(2026, 8, 14, 3) })],
         businessId: "b1",
         start: utc(2026, 8, 15, 3),
@@ -175,7 +190,7 @@ describe("blockForSlot — one booking per day, any salon", () => {
 
   it("a DIFFERENT salon on the same day is blocked too", () => {
     // The widened rule: a live booking anywhere closes the day.
-    const block = blockForSlot({
+    const block = blockFor({
       existing: [
         bk({
           start: utc(2026, 8, 14, 3),
@@ -188,12 +203,12 @@ describe("blockForSlot — one booking per day, any salon", () => {
       durationMin: 30,
     });
     expect(block?.reason).toBe("alreadyBookedThatDay");
-    expect(block?.clash.businessName).toBe("Lhaki Hair Studio");
+    expect(block?.clash?.businessName).toBe("Lhaki Hair Studio");
   });
 
   it("a cancelled booking elsewhere frees the day again", () => {
     expect(
-      blockForSlot({
+      blockFor({
         existing: [
           bk({ start: utc(2026, 8, 14, 3), businessId: "other", status: "cancelled" }),
         ],
@@ -212,7 +227,7 @@ describe("blockForSlot — one booking per day, any salon", () => {
     // genuinely different day from 20:00 Bhutan on the 14th.
     const evening = utc(2026, 8, 14, 14);
     expect(
-      blockForSlot({
+      blockFor({
         existing: [bk({ start: evening })],
         businessId: "b1",
         start: utc(2026, 8, 14, 15),
@@ -221,13 +236,108 @@ describe("blockForSlot — one booking per day, any salon", () => {
     ).toBe("alreadyBookedThatDay");
 
     expect(
-      blockForSlot({
+      blockFor({
         existing: [bk({ start: evening })],
         businessId: "b1",
         start: utc(2026, 8, 15, 5, 30),
         durationMin: 30,
       }),
     ).toBeNull();
+  });
+});
+
+/*
+  The client's mirror of `20260807000035_reject_past_start`, whose pgTAP suite is
+  `../tho/supabase/tests/past_start_test.sql`. There is no Dart equivalent — that migration
+  was server-only — so these are the cases the SQL asserts about `create_booking`, expressed
+  against the guard that has to agree with it.
+
+  `compute_availability` filters against the same server clock, so the grid never offers a
+  past slot; this is the slot that expired while somebody deliberated, and it is the difference
+  between a sentence and a P0016.
+*/
+describe("blockForSlot — a start that has already passed", () => {
+  const noon = utc(2026, 8, 14, 6); // 12:00 Bhutan
+
+  it("refuses a slot in the past", () => {
+    expect(
+      blockForSlot({
+        existing: [],
+        businessId: "b1",
+        start: noon,
+        durationMin: 30,
+        now: plusMin(noon, 1),
+      })?.reason,
+    ).toBe("pastStart");
+  });
+
+  it("carries no clashing booking, because nothing is in the way", () => {
+    const block = blockForSlot({
+      existing: [],
+      start: noon,
+      durationMin: 30,
+      now: plusHours(noon, 3),
+    });
+    expect(block?.clash).toBeNull();
+  });
+
+  it("allows the slot that starts exactly now — no grace period either way", () => {
+    /*
+      `create_booking` compares `p_start_ts < now()`, so the boundary is open at the start:
+      a slot beginning this instant is bookable, and the very next millisecond is not.
+      Widening it would invent a slot the server refuses; narrowing it would refuse one the
+      server takes.
+    */
+    expect(
+      blockForSlot({ existing: [], start: noon, durationMin: 30, now: noon }),
+    ).toBeNull();
+    expect(
+      blockForSlot({
+        existing: [],
+        start: noon,
+        durationMin: 30,
+        now: new Date(noon.getTime() + 1),
+      })?.reason,
+    ).toBe("pastStart");
+  });
+
+  it("a slot still to come is not blocked by the clock", () => {
+    expect(
+      blockForSlot({
+        existing: [],
+        start: noon,
+        durationMin: 30,
+        now: plusHours(noon, -2),
+      }),
+    ).toBeNull();
+  });
+
+  it("reports the passed time ahead of any clash, as the server does", () => {
+    /*
+      The RPC raises P0016 before it looks at working hours or `assert_customer_free`, and
+      the ordering is the useful part: told "you already have a booking that day", somebody
+      goes and cancels it, then finds the slot was never available. The check that names the
+      real obstacle has to win.
+    */
+    const clash = bk({ start: noon, businessName: "Norzin Salon" });
+    const block = blockForSlot({
+      existing: [clash],
+      businessId: "b1",
+      start: plusMin(noon, 15),
+      durationMin: 30,
+      now: plusHours(noon, 1),
+    });
+    expect(block?.reason).toBe("pastStart");
+    // Falsifiable: the same pair with the clock rolled back is an overlap.
+    expect(
+      blockForSlot({
+        existing: [clash],
+        businessId: "b1",
+        start: plusMin(noon, 15),
+        durationMin: 30,
+        now: plusHours(noon, -1),
+      })?.reason,
+    ).toBe("overlapsExisting");
   });
 });
 
@@ -249,6 +359,95 @@ describe("bookingBlockMessage", () => {
 
   it("the overlap message suggests what to do next", () => {
     expect(bookingBlockMessage("overlapsExisting")).toContain("Cancel it first");
+  });
+
+  it("a passed slot says so and points forward, with no salon to name", () => {
+    // Word for word what `bookingFailureMessage` gives P0016 upstream, so the pre-check and
+    // the server's refusal cannot read as two different problems.
+    expect(bookingBlockMessage("pastStart")).toBe("That time has already passed. Pick a later slot.");
+    expect(bookingBlockMessage("pastStart", "Norzin Salon")).not.toContain("Norzin");
+  });
+});
+
+/*
+  A port of the window cases in `../tho/app/test/cancellation_window_test.dart`. That suite is
+  a widget test — it asserts `onPressed == null` on two buttons — and the decision underneath
+  it is what those buttons read, so it is the decision that is pinned here. The web renders it
+  in two places (`/bookings/[id]` and its reschedule route), which is why the rule is one
+  function rather than two copies of the arithmetic.
+*/
+describe("cancellationWindow", () => {
+  const start = utc(2026, 8, 14, 6); // 12:00 Bhutan
+
+  it("closes for a booking inside the window", () => {
+    // Two hours out at a 12-hour salon: the cutoff passed ten hours ago.
+    const state = cancellationWindow({
+      startTs: start,
+      windowHours: 12,
+      now: plusHours(start, -2),
+    });
+    expect(state?.closed).toBe(true);
+  });
+
+  it("takes nothing away outside the window", () => {
+    const state = cancellationWindow({
+      startTs: start,
+      windowHours: 12,
+      now: plusHours(start, -72),
+    });
+    expect(state?.closed).toBe(false);
+    expect(state?.freeUntil.toISOString()).toBe(plusHours(start, -12).toISOString());
+  });
+
+  it("a salon with no window keeps free cancellation to the last minute", () => {
+    /*
+      `coalesce(v_window, 0)` in the RPC, and 0 means the cutoff *is* the start time — the
+      natural reading of "no notice required". So an hour before is still free, and the
+      comparison has to be `now > freeUntil` rather than `>=`, or a booking starting this
+      instant would be refused.
+    */
+    expect(
+      cancellationWindow({ startTs: start, windowHours: 0, now: plusHours(start, -1) })?.closed,
+    ).toBe(false);
+    expect(cancellationWindow({ startTs: start, windowHours: 0, now: start })?.closed).toBe(
+      false,
+    );
+    expect(
+      cancellationWindow({ startTs: start, windowHours: 0, now: plusMin(start, 1) })?.closed,
+    ).toBe(true);
+  });
+
+  it("the cutoff itself is still open; a minute past it is not", () => {
+    const cutoff = plusHours(start, -12);
+    expect(cancellationWindow({ startTs: start, windowHours: 12, now: cutoff })?.closed).toBe(
+      false,
+    );
+    expect(
+      cancellationWindow({ startTs: start, windowHours: 12, now: plusMin(cutoff, 1) })?.closed,
+    ).toBe(true);
+  });
+
+  it("fails OPEN when the salon did not load, leaving the server the last word", () => {
+    /*
+      The case the Dart suite spells out: without the salon there is no window to apply.
+      Disabling on a failed read would strand a customer who could legitimately cancel, and
+      `cancel_booking` still raises P0015 if they could not. Null, not a guessed default —
+      which is why the return type is nullable at all.
+    */
+    expect(
+      cancellationWindow({ startTs: start, windowHours: null, now: plusHours(start, -1) }),
+    ).toBeNull();
+    expect(
+      cancellationWindow({ startTs: start, windowHours: undefined, now: plusHours(start, -1) }),
+    ).toBeNull();
+  });
+
+  it("a long window can close before the booking is even made", () => {
+    // 48 hours at a salon somebody books for tomorrow: closed from the start, which is
+    // correct and is the salon's own choice rather than a bug to clamp away.
+    expect(
+      cancellationWindow({ startTs: start, windowHours: 48, now: plusHours(start, -24) })?.closed,
+    ).toBe(true);
   });
 });
 

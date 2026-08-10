@@ -292,7 +292,9 @@ function Agenda({
       {bookings.map((b, i) => (
         <li key={b.id}>
           {i === firstAhead ? <NowRule /> : null}
-          <OwnerBookingCard booking={b} />
+          {/* The day's own list is where a salon is run, so this is the one place the card
+              carries its actions — the same surface the app puts them on. */}
+          <OwnerBookingCard booking={b} actions />
         </li>
       ))}
       {/* Everything today has already started, so the rule belongs at the end. */}
@@ -480,7 +482,12 @@ function ListBody({
         <ul className="gap-sm flex flex-col">
           {shown.map((b) => (
             <li key={b.id}>
-              <OwnerBookingCard booking={b} />
+              {/* Actions here too, and only here besides the agenda: the Upcoming segment is
+                  the owner's catch-up list — bookings whose time has passed that nobody
+                  marked — and clearing it one detail page at a time is exactly the toll the
+                  agenda's actions remove. `InlineBookingActions` renders nothing on a
+                  terminal booking, so the other two segments are unaffected. */}
+              <OwnerBookingCard booking={b} actions />
             </li>
           ))}
         </ul>

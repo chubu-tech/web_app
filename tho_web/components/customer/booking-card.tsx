@@ -2,22 +2,9 @@ import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { StatusPill } from "@/components/ui/status-pill";
-import { hasFeature } from "@/lib/entitlements";
-import { bookingCode, isActive, type Booking } from "@/lib/types/booking";
+import { bookingCode, canRemind, isActive, type Booking } from "@/lib/types/booking";
 import { cn, formatNu } from "@/lib/utils";
 import { ReminderToggle } from "./reminder-toggle";
-
-/**
- * The three conditions for offering the reminder toggle. Exported so `/bookings/[id]` and
- * the card cannot disagree about when it appears.
- */
-export function canRemind(booking: Booking): boolean {
-  return (
-    isActive(booking) &&
-    booking.customerProfileId != null &&
-    hasFeature(booking.businessPlan, "reminders")
-  );
-}
 
 /**
  * The customer booking card, ported from

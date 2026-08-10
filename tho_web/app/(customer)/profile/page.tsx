@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { readySecondary } from "@/components/customer/destinations";
 import { ProfileEditor } from "@/components/customer/profile-editor";
+import { DeleteAccountCard } from "@/components/auth/delete-account";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
@@ -118,12 +119,32 @@ export default async function ProfilePage() {
         ))}
       </ul>
 
+      {/*
+        Safety, in its own group rather than mixed into the destinations above.
+
+        **Written out, not from `destinations.ts`**, for the reason the footer's legal group
+        is: blocked accounts is a control, not a place someone wants to be, and the nav's
+        list is of places. It is a row rather than a section on this page so that its empty
+        state — the ordinary one, since **0 accounts are blocked platform-wide** — is
+        reachable and can say where blocking actually happens. The block sheet promises this
+        row by name.
+      */}
+      <ul className="mt-lg border-hairline-soft divide-hairline-soft divide-y rounded-md border">
+        <Row href="/profile/blocked" icon={Icons.locked} label="Blocked accounts" />
+      </ul>
+
       {/* `max-w-sm` again — see above. */}
       <div className="mt-lg max-w-[24rem]">
         <SignOutButton />
       </div>
 
       <About />
+
+      {/* Last on the page, under everything, and the only destructive control a customer
+          has. A store-compliance surface as much as a feature — see the component. */}
+      <div className="max-w-[24rem]">
+        <DeleteAccountCard />
+      </div>
     </Shell>
   );
 }

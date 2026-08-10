@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,7 @@ export function QueueBoard({
   queueLink,
   queueQrSvg,
   runsQueue,
+  clientProfileIds = [],
 }: {
   business: Business;
   staff: StaffMember[];
@@ -64,6 +65,13 @@ export function QueueBoard({
   queueLink: string;
   queueQrSvg: string | null;
   runsQueue: boolean;
+  /**
+   * Which customer profiles have a page at `/business/clients/[id]` — i.e. who is in this
+   * salon's client book. Resolved on the server, because that route 404s on a profile the book
+   * does not contain and `client_book` is built from bookings, not from the queue. See
+   * `Identity`.
+   */
+  clientProfileIds?: string[];
 }) {
   const { entries, setEntries, refresh } = useBusinessQueue({
     businessId: business.id,
@@ -72,6 +80,10 @@ export function QueueBoard({
     // board that quietly costs a request every four seconds for a feature nobody has.
     paused: !runsQueue,
   });
+
+  // A set once per mount rather than an `includes` per row per poll: the board re-renders
+  // every four seconds and the book can hold every customer the salon has ever had.
+  const clients = useMemo(() => new Set(clientProfileIds), [clientProfileIds]);
 
   const [callingStaff, setCallingStaff] = useState<string | null>(null);
   const [actingEntry, setActingEntry] = useState<string | null>(null);
@@ -181,6 +193,7 @@ export function QueueBoard({
                       entry={e}
                       barber={barberFor(summary, e)}
                       busy={actingEntry === e.id}
+                      clientIds={clients}
                       onDone={() => void doSetStatus(e, "done")}
                       onNoShow={() => void doSetStatus(e, "no_show")}
                     />
@@ -205,6 +218,7 @@ export function QueueBoard({
                       eta={etaForPositionIn(summary, i)}
                       barber={barberFor(summary, e)}
                       busy={actingEntry === e.id}
+                      clientIds={clients}
                       onNoShow={() => void doSetStatus(e, "no_show")}
                     />
                   </li>
@@ -328,12 +342,14 @@ function ServingRow({
   entry,
   barber,
   busy,
+  clientIds,
   onDone,
   onNoShow,
 }: {
   entry: QueueEntry;
   barber: string;
   busy: boolean;
+  clientIds: ReadonlySet<string>;
   onDone: () => void;
   onNoShow: () => void;
 }) {
@@ -345,7 +361,7 @@ function ServingRow({
           style={{ width: IconSize.xs, height: IconSize.xs }}
           aria-hidden
         />
-        <Identity entry={entry} />
+        <Identity entry={entry} clientIds={clientIds} />
         <span className="text-caption-sm text-rausch shrink-0 font-medium">{barber}</span>
       </div>
       <div className="gap-sm mt-sm flex flex-wrap">
@@ -366,6 +382,7 @@ function WaitingRow({
   eta,
   barber,
   busy,
+  clientIds,
   onNoShow,
 }: {
   entry: QueueEntry;
@@ -373,6 +390,7 @@ function WaitingRow({
   eta: number;
   barber: string;
   busy: boolean;
+  clientIds: ReadonlySet<string>;
   onNoShow: () => void;
 }) {
   return (
@@ -380,7 +398,7 @@ function WaitingRow({
       <span className="bg-surface-soft text-caption-sm text-ink flex size-6 shrink-0 items-center justify-center rounded-full font-medium tabular-nums">
         #{position}
       </span>
-      <Identity entry={entry} />
+      <Identity entry={entry} clientIds={clientIds} />
       <span
         className={cn(
           "text-badge px-sm shrink-0 rounded-full py-px font-medium",
@@ -410,21 +428,53 @@ function WaitingRow({
 }
 
 /**
- * Avatar, name and phone for one row.
+ * Avatar, name and phone for one row — and a link to the client's record when there is one.
  *
- * **Inert, and that is 3a's limit rather than a design choice.** The app makes this open
- * the client book, which is a Growth surface built in 3c. Linking it now would either
- * lead nowhere or — as the app does — open a client screen fed a synthetic summary, so a
- * customer with a long history always reads "0 visits · Nu 0 spent". Better to show
- * nothing than a wrong number.
+ * **This used to be inert, and the reason expired.** 3a's note said the app opens the client
+ * book from here but that surface did not exist yet; 3c built `/business/clients/[id]`.
+ *
+ * **It links only when the route will actually render**, which is three conditions, not one —
+ * and the third is the one that is easy to miss:
+ *
+ * 1. The entry has a `customer_profile_id`. A walk-in typed in at the counter has none, so
+ *    there is nobody to open; the app pushes a detail screen anyway and then hides both of its
+ *    sections.
+ * 2. The salon has the `clientBook` feature — `/business/clients/[id]` `notFound()`s otherwise.
+ * 3. **They are in the client book.** `client_book` is built from `bookings`, so somebody who
+ *    walked in off the street and has never booked is *not* in it, and that route 404s on a
+ *    profile it cannot find. On this seed that is the common case, not the edge one: all 9
+ *    live queue entries belong to Norzin and none has ever carried a `booking_id`.
+ *
+ * `clientIds` is resolved on the server and passed down for exactly that reason. An empty set
+ * means every row stays plain text, which is what it did before and is never wrong.
  */
-function Identity({ entry }: { entry: QueueEntry }) {
+function Identity({
+  entry,
+  clientIds,
+}: {
+  entry: QueueEntry;
+  clientIds: ReadonlySet<string>;
+}) {
   const name = entry.customerName ?? "Walk-in";
+  const href =
+    entry.customerProfileId && clientIds.has(entry.customerProfileId)
+      ? `/business/clients/${entry.customerProfileId}`
+      : null;
+
   return (
     <span className="gap-sm flex min-w-0 flex-1 items-center">
       <Avatar name={name} photoUrl={entry.customerAvatarUrl} size={36} />
       <span className="min-w-0">
-        <span className="text-body-md text-ink block truncate">{name}</span>
+        {href ? (
+          <Link
+            href={href}
+            className="text-body-md text-ink hover:text-rausch-cta block truncate underline decoration-transparent transition-colors duration-[var(--duration-fast)] hover:decoration-current"
+          >
+            {name}
+          </Link>
+        ) : (
+          <span className="text-body-md text-ink block truncate">{name}</span>
+        )}
         {entry.customerPhone ? (
           <span className="text-caption-sm text-muted block truncate tabular-nums">
             {entry.customerPhone}

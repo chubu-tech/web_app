@@ -25,6 +25,16 @@ import { cn } from "@/lib/utils";
  * it back — showing "off" while the outbox still holds a pending reminder is the exact lie
  * this control used to tell. Same pattern and same reasoning as `FavouriteButton`.
  *
+ * **The revert path finally has something to catch.**
+ * `20260807000024_reminders_require_plan` made `set_booking_reminders` raise `P0001` when
+ * *enabling* at a salon whose plan does not send reminders — before that it succeeded and
+ * enqueued nothing, so there was no failure for this to roll back. `canRemind` hides the
+ * switch on those salons, which means reaching this branch is a stale tab or a query that
+ * lost the plan embed; either way `bookingErrorMessage` passes the server's own sentence
+ * through ("This salon does not send appointment reminders.") rather than blaming the network
+ * for a fact about the salon. Muting is allowed at every plan, so the refusal is one-sided:
+ * only the promise is gated, never the withdrawal of one.
+ *
  * No `router.refresh()` on success: the row and the local state already agree, and a refresh
  * would re-fetch a whole list to change one boolean.
  *

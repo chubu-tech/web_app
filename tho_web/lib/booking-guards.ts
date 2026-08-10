@@ -18,7 +18,21 @@ export type BookingBlock =
    * Already booked somewhere on this day. Mirrors P0012 — one active booking per
    * calendar day, at *any* salon.
    */
-  | "alreadyBookedThatDay";
+  | "alreadyBookedThatDay"
+  /**
+   * The slot has already gone by. Mirrors P0016, added by
+   * `20260807000035_reject_past_start`.
+   *
+   * Until that migration both `create_booking` and `reschedule_booking` accepted a
+   * start in the past — only `compute_availability` ever filtered — so a confirmed
+   * booking could be written onto last Tuesday, into rows that feed
+   * `analytics_dashboard`, `payroll_report` and the tax estimate.
+   *
+   * The grid is filtered server-side, so this is not the common path: it is the slot
+   * that expired while the customer deliberated, or a tab left open over lunch. The
+   * server refuses either way; this is what makes it a sentence instead of a failure.
+   */
+  | "pastStart";
 
 /**
  * A rejected slot: why, and which existing booking says so.
@@ -26,11 +40,14 @@ export type BookingBlock =
  * The clashing booking travels with the reason because the message has to name
  * the salon the customer is *already* booked at — which is usually not the salon
  * they are currently looking at.
+ *
+ * `clash` is **null for `pastStart`**: nothing is in the way there, the time has
+ * simply gone.
  */
-export type SlotBlock = { reason: BookingBlock; clash: Booking };
+export type SlotBlock = { reason: BookingBlock; clash: Booking | null };
 
 /**
- * Check a candidate slot against the customer's own upcoming bookings.
+ * Check a candidate slot against the clock and the customer's own upcoming bookings.
  *
  * `existing` should be the customer's bookings; anything not pending or
  * confirmed is ignored, so a cancelled appointment never blocks a rebooking —
@@ -38,19 +55,36 @@ export type SlotBlock = { reason: BookingBlock; clash: Booking };
  *
  * `businessId` no longer narrows the day rule (it spans salons) but stays in the
  * signature: callers pass it, and a future per-salon exception would need it.
+ *
+ * `now` is passed in rather than read here, the same way `travelWarning` takes it: this
+ * module is pure, and two things deciding the same render must not disagree about the
+ * time.
  */
 export function blockForSlot({
   existing,
   start,
   durationMin,
+  now,
 }: {
   existing: Booking[];
   businessId?: string;
   start: Date;
   durationMin: number;
+  now: Date;
 }): SlotBlock | null {
   const end = new Date(start.getTime() + durationMin * 60_000);
   const candidateDay = thimphuDayOf(start).getTime();
+
+  /*
+    First, because the server checks it first and for the same reason: "that time has
+    already passed" is the useful answer, and a slot in the past would otherwise be
+    reported as whatever else it happens to collide with. No grace period — `create_booking`
+    compares against a bare `now()`, so pretending a minute is still available would be
+    inventing a slot the server refuses.
+  */
+  if (start.getTime() < now.getTime()) {
+    return { reason: "pastStart", clash: null };
+  }
 
   for (const b of existing) {
     if (b.status !== "pending" && b.status !== "confirmed") continue;
@@ -85,7 +119,58 @@ export function bookingBlockMessage(
       const where = salonName ?? "another salon";
       return `You already have a booking at ${where} that day. Cancel it first, or pick another day.`;
     }
+    case "pastStart":
+      // The same words `bookingFailureMessage` gives P0016 upstream, so the client's
+      // pre-check and the server's refusal read identically.
+      return "That time has already passed. Pick a later slot.";
   }
+}
+
+/* --------------------------------------------------------------------------
+   The salon's cancellation window.
+   -------------------------------------------------------------------------- */
+
+/** When free cancellation and self-service changes close, and whether they have. */
+export type CancellationWindow = { freeUntil: Date; closed: boolean };
+
+/**
+ * What `businesses.cancellation_window_hours` allows for one booking.
+ *
+ * Until `20260807000032_cancellation_window` this column was enforced **nowhere** — no
+ * function in `public` or `private` referenced it. Both clients rendered *"Free cancellation
+ * has closed for this booking"* and put a working Cancel button directly beneath it, so a
+ * salon setting 12 hours changed one sentence and nothing else, and a Nu 1,700 colour could be
+ * dropped ten minutes before, free and unrecorded. `cancel_booking` and `reschedule_booking`
+ * now both raise **P0015** past the cutoff.
+ *
+ * Three properties, each a case in `../tho/app/test/cancellation_window_test.dart`:
+ *
+ * - **Reschedule closes with cancellation.** The RPC measures the window against the
+ *   **current** start — the commitment being broken — not the new one, because moving an
+ *   appointment an hour before it starts costs the salon the same empty chair.
+ * - **A window of 0 means the cutoff is the start time.** The natural reading of "no notice
+ *   required", and the reason this compares with `>` rather than `>=`.
+ * - **It fails open.** `windowHours` is null when the salon could not be read, and this
+ *   returns null rather than assuming a default — there is no window to apply, and disabling
+ *   on a failed read would strand a customer who could legitimately cancel. The server still
+ *   refuses if they could not.
+ *
+ * A salon member is exempt server-side, so the salon can always act for a customer who
+ * phones; only self-service closes.
+ */
+export function cancellationWindow({
+  startTs,
+  windowHours,
+  now,
+}: {
+  startTs: Date;
+  /** `businesses.cancellationWindowHours`, or null when the salon did not load. */
+  windowHours: number | null | undefined;
+  now: Date;
+}): CancellationWindow | null {
+  if (windowHours == null) return null;
+  const freeUntil = new Date(startTs.getTime() - windowHours * 3_600_000);
+  return { freeUntil, closed: now.getTime() > freeUntil.getTime() };
 }
 
 /* --------------------------------------------------------------------------

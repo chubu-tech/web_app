@@ -4,7 +4,9 @@ import QRCode from "qrcode";
 import { NoSalonYet } from "@/components/owner/no-salon-yet";
 import { QueueBoard } from "@/components/owner/queue-board";
 import { fetchBusinessQueue } from "@/lib/api/owner";
+import { fetchClientBook } from "@/lib/api/owner-back-office";
 import { fetchServices, fetchStaff } from "@/lib/api/salon";
+import { hasFeature } from "@/lib/entitlements";
 import { getOwnerContext } from "@/lib/owner/context";
 import { createClient } from "@/lib/supabase/server";
 import type { QueueEntry } from "@/lib/types/queue";
@@ -36,7 +38,7 @@ export default async function OwnerQueuePage() {
   const open = runsQueue(active);
   const supabase = await createClient();
 
-  const [entries, staff, services] = open
+  const [entries, staff, services, clientProfileIds] = open
     ? await Promise.all([
         fetchBusinessQueue(supabase, active.id),
         // Active only — an inactive barber cannot be called, and an inactive service should
@@ -44,8 +46,29 @@ export default async function OwnerQueuePage() {
         // first caller in the repo that has ever wanted anything else to be possible.
         fetchStaff(supabase, active.id),
         fetchServices(supabase, active.id),
+        /*
+          Who in the line has a client record to open.
+
+          **The board cannot work this out for itself.** `/business/clients/[id]` 404s on a
+          profile that is not in `client_book`, and `client_book` is built from `bookings` — so
+          somebody who walked in off the street and has never booked here has no page, and a
+          link to one would be the dead end `destinations.ts` exists to prevent.
+
+          Read here, once, rather than per row: the board polls every four seconds and this
+          does not change on that cadence. Gated on the feature because the RPC raises `P0001`
+          below Growth, and a failure costs the links and nothing else.
+        */
+        hasFeature(active.plan, "clientBook")
+          ? fetchClientBook(supabase, active.id)
+              .then((book) =>
+                book
+                  .map((c) => c.customerProfileId)
+                  .filter((id): id is string => id != null),
+              )
+              .catch(() => [] as string[])
+          : Promise.resolve([] as string[]),
       ])
-    : [[] as QueueEntry[], [], []];
+    : [[] as QueueEntry[], [], [], [] as string[]];
 
   const link = open ? await queueLinkFor(active.id) : "";
   const svg = link ? await qrSvg(link) : null;
@@ -59,6 +82,7 @@ export default async function OwnerQueuePage() {
       queueLink={link}
       queueQrSvg={svg}
       runsQueue={open}
+      clientProfileIds={clientProfileIds}
     />
   );
 }

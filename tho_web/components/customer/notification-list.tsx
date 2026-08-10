@@ -6,7 +6,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
-import { markAllNotificationsRead, markNotificationRead } from "@/lib/api/notifications";
+import {
+  fetchNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  NOTIFICATIONS_PAGE_SIZE,
+} from "@/lib/api/notifications";
 import { relativeAge } from "@/lib/chat-logic";
 import {
   matchesFilter,
@@ -66,9 +71,46 @@ export function NotificationList({
   const [items, setItems] = useState(initial);
   const [filter, setFilter] = useState<NotificationFilter>("all");
   const [busy, setBusy] = useState(false);
+  /**
+   * Whether there is anything older to ask for.
+   *
+   * A full first page means "probably more"; a short one is proof there is nothing else. That
+   * is the same test the app makes (`_hasMore = page.length >= pageSize`) and it costs one
+   * extra request at the exact multiple — better than a count query on every load.
+   */
+  const [hasMore, setHasMore] = useState(initial.length >= NOTIFICATIONS_PAGE_SIZE);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const unread = items.filter(isUnread).length;
   const shown = items.filter((n) => matchesFilter(filter, n));
+
+  /**
+   * The next page, appended.
+   *
+   * **De-duplicated by id**, because offset paging is not stable: a notification arriving
+   * between two requests shifts the window and would otherwise repeat a row. The app has the
+   * same window and does not do this.
+   *
+   * A failure leaves what is on screen alone and lets the button be pressed again — the pages
+   * already loaded are still good, so replacing them with an error state would be a downgrade
+   * (`notifications_screen.dart:318-337` says exactly that).
+   */
+  async function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await fetchNotifications(createClient(), { offset: items.length });
+      setItems((prev) => {
+        const seen = new Set(prev.map((n) => n.id));
+        return [...prev, ...page.filter((n) => !seen.has(n.id))];
+      });
+      setHasMore(page.length >= NOTIFICATIONS_PAGE_SIZE);
+    } catch {
+      toast.error("Couldn't load older notifications.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   /** Stamp locally first, then tell the server. Reverted on failure. */
   async function markRead(ids: string[]) {
@@ -153,11 +195,27 @@ export function NotificationList({
           <EmptyState
             icon={Icons.filterOff}
             title={`Nothing in ${NOTIFICATION_FILTERS.find((f) => f.id === filter)!.label.toLowerCase()}`}
-            message="Try another tab."
+            /*
+              **"…on this page" while there is another page.** The chips filter what has been
+              loaded, not the table, so with older pages still unread a bare "Nothing here" is a
+              claim this component cannot support — and the counts on the chips have the same
+              scope. Offering the load from inside the empty state is what makes the two agree.
+            */
+            message={
+              hasMore
+                ? "Nothing of this kind on the notifications loaded so far."
+                : "Try another tab."
+            }
             action={
-              <Button variant="outlined" onClick={() => setFilter("all")}>
-                Show all
-              </Button>
+              hasMore ? (
+                <Button variant="outlined" busy={loadingMore} onClick={() => void loadMore()}>
+                  Load older
+                </Button>
+              ) : (
+                <Button variant="outlined" onClick={() => setFilter("all")}>
+                  Show all
+                </Button>
+              )
             }
           />
         ) : (
@@ -201,6 +259,20 @@ export function NotificationList({
               </section>
             );
           })}
+
+          {/* The way past the page cap. Absent once a short page has proved there is nothing
+              older, rather than sitting there returning nothing. */}
+          {hasMore ? (
+            <Button
+              variant="outlined"
+              fullWidth
+              busy={loadingMore}
+              onClick={() => void loadMore()}
+              className="max-w-[20rem] self-center"
+            >
+              Load older
+            </Button>
+          ) : null}
         </div>
       )}
     </div>

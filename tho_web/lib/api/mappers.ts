@@ -216,11 +216,14 @@ export function toReview(m: Row): Review {
     // Sorted here rather than trusting the join: PostgREST makes no ordering
     // promise on an embedded resource, and the first photo the customer picked
     // should lead the strip.
-    photoUrls: raw
+    //
+    // `id` is whatever the select asked for — null when it asked for none, which
+    // is what makes the report control fall back to the review. See `ReviewPhoto`.
+    photos: raw
       .slice()
       .sort((a, b) => (numOrNull(a.sort) ?? 0) - (numOrNull(b.sort) ?? 0))
-      .map((p) => p.url as string)
-      .filter(Boolean),
+      .filter((p) => typeof p.url === "string" && (p.url as string).length > 0)
+      .map((p) => ({ id: str(p.id), url: p.url as string })),
   };
 }
 
@@ -332,8 +335,12 @@ export function toPayment(m: Row): Payment {
   return {
     id: m.id as string,
     amountNu: numOrNull(m.amount_nu) ?? 0,
-    kind: str(m.kind) ?? "payment",
-    method: str(m.method) ?? "cash",
+    // Both columns are `not null` with a CHECK, so the fallbacks only cover a projection that
+    // named neither. `'full'` rather than the old `'payment'`, which is not one of the four
+    // values `payments_kind_check` allows — see `PaymentKind`. The cast is the honest shape of
+    // reading an enum out of a text column: the constraint is the guarantee, not this line.
+    kind: (str(m.kind) ?? "full") as Payment["kind"],
+    method: (str(m.method) ?? "cash") as Payment["method"],
     createdAt: new Date(m.created_at as string),
   };
 }
@@ -431,6 +438,7 @@ export function toConversation(m: Row): Conversation {
     customerName: str(m.customer_name),
     businessName: biz ? str(biz.name) : null,
     businessCoverUrl: biz ? str(biz.cover_url) : null,
+    businessOwnerId: biz ? str(biz.owner_id) : null,
     lastMessage: str(m.last_message),
     lastMessageAt: dateOrNull(m.last_message_at),
     customerLastReadAt: dateOrNull(m.customer_last_read_at),

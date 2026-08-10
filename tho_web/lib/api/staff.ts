@@ -89,6 +89,36 @@ export async function fetchStaffBookings(
   return ((data ?? []) as unknown as Record<string, unknown>[]).map(toBooking);
 }
 
+/**
+ * One of this stylist's own appointments, by id.
+ *
+ * **Two `.eq()`s, and the second one is the whole authorisation.** `bookings_select` admits
+ * `private.is_business_member(business_id)`, and a linked stylist is a member of the entire
+ * salon — so `.eq("id", …)` alone would open **any** booking in the shop: another stylist's
+ * customer, their phone number, their note, with a working Complete and Cancel on it. That is
+ * the **sixth** instance of the OR-policy leak in this repo (`fetchMyBookings`,
+ * `/bookings/[id]`, `fetchMyConversations`, `fetchMyActiveEntries`, `fetchStaffBookings`), and
+ * the fix is the same every time: pass the id in rather than trusting a policy to be a filter.
+ *
+ * `null` rather than a raise for a booking that is not theirs, so the route can answer
+ * `notFound()` — the same refusal `/messages/[id]` and `/business/bookings/[id]` make. A
+ * stylist guessing an id learns nothing about whether it exists.
+ */
+export async function fetchStaffBookingById(
+  supabase: SupabaseClient,
+  staffMemberId: string,
+  bookingId: string,
+): Promise<Booking | null> {
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(BOOKING_SELECT)
+    .eq("id", bookingId)
+    .eq("staff_member_id", staffMemberId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? toBooking(data as unknown as Record<string, unknown>) : null;
+}
+
 export async function fetchStaffById(
   supabase: SupabaseClient,
   id: string,

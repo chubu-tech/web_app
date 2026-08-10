@@ -7,9 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Icons, IconSize } from "@/components/ui/icons";
 import {
   DAY_NAMES,
+  END_OF_DAY_MIN,
   copyDay,
   dayHasOverlap,
   enabledSegments,
+  endInputValue,
+  endMinutesFromInput,
   gapsFor,
   mergeGap,
   segment,
@@ -25,8 +28,23 @@ import { formatMinutesOfDay, minutesOfDay } from "@/lib/time";
 const DEFAULT_START = 9 * 60;
 const DEFAULT_END = 18 * 60;
 
-/** `<input type="time">` cannot express 24:00, so a stretch can end at 23:59 at the latest. */
-const LATEST = 23 * 60 + 59;
+/** The latest a stretch can *begin*. An end may be `END_OF_DAY_MIN`; a start may not. */
+const LATEST_START = 23 * 60 + 59;
+
+/**
+ * How long a break the "+" button leaves before the stretch it adds.
+ *
+ * The Dart's `_addSegment` used `start = rows.last.endMin`, which produced two **touching**
+ * intervals — and since `is_bookable_window` needs a booking to fit inside one row,
+ * `09:00–18:00` + `18:00–19:00` is not a 9-to-7 day. An owner extending Tuesday to 7pm lost
+ * every slot a long service could no longer fit (measured upstream: 31 slots offered, none
+ * after 16:45, 17:00 rejected on tap) and was told nothing.
+ * `20260807000034_merge_touching_working_hours` fixed both halves — the server coalesces
+ * touching runs, and the button leaves a real gap, because a second stretch is meant to be a
+ * *second stretch*. It is also the only way the break becomes visible and editable, since
+ * `gapsFor` counts strict gaps and rendered a zero-length one as nothing at all.
+ */
+const ADDED_BREAK_MIN = 60;
 
 /**
  * The weekly hours grid — a port of `working_hours_editor.dart`, shared by the stylist
@@ -86,22 +104,24 @@ export function HoursEditor({
 
   function setTime(dayIndex: number, rowIndex: number, isStart: boolean, value: string) {
     if (!value) return;
-    const minutes = Math.min(minutesOfDay(value), LATEST);
     const rows = [...rowsFor(dayIndex)];
     const row = rows[rowIndex]!;
     // Editing a time enables the row: the placeholder is how an unconfigured day offers
     // itself, and typing into it is the whole gesture.
     rows[rowIndex] = isStart
-      ? { ...row, startMin: minutes, enabled: true }
-      : { ...row, endMin: minutes, enabled: true };
+      ? { ...row, startMin: Math.min(minutesOfDay(value), LATEST_START), enabled: true }
+      : { ...row, endMin: endMinutesFromInput(value), enabled: true };
     replaceRows(dayIndex, rows);
   }
 
   function addStretch(dayIndex: number) {
     const rows = rowsFor(dayIndex).filter((s) => s.enabled);
-    const start = rows.length === 0 ? DEFAULT_START : rows[rows.length - 1]!.endMin;
-    const end = Math.min(start + 60, LATEST);
-    if (end <= start) return; // already at the end of the day
+    const last = rows[rows.length - 1];
+    const start = last ? last.endMin + ADDED_BREAK_MIN : DEFAULT_START;
+    const end = Math.min(start + 60, END_OF_DAY_MIN);
+    // No room left for a break plus a stretch. Extending the last row's end is the right
+    // gesture for that, and it is one field away.
+    if (start >= END_OF_DAY_MIN || end <= start) return;
     replaceRows(dayIndex, [...rows, segment(start, end)]);
   }
 
@@ -207,11 +227,21 @@ export function HoursEditor({
                       label={`${DAY_NAMES[dayIndex]} end`}
                       minutes={row.endMin}
                       muted={!row.enabled}
+                      isEnd
                       onChange={(v) => setTime(dayIndex, rowIndex, false, v)}
                     />
                   </div>
                 ))}
               </div>
+
+              {/* Stated, because `00:00` in an end field is a convention rather than a
+                  reading anyone would arrive at. Shown only on the day it applies to, so it
+                  is an explanation of what is on screen and not a rule to remember. */}
+              {rows.some((r) => r.enabled && r.endMin === END_OF_DAY_MIN) ? (
+                <p className="text-caption text-muted mt-xs">
+                  An end of 00:00 means midnight — the close of this day.
+                </p>
+              ) : null}
 
               {dayHasOverlap(day) ? (
                 <p className="text-caption text-rausch-cta mt-xs">These hours overlap.</p>
@@ -270,18 +300,30 @@ export function HoursEditor({
  *
  * A native time input: it is 24-hour in its value whatever the viewer's locale shows, which
  * is what `minutesOfDay` parses, and it is keyboard- and screen-reader-correct without any of
- * that being reimplemented. `max` stops a stretch running past 23:59, so the 1440 end-of-day
- * case the Dart has to format specially cannot arise here.
+ * that being reimplemented.
+ *
+ * **The end field carries midnight as `00:00`, and this used to claim it could not arise.**
+ * The old note here read *"`max` stops a stretch running past 23:59, so the 1440 end-of-day
+ * case the Dart has to format specially cannot arise here"* — but nothing stops a **stored**
+ * row holding `24:00:00`. `set_staff_working_hours` accepts it, the Flutter editor writes it,
+ * and `weekFromWorkingHours` reads whatever is there. So the clamp did not prevent 1440; it
+ * displayed it as 23:59 and wrote that back on the next keystroke, deleting the last minute of
+ * the day — and with it the whole final slot of a late-closing day, which is the exact thing
+ * `20260807000036_bookable_window_midnight` was written to make bookable. `endInputValue` and
+ * `endMinutesFromInput` carry it losslessly instead, and the visible note below says so.
  */
 function TimeInput({
   label,
   minutes,
   muted,
+  isEnd = false,
   onChange,
 }: {
   label: string;
   minutes: number;
   muted: boolean;
+  /** End fields accept midnight; start fields stop at 23:59. */
+  isEnd?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
@@ -289,8 +331,8 @@ function TimeInput({
       <span className="sr-only">{label}</span>
       <input
         type="time"
-        value={formatMinutesOfDay(Math.min(minutes, LATEST))}
-        max="23:59"
+        value={isEnd ? endInputValue(minutes) : formatMinutesOfDay(Math.min(minutes, LATEST_START))}
+        max={isEnd ? undefined : "23:59"}
         onChange={(e) => onChange(e.target.value)}
         className={
           "border-hairline text-body-md focus:border-ink px-sm min-h-11 w-full rounded-sm border bg-transparent text-center outline-none focus:border-2 " +

@@ -13,6 +13,7 @@ import { Icons, IconSize } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Sheet } from "@/components/ui/sheet";
 import { ownerErrorMessage } from "@/lib/api/owner-errors";
+import type { PendingInvite } from "@/lib/api/staff-invites";
 import {
   addStaffPhoto,
   deleteStaffPhoto,
@@ -66,6 +67,8 @@ export function StaffEditor({
   salonHours,
   photos: initialPhotos,
   upcoming,
+  pendingInvite,
+  storedPay,
 }: {
   business: Business;
   member: StaffMember;
@@ -75,6 +78,20 @@ export function StaffEditor({
   salonHours: WorkingHour[];
   photos: BusinessPhoto[];
   upcoming: Booking[];
+  /** An outstanding invitation to this chair. Read server-side; null is the norm. */
+  pendingInvite: PendingInvite | null;
+  /**
+   * This stylist's **stored** commission and base salary, read through `payroll_report`.
+   *
+   * Null on any salon that is not Pro — which is every live one — and null if the read failed.
+   * That is the difference between "no pay to show" and "pay of zero", and the pay block below
+   * is locked in exactly the case this is null, so the two cannot disagree.
+   *
+   * **Why not `member`:** `staff_members.commission_pct` and `base_salary_nu` are outside every
+   * client role's SELECT privilege, so `toStaffMember` substitutes 0 for both and no table read
+   * can ever return the real figures. See `STAFF_PUBLIC_SELECT`.
+   */
+  storedPay: { commissionPct: number; baseSalaryNu: number } | null;
 }) {
   const router = useRouter();
   const [name, setName] = useState(member.displayName);
@@ -83,8 +100,23 @@ export function StaffEditor({
   const [serviceIds, setServiceIds] = useState<string[]>(initialServiceIds);
   const [week, setWeek] = useState<WeekHours>(() => weekFromWorkingHours(initialHours));
   const [photos, setPhotos] = useState(initialPhotos);
-  const [commission, setCommission] = useState(String(member.commissionPct));
-  const [salary, setSalary] = useState(String(member.baseSalaryNu));
+  /**
+   * The pay inputs, prefilled from `payroll_report` — **not from the staff row.**
+   *
+   * This used to read `member.commissionPct` and `member.baseSalaryNu`, which are always 0: no
+   * client role holds SELECT on either column, so `toStaffMember` substitutes zero. The inputs
+   * therefore opened at 0 on a Pro salon and **Save wrote 0 back over a real salary**, silently,
+   * because `commit()` sends whatever is in the boxes. `payroll_report` returns both columns
+   * (it is `SECURITY DEFINER`, so column privileges do not apply to it) and is the only way a
+   * client can see them at all.
+   *
+   * Falling back to `member` rather than to a literal 0 keeps one thing true: when there is no
+   * stored pay to show, the value shown is the same value the type says it is.
+   */
+  const [commission, setCommission] = useState(
+    String(storedPay?.commissionPct ?? member.commissionPct),
+  );
+  const [salary, setSalary] = useState(String(storedPay?.baseSalaryNu ?? member.baseSalaryNu));
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [addingPhoto, setAddingPhoto] = useState(false);
@@ -253,7 +285,11 @@ export function StaffEditor({
       {/* --------------------------------------------------- login account ---- */}
       <div className="mt-xl">
         <SectionHeader title="Login account" as="h2" />
-        <StaffLinkCard staffId={member.id} linkedProfileId={member.profileId} />
+        <StaffLinkCard
+          staffId={member.id}
+          linkedProfileId={member.profileId}
+          pendingInvite={pendingInvite}
+        />
       </div>
 
       {/* -------------------------------------------------------------- pay ---- */}

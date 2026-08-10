@@ -20,6 +20,17 @@ import { SlotPicker } from "./slot-picker";
  * `blockForSlot`: the booking being moved is itself in the customer's list, and
  * warning them that they already have a booking at that time would be describing the
  * very booking they are moving.
+ *
+ * That includes the past-start rule the same RPC gained in `20260807000035`. Not applying it
+ * here is a decision rather than an omission: `compute_availability` filters against the same
+ * server clock, so the grid arrives clean, and the only way to reach a passed slot is a tab
+ * left open — for which the failure path below is already right. It reloads the grid, so the
+ * stale slot stops being offered, and `bookingErrorMessage` now maps **P0016** to *"That time
+ * has already passed. Pick a later slot."* rather than to the generic "may have just been
+ * taken", which would have been a plausible and wrong explanation.
+ *
+ * Getting here at all requires the window to be open: `/bookings/[id]/reschedule` refuses past
+ * the salon's cancellation cutoff, because `reschedule_booking` raises P0015 there too.
  */
 export function RescheduleFlow({
   bookingId,

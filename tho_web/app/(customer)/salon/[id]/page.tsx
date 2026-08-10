@@ -19,6 +19,7 @@ import {
 import { Icons, IconSize } from "@/components/ui/icons";
 import { PhotoStrip } from "@/components/ui/photo-gallery";
 import { RatingPill, StarBar } from "@/components/ui/rating";
+import { ReportButton } from "@/components/ui/report-button";
 import { SectionHeader } from "@/components/ui/section-header";
 import {
   fetchBusinessById,
@@ -231,10 +232,18 @@ export default async function SalonPage({
    * De-duplicated because `business_photos` may repeat the cover — the owner uploads it
    * twice through two different forms and nothing upstream stops them — and the same
    * photograph appearing as both the hero and the tile beside it reads as a bug.
+   *
+   * **Each one is paired back to its `business_photos` id**, which is what
+   * `report_content` identifies a `business_photo` by. The cover has none of its own — it
+   * is a column on `businesses`, not a row — so it reports as null *unless* it is also a
+   * gallery row, which the duplicate case above is exactly when it is. Resolving it here
+   * rather than in the component is deliberate: the de-duplication happens here, so this is
+   * the only place that still knows which url came from which row.
    */
-  const galleryUrls = [...new Set([business.coverUrl, ...photos.map((p) => p.url)])].filter(
-    (url): url is string => typeof url === "string" && url.length > 0,
-  );
+  const photoIdByUrl = new Map(photos.map((p) => [p.url, p.id]));
+  const galleryPhotos = [...new Set([business.coverUrl, ...photos.map((p) => p.url)])]
+    .filter((url): url is string => typeof url === "string" && url.length > 0)
+    .map((url) => ({ url, reportId: photoIdByUrl.get(url) ?? null }));
 
   /**
    * The nav's sections, in document order, **built from what actually exists.**
@@ -377,7 +386,7 @@ export default async function SalonPage({
         </div>
 
         <div className="mt-base">
-          <SalonGallery name={business.name} urls={galleryUrls} />
+          <SalonGallery name={business.name} photos={galleryPhotos} />
         </div>
       </div>
 
@@ -689,21 +698,41 @@ function Reviews({
         <li key={r.id} className="border-hairline p-base rounded-md border">
           <div className="gap-md flex items-center justify-between">
             <StarBar rating={r.rating} size={20} />
-            <time
-              dateTime={r.createdAt.toISOString()}
-              className="text-caption-sm text-muted"
-            >
-              {r.createdAt.toLocaleDateString("en-GB", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}
-            </time>
+            <div className="gap-xs flex shrink-0 items-center">
+              <time
+                dateTime={r.createdAt.toISOString()}
+                className="text-caption-sm text-muted"
+              >
+                {r.createdAt.toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </time>
+              {/* Beside the date, which is where the app puts it
+                  (`business_detail_screen.dart:751`) and the only trailing space on the
+                  tile that is not the review's own words. */}
+              <ReportButton target="review" targetId={r.id} label="this review" />
+            </div>
           </div>
           {r.body ? <p className="text-body-sm text-body mt-xs">{r.body}</p> : null}
-          {r.photoUrls.length > 0 ? (
+          {r.photos.length > 0 ? (
             <div className="mt-sm">
-              <PhotoStrip urls={r.photoUrls} size={72} />
+              {/*
+                A photo reports as itself, and falls back to the review that carries it when
+                the row has no id — which cannot happen through `fetchReviews`, since its
+                select asks for one, but is the honest answer for any other projection and is
+                what the app does at `business_detail_screen.dart:777-786`.
+              */}
+              <PhotoStrip
+                urls={r.photos.map((p) => p.url)}
+                size={72}
+                reportTargets={r.photos.map((p) =>
+                  p.id
+                    ? { target: "review_photo" as const, targetId: p.id, label: "this photo" }
+                    : { target: "review" as const, targetId: r.id, label: "this review" },
+                )}
+              />
             </div>
           ) : null}
         </li>

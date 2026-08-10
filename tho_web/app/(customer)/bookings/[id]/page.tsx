@@ -14,6 +14,7 @@ import {
   signedBookingMediaUrls,
 } from "@/lib/api/booking";
 import { fetchBusinessById } from "@/lib/api/discovery";
+import { cancellationWindow } from "@/lib/booking-guards";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -21,6 +22,7 @@ import {
   hasNote,
   isActive,
   outstandingNu,
+  paymentLine,
   type Payment,
 } from "@/lib/types/booking";
 import { hasLocation, runsQueue, travels } from "@/lib/types/salon";
@@ -81,33 +83,39 @@ export default async function BookingDetailPage({
    * Whether free cancellation has already closed, per the salon's own window.
    *
    * The clock is read **here**, on the server. This page reads cookies, so it is
-   * always rendered per request and never cached — "now" is genuinely now. The
-   * react-hooks/purity rule below cannot distinguish a server component from a client
-   * one; in a client render this would be a real bug, which is why the suppression is
-   * this narrow.
+   * always rendered per request and never cached — "now" is genuinely now. Note that
+   * `react-hooks/purity` does not flag `new Date()` passed straight into a call the way it
+   * flags one assigned and then read, so nothing lints this: in a *client* component it
+   * would be a real bug and the linter would be silent about it.
+   *
+   * The decision itself is `cancellationWindow` in `lib/booking-guards.ts`, shared with
+   * `/bookings/[id]/reschedule` — the two must not disagree about the same booking, and
+   * since `20260807000032` the answer disables two controls rather than only choosing a
+   * sentence.
    */
   const active = isActive(booking);
-  let cancellationNote: { text: string; closed: boolean } | null = null;
-  if (active && business) {
-    const freeUntil = new Date(
-      booking.startTs.getTime() - business.cancellationWindowHours * 3_600_000,
-    );
-    // eslint-disable-next-line react-hooks/purity
-    const closed = Date.now() > freeUntil.getTime();
-    cancellationNote = {
-      closed,
-      text: closed
-        ? "Free cancellation has closed for this booking. Call the salon if you need to change it."
-        : `Free until ${freeUntil.toLocaleString("en-GB", {
-            weekday: "short",
-            day: "numeric",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "Asia/Thimphu",
-          })}.`,
-    };
-  }
+  const windowState = active
+    ? cancellationWindow({
+        startTs: booking.startTs,
+        windowHours: business?.cancellationWindowHours,
+        now: new Date(),
+      })
+    : null;
+  const cancellationNote = windowState
+    ? {
+        closed: windowState.closed,
+        text: windowState.closed
+          ? "Free cancellation has closed for this booking. Call the salon if you need to change it."
+          : `Free until ${windowState.freeUntil.toLocaleString("en-GB", {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "Asia/Thimphu",
+            })}.`,
+      }
+    : null;
 
   /**
    * The check-in window, per `20260731000002_queue_checkin_window_and_locking.sql`:
@@ -262,7 +270,9 @@ export default async function BookingDetailPage({
                 <div className="border-hairline-soft mt-sm pt-sm border-t">
                   {payments.map((p) => (
                     <div key={p.id} className="mb-xs flex items-baseline justify-between gap-4">
-                      <dt className="text-body-sm text-muted">{paymentLabel(p)}</dt>
+                      <dt className="text-body-sm text-muted">
+                        {paymentLine(p, "Asia/Thimphu")}
+                      </dt>
                       <dd
                         className={
                           p.kind === "refund"
@@ -301,13 +311,3 @@ export default async function BookingDetailPage({
   );
 }
 
-function paymentLabel(p: Payment): string {
-  const kind =
-    p.kind === "deposit" ? "Deposit" : p.kind === "refund" ? "Refund" : "Payment";
-  const when = p.createdAt.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    timeZone: "Asia/Thimphu",
-  });
-  return `${kind} · ${p.method} · ${when}`;
-}

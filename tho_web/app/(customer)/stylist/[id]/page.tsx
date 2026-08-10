@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
 import { PhotoCollage } from "@/components/ui/photo-gallery";
 import { StarBar } from "@/components/ui/rating";
+import { ReportButton } from "@/components/ui/report-button";
 import { SalonTabs } from "@/components/customer/salon-tabs";
 import { fetchBusinessById } from "@/lib/api/discovery";
 import { fetchReviewsForStaff } from "@/lib/api/salon";
@@ -204,16 +205,23 @@ function Reviews({ reviews, salonName }: { reviews: Review[]; salonName: string 
         <li key={r.id} className="border-hairline p-base rounded-md border">
           <div className="gap-md flex items-baseline justify-between">
             <p className="text-title text-ink truncate font-medium">{salonName}</p>
-            <time
-              dateTime={r.createdAt.toISOString()}
-              className="text-caption-sm text-muted shrink-0"
-            >
-              {r.createdAt.toLocaleDateString("en-GB", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}
-            </time>
+            <div className="gap-xs flex shrink-0 items-center">
+              <time
+                dateTime={r.createdAt.toISOString()}
+                className="text-caption-sm text-muted"
+              >
+                {r.createdAt.toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </time>
+              {/* The same review rows as the salon page's Reviews section — the same
+                  `reviews` table, read by `staff_member_id` instead of `business_id` — so
+                  they get the same report control. A reportable review that is only
+                  reportable on one of the two pages that show it is a gap by accident. */}
+              <ReportButton target="review" targetId={r.id} label="this review" />
+            </div>
           </div>
           {r.body ? <p className="text-body-sm text-muted mt-xs">{r.body}</p> : null}
           <div className="mt-xs">

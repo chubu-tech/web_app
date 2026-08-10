@@ -221,15 +221,38 @@ export async function fetchBookingById(
   return data ? toBooking(data as unknown as Record<string, unknown>) : null;
 }
 
+/**
+ * What has been recorded against a booking — **through `booking_payments`, not the table.**
+ *
+ * This was a direct `from("payments")` read, and `payments_select_owner` is the *only* policy on
+ * that table: `private.is_business_owner(business_id)`. So it worked for the salon and returned
+ * an empty array for **the customer looking at their own receipt** — silently, because a plain
+ * destructure of `data` drops `error` and RLS returns no rows rather than raising. Measured: the
+ * receipt's payments block never rendered for the person who had paid, and the fallback line
+ * *"Pay at the salon."* stood in for a deposit they had actually handed over.
+ *
+ * That is the defect `20260807000033` exists to fix, and its comment says why it is not
+ * cosmetic: a salon takes a Nu 500 deposit, the customer has no record of it anywhere, and later
+ * the owner is shown "deposit retained as no-show cover" against money the customer cannot prove
+ * they paid. The RPC authorises **the salon that took the money or the person who paid it, and
+ * nobody else** — so one call serves both sides and the ledger stops being owner-only.
+ *
+ * `total_paid` travels in the row and is deliberately ignored: it is `sum(amount_nu) over ()`,
+ * which counts a **refund as positive**, so it disagrees with `outstandingNu`'s signed
+ * arithmetic. The signed version is the one that can be read against a total.
+ *
+ * `28000` for no session and `42501` for somebody else's booking are the RPC's own refusals; both
+ * reach the caller, which is why every call site wraps this in a `catch` that costs the block
+ * rather than the page.
+ */
 export async function fetchBookingPayments(
   supabase: SupabaseClient,
   bookingId: string,
 ): Promise<Payment[]> {
-  const { data } = await supabase
-    .from("payments")
-    .select("*")
-    .eq("booking_id", bookingId)
-    .order("created_at", { ascending: true });
+  const { data, error } = await supabase.rpc("booking_payments", {
+    p_booking: bookingId,
+  });
+  if (error) throw error;
   return ((data ?? []) as Record<string, unknown>[]).map(toPayment);
 }
 

@@ -1,7 +1,7 @@
 import { countdownLabel, dayStats } from "@/lib/calendar-logic";
 import type { Booking } from "@/lib/types/booking";
 import { formatNu } from "@/lib/utils";
-import { customerName } from "./owner-booking-card";
+import { customerName } from "@/lib/types/booking";
 
 /**
  * The day's four figures, over the agenda — a port of

@@ -1,10 +1,19 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { StatusPill } from "@/components/ui/status-pill";
 import { THIMPHU_TZ } from "@/lib/time";
-import { bookingCode, type Booking } from "@/lib/types/booking";
+import {
+  bookingCode,
+  customerName,
+  type Booking,
+  type BookingStatus,
+} from "@/lib/types/booking";
 import { cn, formatNu } from "@/lib/utils";
+import { InlineBookingActions } from "./inline-booking-actions";
 
 /**
  * One row of the owner's day — a port of
@@ -26,16 +35,40 @@ import { cn, formatNu } from "@/lib/utils";
  * member clicking their own appointment would have been bounced out of their own shell.
  * Passing `null` renders the name as plain text instead of a link, which is what a surface
  * with no detail route wants. Same reason `SpecialistCard` takes an optional `href`.
+ *
+ * **`actions` makes the card able to finish a booking**, and the card holds the optimistic
+ * status for it — see `InlineBookingActions` for why the state is split this way and why a
+ * button row inside a card whose title link covers the whole surface needs its own stacking
+ * context. It is a client component for that state alone; both of its callers already were.
  */
 export function OwnerBookingCard({
   booking,
   href = `/business/bookings/${booking.id}`,
+  actions = false,
 }: {
   booking: Booking;
   /** Where the card leads. `null` for a card that is not clickable. */
   href?: string | null;
+  /**
+   * Offer Confirm / Complete / No-show / Cancel on the card itself.
+   *
+   * Off by default, because two of the three surfaces that render this card should not have
+   * them: the **week** view is read for shape and load and its `groupWeekByDay` already drops
+   * terminal bookings, and a stylist's own list is not where a salon's day is run. The app
+   * makes the same call — `_actionsFor` is wired to the agenda only.
+   */
+  actions?: boolean;
 }) {
-  const dead = booking.status === "cancelled" || booking.status === "no_show";
+  /**
+   * A status this card is showing ahead of the server, set by its own action row.
+   *
+   * Local to the card rather than lifted into the calendar, because the calendar has no list
+   * state to update — its bookings come from the server component and the day lives in the URL.
+   */
+  const [optimistic, setOptimistic] = useState<BookingStatus | null>(null);
+  const status = optimistic ?? booking.status;
+
+  const dead = status === "cancelled" || status === "no_show";
   const tz = { timeZone: THIMPHU_TZ } as const;
 
   return (
@@ -87,7 +120,7 @@ export function OwnerBookingCard({
               </span>
             ) : null}
           </span>
-          <StatusPill status={booking.status} />
+          <StatusPill status={status} />
         </span>
 
         <span className="mt-sm gap-md text-caption-sm text-muted flex items-center">
@@ -136,15 +169,28 @@ export function OwnerBookingCard({
             </span>
           ) : null}
         </span>
+
+        {actions ? (
+          <InlineBookingActions
+            booking={booking}
+            status={status}
+            onOptimistic={setOptimistic}
+          />
+        ) : null}
       </span>
     </article>
   );
 }
 
-/** The app's `customerDisplayName`, fallbacks in the same order. */
-export function customerName(b: Booking): string {
-  return b.customerName ?? (b.source === "walk_in" ? "Walk-in" : "Guest");
-}
+/*
+  `customerName` used to be exported from here and now lives in `lib/types/booking.ts`.
+
+  It had to move the moment this file gained `"use client"`: a server component importing a
+  function from a client module receives a client *reference*, not the function, so every server
+  surface that called it — both booking detail routes, `booking-detail.tsx`, `today-snapshot.tsx` —
+  threw at render. The 500 was silent in `npm run build` and showed up only as Next's own error
+  page. Do not re-export it from here.
+*/
 
 function totalMinutes(b: Booking): number {
   const items = b.items ?? [];

@@ -26,12 +26,14 @@ import { bookingTab, type Booking } from "@/lib/types/booking";
  * suppress the stylist's own name on every row, which would otherwise repeat down the list.
  * `OwnerBookingCard` never renders the staff name at all, so there is nothing to switch off.
  *
- * **The cards do not link yet.** The app opens `BusinessBookingDetailScreen` from here, and
- * that screen's web equivalent lives at `/business/bookings/[id]` — inside the console, which
- * `getOwnerContext` closes to a stylist. A link would bounce them out of their own shell, so
- * `href={null}` renders the card as plain content until the staff-scoped detail route exists.
- * Nothing is broken by its absence; the row still carries the time, the customer, the
- * services, the total and the status.
+ * **The cards link now.** This note used to explain why they could not: the app opens
+ * `BusinessBookingDetailScreen` from here, and its web equivalent existed only at
+ * `/business/bookings/[id]`, which `getOwnerContext` closes to a stylist — so `href={null}`
+ * rendered the card as plain content rather than bouncing them out of their own shell. That was
+ * a real gap dressed up as a design choice: the row carried the time and the customer but a
+ * stylist could not complete their own appointment, mark a no-show, read the note or phone
+ * anyone, while `set_booking_status` would have accepted every one of those writes.
+ * `/staff/bookings/[id]` is the route that was missing.
  */
 const LABELS = ["Upcoming", "Completed", "Cancelled"];
 
@@ -74,7 +76,7 @@ export function StaffBookings({ bookings }: { bookings: Booking[] }) {
         <ul className="gap-base mt-lg grid grid-cols-1 desktop:grid-cols-2">
           {shown.map((booking) => (
             <li key={booking.id}>
-              <OwnerBookingCard booking={booking} href={null} />
+              <OwnerBookingCard booking={booking} href={`/staff/bookings/${booking.id}`} />
             </li>
           ))}
         </ul>

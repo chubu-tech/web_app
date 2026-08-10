@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { NoSalonYet } from "@/components/owner/no-salon-yet";
 import { StaffEditor } from "@/components/owner/staff-editor";
+import { fetchPendingInvite } from "@/lib/api/staff-invites";
 import { fetchBusinessHours } from "@/lib/api/discovery";
 import { fetchBusinessBookings } from "@/lib/api/owner";
 import {
@@ -9,9 +10,12 @@ import {
   fetchStaffServiceIds,
   fetchStaffWorkingHours,
 } from "@/lib/api/owner-setup";
+import { fetchPayroll } from "@/lib/api/owner-back-office";
 import { fetchServices, fetchStaff } from "@/lib/api/salon";
+import { hasFeature } from "@/lib/entitlements";
 import { getOwnerContext } from "@/lib/owner/context";
 import { createClient } from "@/lib/supabase/server";
+import { thimphuToday } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Edit staff" };
 
@@ -51,17 +55,62 @@ export default async function OwnerStaffDetailPage({
   const now = new Date();
   const in60Days = new Date(now.getTime() + 60 * 86_400_000);
 
-  const [services, serviceIds, hours, photos, salonHours, bookings] = await Promise.all([
-    fetchServices(supabase, active.id, { activeOnly: false }),
-    fetchStaffServiceIds(supabase, id),
-    fetchStaffWorkingHours(supabase, id),
-    fetchStaffPhotoRows(supabase, id),
-    // Its own failure must not blank the screen: it only greys weekdays out, so an empty
-    // array means "every day editable", which is what `openWeekdaysFrom` already does for an
-    // unseeded salon.
-    fetchBusinessHours(supabase, active.id).catch(() => []),
-    fetchBusinessBookings(supabase, active.id, { from: now, to: in60Days }).catch(() => []),
-  ]);
+  /**
+   * This stylist's stored pay, and the **only** way a client can see it.
+   *
+   * `staff_members.commission_pct` and `base_salary_nu` are outside every client role's SELECT
+   * privilege, so `fetchStaff` above cannot return them and `toStaffMember` substitutes 0 — which
+   * meant the editor's pay inputs opened at 0 on a Pro salon and Save wrote that 0 over a real
+   * salary. `payroll_report` is `SECURITY DEFINER`, so it reads both columns; the app re-reads
+   * them the same way after `16e13d6` dropped them from its own projection.
+   *
+   * **Read only when the plan allows it.** The RPC raises `P0001 'payroll requires Pro'`
+   * otherwise, and no live salon is Pro — so on every real salon this is skipped entirely and the
+   * pay block renders its locked card, which is the same condition. Asking anyway would be one
+   * guaranteed refusal per page load.
+   *
+   * The window is the current Thimphu month. It scopes the *aggregates* — completed bookings and
+   * revenue — which nothing here reads; `commission_pct` and `base_salary_nu` come straight off
+   * the row and are the same in any window. A natural month rather than an empty range so the
+   * call is one a person would recognise in a log.
+   */
+  const payWindowStart = new Date(
+    Date.UTC(thimphuToday().getUTCFullYear(), thimphuToday().getUTCMonth(), 1),
+  );
+  const payWindowEnd = new Date(
+    Date.UTC(thimphuToday().getUTCFullYear(), thimphuToday().getUTCMonth() + 1, 1),
+  );
+  const storedPay = hasFeature(active.plan, "commissions")
+    ? await fetchPayroll(supabase, active.id, payWindowStart, payWindowEnd)
+        .then((rows) => {
+          const row = rows.find((r) => r.staffMemberId === id);
+          return row
+            ? { commissionPct: row.commissionPct, baseSalaryNu: row.baseSalaryNu }
+            : null;
+        })
+        // A failure must not take the editor down, and must not become a zero either: null
+        // leaves the inputs at what the type says rather than inventing a salary.
+        .catch(() => null)
+    : null;
+
+  const [services, serviceIds, hours, photos, salonHours, bookings, pendingInvite] =
+    await Promise.all([
+      fetchServices(supabase, active.id, { activeOnly: false }),
+      fetchStaffServiceIds(supabase, id),
+      fetchStaffWorkingHours(supabase, id),
+      fetchStaffPhotoRows(supabase, id),
+      // Its own failure must not blank the screen: it only greys weekdays out, so an
+      // empty array means "every day editable", which is what `openWeekdaysFrom` already
+      // does for an unseeded salon.
+      fetchBusinessHours(supabase, active.id).catch(() => []),
+      fetchBusinessBookings(supabase, active.id, { from: now, to: in60Days }).catch(
+        () => [],
+      ),
+      // An outstanding invitation to this chair, if any. Failing to read it costs the
+      // pending card and nothing else — the form below it still works, and re-sending is
+      // safe because the RPC revokes any previous invite itself.
+      fetchPendingInvite(supabase, id).catch(() => null),
+    ]);
 
   return (
     <StaffEditor
@@ -73,6 +122,8 @@ export default async function OwnerStaffDetailPage({
       salonHours={salonHours}
       photos={photos}
       upcoming={bookings.filter((b) => b.staffMemberId === id)}
+      pendingInvite={pendingInvite}
+      storedPay={storedPay}
     />
   );
 }

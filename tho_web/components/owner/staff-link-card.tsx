@@ -7,51 +7,82 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { ownerErrorMessage } from "@/lib/api/owner-errors";
-import { linkStaffMember, unlinkStaffMember } from "@/lib/api/owner-setup";
+import { unlinkStaffMember } from "@/lib/api/owner-setup";
+import {
+  createStaffInvite,
+  revokeStaffInvite,
+  type PendingInvite,
+} from "@/lib/api/staff-invites";
 import { createClient } from "@/lib/supabase/client";
 
 /**
- * Attach a login to a stylist, or detach one — a port of the Login account block in
- * `staff_edit_screen.dart`.
+ * Invite someone to a chair, or detach the account already in it — a port of the Login
+ * account block in `staff_edit_screen.dart:167-213,426-448`.
  *
- * **This is what Phase 4 is built on.** `private.is_business_member` admits an active
- * `staff_members` row whose `profile_id` matches the caller, so linking is what lets someone
- * sign in and see their own day; nothing else grants staff access to a salon.
+ * ## It used to link instantly, and that was the bug
  *
- * **Two things the RPC does that a direct write cannot**, which is why it is the only path
- * and why `20260805000001` took `profile_id` out of the owner's UPDATE grant: it resolves the
- * address against `auth.users`, so the account must exist and the owner had to know an email
- * the person controls; and it sets `profiles.role = 'staff'`, so the app routes them to the
- * staff surface instead of the customer one.
+ * This called `link_staff_member`, which resolved an email against `auth.users` and set
+ * `profiles.role = 'staff'` on the spot. An owner who knew an address could convert a
+ * stranger's account — replacing their entire shell — with no consent and no notice.
+ * Upstream removed that RPC in `ee413c6` ("ask before making someone staff") and this was
+ * the last caller anywhere. Now the owner invites and the person accepts; nothing about
+ * their account moves until they do.
  *
- * **The RPC's own message is passed through**, because *"Ask the person to create an account
- * first, then link"* is the actual next step and no wording of ours improves on it.
+ * ## The message after sending must not depend on whether the account exists
  *
- * Linking is immediate rather than part of the screen's Save: it changes another person's
- * account, which is not something to bundle into a button labelled Save.
+ * `create_staff_invite` deliberately returns one constant answer, with a comment in the
+ * SQL warning against a friendlier "we couldn't find that account" branch — because that
+ * branch is an account-existence oracle for any address an owner cares to type. The toast
+ * below therefore says the same sentence every time, and the pending card states the
+ * address rather than a person. Do not "improve" either into a confirmation that somebody
+ * is there.
+ *
+ * ## Three states, not two
+ *
+ * **Linked** — someone accepted; offer Unlink. **Invited** — outstanding, with the
+ * address, when it lapses, and Revoke. **Neither** — the form. Sending while an invite is
+ * outstanding is safe: the RPC revokes the old one itself, so re-sending is how you
+ * correct a typo.
  */
 export function StaffLinkCard({
   staffId,
   linkedProfileId,
+  pendingInvite,
 }: {
   staffId: string;
   linkedProfileId: string | null;
+  /** Read server-side by the staff editor page. Null when nothing is outstanding. */
+  pendingInvite: PendingInvite | null;
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function link() {
+  async function invite() {
     const trimmed = email.trim();
     if (!trimmed) return;
     setBusy(true);
     try {
-      await linkStaffMember(createClient(), staffId, trimmed);
+      await createStaffInvite(createClient(), staffId, trimmed);
       setEmail("");
-      toast.success("Linked — they can now sign in and see their bookings.");
+      // One sentence, whether or not that address belongs to anyone. See above.
+      toast.success("Invite sent — they join once they accept.");
       router.refresh();
     } catch (caught) {
-      toast.error(ownerErrorMessage("linkStaff", caught));
+      toast.error(ownerErrorMessage("inviteStaff", caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revoke(inviteId: string) {
+    setBusy(true);
+    try {
+      await revokeStaffInvite(createClient(), inviteId);
+      toast.success("Invite withdrawn.");
+      router.refresh();
+    } catch (caught) {
+      toast.error(ownerErrorMessage("inviteStaff", caught));
     } finally {
       setBusy(false);
     }
@@ -86,14 +117,48 @@ export function StaffLinkCard({
     );
   }
 
+  if (pendingInvite) {
+    return (
+      <div className="border-hairline-soft bg-surface-soft p-base rounded-md border">
+        <div className="gap-sm flex items-start">
+          <Icons.mail
+            className="text-muted mt-0.5 shrink-0"
+            style={{ width: IconSize.xs, height: IconSize.xs }}
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            {/* The address, not a name. We do not know — and must not imply — that
+                anybody holds it. */}
+            <p className="text-body-sm text-ink">
+              Invite sent to <span className="font-medium">{pendingInvite.email}</span> —
+              they join once they accept.
+            </p>
+            <p className="text-caption text-muted mt-xxs">
+              Expires{" "}
+              {pendingInvite.expiresAt.toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "long",
+                timeZone: "Asia/Thimphu",
+              })}
+              . Sending a new invite replaces this one.
+            </p>
+          </div>
+          <Button variant="quiet" busy={busy} onClick={() => void revoke(pendingInvite.id)}>
+            Revoke
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <p className="text-body-sm text-muted mb-sm">
-        Link a login so this stylist can sign in and see only their own bookings and schedule.
-        They need to create an account first.
+        Invite someone to this chair. They&apos;ll be asked to accept, and once they do
+        they can sign in and see only their own bookings and schedule.
       </p>
       <Field
-        label="Account email"
+        label="Their email"
         value={email}
         onChange={setEmail}
         type="email"
@@ -101,9 +166,14 @@ export function StaffLinkCard({
         autoComplete="off"
       />
       <div className="mt-sm">
-        <Button variant="outlined" busy={busy} disabled={!email.trim()} onClick={() => void link()}>
-          <Icons.link style={{ width: IconSize.xs, height: IconSize.xs }} aria-hidden />
-          Link account
+        <Button
+          variant="outlined"
+          busy={busy}
+          disabled={!email.trim()}
+          onClick={() => void invite()}
+        >
+          <Icons.send style={{ width: IconSize.xs, height: IconSize.xs }} aria-hidden />
+          Send invite
         </Button>
       </div>
     </div>

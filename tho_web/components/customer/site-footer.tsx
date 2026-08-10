@@ -11,12 +11,20 @@ import { readySecondary, readyTabs } from "./destinations";
  *
  * ## Every link here is a route that exists
  *
- * The groups below are built from `destinations.ts`, the same list the header and
- * `/profile` read, rather than from a hand-written array — so the footer cannot promise
- * a page the nav knows is not ready, and a milestone that flips a `ready` flag lights it
- * up in all three places at once. That rule is why there is no About, no Help centre, no
- * Privacy and no app-store badge: none of them exist, and a footer full of dead links is
- * the most generic thing a footer can be.
+ * The destination groups below are built from `destinations.ts`, the same list the header
+ * and `/profile` read, rather than from a hand-written array — so the footer cannot
+ * promise a page the nav knows is not ready, and a milestone that flips a `ready` flag
+ * lights it up in all three places at once.
+ *
+ * **The fourth group is legal, and it used to be an argument for having none.** This
+ * comment previously reasoned that there was no Help, no Privacy and no Terms because
+ * none of them existed and a footer full of dead links is the most generic thing a footer
+ * can be. That reasoning was right and the premise expired: `accept_terms` made agreeing
+ * to the Terms a precondition for posting anything, so the document it asks people to
+ * accept has to be reachable without being mid-way through a review. All four are real
+ * routes under `app/(customer)/legal/` and `/help`.
+ *
+ * There is still no About and no app-store badge, for the original reason.
  *
  * `/products` and `/cart` are deliberately absent for the same reason `destinations.ts`
  * gives — Products is a *segment* of Discover sharing its search box, and the cart is
@@ -79,6 +87,19 @@ export function SiteFooter({
     { label: "Browse", items: pick(["/", "/map", "/saved"], at) },
     { label: "Your visits", items: pick(["/bookings", "/messages", "/notifications"], at) },
     { label: "Shop & rewards", items: pick(["/orders", "/rewards", "/profile"], at) },
+    // Not from `destinations.ts`: these are documents, not places to go, so they are
+    // deliberately absent from the nav and from `/profile`'s row list. They are written
+    // out because there is no `ready` flag to consult — the routes either exist or the
+    // build fails.
+    {
+      label: "Legal",
+      items: [
+        { href: "/help", label: "Help" },
+        { href: "/legal/terms", label: "Terms" },
+        { href: "/legal/privacy", label: "Privacy" },
+        { href: "/legal/content-policy", label: "Content policy" },
+      ],
+    },
   ];
 
   return (
@@ -115,13 +136,14 @@ export function SiteFooter({
             **Two columns at 390**, not one. Nine links in a single stack made the footer
             955px tall on a phone — measured — which is a screen and a half of scrolling
             past the end of the page. The labels are one or two short words, so two
-            columns fit at 171px each and the block halves. Three columns only at
-            `desktop`, where the brand block sits beside them.
+            columns fit at 171px each and the block halves. Two columns still at `desktop`
+            now that Legal is a fourth group: four across would squeeze "Content policy"
+            onto two lines beside a brand block that already takes 1.4fr.
 
-            A `nav` per group with its own label, because three unlabelled link lists in
+            A `nav` per group with its own label, because four unlabelled link lists in
             one landmark is one landmark a screen reader cannot navigate.
           */}
-          <div className="gap-lg desktop:gap-lg grid grid-cols-2 desktop:col-span-3 desktop:grid-cols-3">
+          <div className="gap-lg grid grid-cols-2 desktop:col-span-3">
             {groups.map((group) => (
               <nav key={group.label} aria-label={group.label}>
                 <h2 className="text-caption-sm text-ink mb-md font-semibold tracking-[0.14em] uppercase">

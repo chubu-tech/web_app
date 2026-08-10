@@ -23,10 +23,59 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 export type Role = "customer" | "staff" | "owner" | "admin";
 
+/**
+ * The part of the `profiles` row that routing depends on — **not just the role**.
+ *
+ * A port of `tho/app/lib/auth/account_state.dart`, and it exists for the reason that
+ * file spells out: `role` alone cannot answer *"should this session still work at all"*.
+ * Upstream's audit found a deleted account keeping a fully working session and creating
+ * a confirmed booking (A2-01), and suspension read by nothing anywhere (A2-04). The
+ * server refuses those writes now, but a refusal nobody can interpret is its own
+ * failure — you land on Discover, press Book, and get *"the slot may have just been
+ * taken"*.
+ */
+export type AccountState = {
+  role: Role;
+  deletedAt: Date | null;
+  suspendedAt: Date | null;
+  /** Null **while suspended** means indefinitely — not "not suspended". */
+  suspendedUntil: Date | null;
+};
+
+/**
+ * Mirrors `private.is_user_blocked` on the server: suspended, and either open-ended or
+ * with an end still in the future. **A suspension that has run out is not a suspension**
+ * — reading `suspended_at` alone would strand someone whose ban expired last month.
+ */
+export function isSuspended(s: AccountState, now: Date = new Date()): boolean {
+  if (s.suspendedAt == null) return false;
+  return s.suspendedUntil == null || s.suspendedUntil.getTime() > now.getTime();
+}
+
+export function isDeleted(s: AccountState): boolean {
+  return s.deletedAt != null;
+}
+
+/** Either terminal state. Deletion is tested first everywhere, because the copy differs. */
+export function isBlocked(s: AccountState, now: Date = new Date()): boolean {
+  return isDeleted(s) || isSuspended(s, now);
+}
+
 export type Account =
   | { state: "anonymous"; user: null }
   | { state: "guest"; user: User }
-  | { state: "registered"; user: User; role: Role };
+  | { state: "registered"; user: User; role: Role; account: AccountState }
+  /**
+   * A session with **no readable `profiles` row**, which is deliberately its own state
+   * rather than a shrug.
+   *
+   * `getAccount` used to end `(data?.role as Role) ?? "customer"`, so *"I could not read
+   * the profile"* and *"this person is a customer"* were the same answer — meaning any
+   * future tightening of `profiles` RLS would silently demote every owner and stylist to
+   * the customer shell, with nothing logged and nothing shown. Upstream hit exactly this
+   * and calls it A2-08. **An unknown must not be routed on.**
+   */
+  | { state: "unavailable"; user: User };
 
 /** True when there is no session, or the session is anonymous. */
 export function isGuestUser(user: User | null): boolean {

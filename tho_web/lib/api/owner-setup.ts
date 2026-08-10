@@ -286,30 +286,22 @@ export async function setStaffWorkingHours(
 }
 
 /**
- * Attach a login to a stylist by email.
+ * **`linkStaffMember` was here and is deliberately gone.**
  *
- * The RPC resolves the address against `auth.users` and sets `profiles.role = 'staff'`, so
- * the person can sign in and reach the staff surface. It raises a sentence written for a
- * human when there is no such account — surfaced as-is, because "ask them to create an
- * account first" is the actual next step.
+ * It called `link_staff_member`, which resolved an email against `auth.users` and set
+ * `profiles.role = 'staff'` on the holder immediately — so an owner who knew or guessed
+ * an address could replace a stranger's entire shell with no consent and no notice.
+ * Upstream removed that RPC in `ee413c6` ("ask before making someone staff") and
+ * `tho_web` was the last caller anywhere.
  *
- * Note what the owner cannot then see: `profiles_select` only lets a member read a
- * customer who is in their queue or has booked with them, so the linked person's profile
- * row stays invisible to the salon. Nothing here needs it — `staff_members.display_name`
- * is the salon's own name for them.
+ * Its replacement is the handshake in `lib/api/staff-invites.ts`: the owner invites, the
+ * person accepts, and nothing about their account moves until they do. **Do not
+ * reintroduce this as a shortcut** — the RPC may still exist on the database, and calling
+ * it would re-open exactly the hole the migration closed.
+ *
+ * Unlinking stays, and is not the same shape: it only ever detaches an account that
+ * already consented, and only from the owner's own salon.
  */
-export async function linkStaffMember(
-  supabase: SupabaseClient,
-  staffId: string,
-  email: string,
-): Promise<void> {
-  const { error } = await supabase.rpc("link_staff_member", {
-    p_staff_id: staffId,
-    p_email: email,
-  });
-  if (error) throw error;
-}
-
 export async function unlinkStaffMember(
   supabase: SupabaseClient,
   staffId: string,
@@ -546,29 +538,35 @@ export async function fetchBusinessCategoryIds(
 }
 
 /**
- * Replace the salon's categories.
+ * Replace the salon's categories — **through the RPC.**
  *
- * Delete-then-insert, because there is no RPC and the table is a bare join with a
- * composite primary key — nothing to upsert *onto*. The failure mode is mild and the order
- * still matters: a failed insert after a successful delete leaves the salon uncategorised,
- * which affects only which category chips it appears under on Discover. Insert first would
- * violate the primary key on every unchanged row.
+ * This was a client-side delete-then-insert, and the comment above it said there was no RPC
+ * to route through. There is: `set_business_categories(p_business_id, p_category_ids)`,
+ * granted to `authenticated`, confirmed against the live catalogue. Three things the two
+ * writes bought that one call does not have to:
+ *
+ * - **Atomicity.** A failed insert after a successful delete left the salon *uncategorised* —
+ *   invisible under every category chip on Discover until the owner saved again. The RPC does
+ *   both in one statement pair inside one function, so a failure changes nothing.
+ * - **A real ownership check.** `business_categories`' policies were the only gate; the RPC
+ *   checks `private.is_business_owner` itself and refuses otherwise, which is the
+ *   CLAUDE.md rule every other set-write here already follows.
+ * - **Category validation.** It inserts by joining `public.categories`, so an id that names
+ *   nothing is dropped rather than raising a foreign-key error at the client.
+ *
+ * An empty array clears them, which is why there is no early return: the delete has to
+ * happen even with nothing to insert, and the RPC's `array_length(...) is null` guard is what
+ * makes that safe.
  */
 export async function setBusinessCategories(
   supabase: SupabaseClient,
   businessId: string,
   categoryIds: string[],
 ): Promise<void> {
-  const { error: deleteError } = await supabase
-    .from("business_categories")
-    .delete()
-    .eq("business_id", businessId);
-  if (deleteError) throw deleteError;
-
-  if (categoryIds.length === 0) return;
-  const { error } = await supabase
-    .from("business_categories")
-    .insert(categoryIds.map((id) => ({ business_id: businessId, category_id: id })));
+  const { error } = await supabase.rpc("set_business_categories", {
+    p_business_id: businessId,
+    p_category_ids: categoryIds,
+  });
   if (error) throw error;
 }
 

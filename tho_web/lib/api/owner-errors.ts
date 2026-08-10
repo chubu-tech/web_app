@@ -56,7 +56,7 @@ export type OwnerAction =
   | "enableCatalogService"
   | "createStaff"
   | "saveStaff"
-  | "linkStaff"
+  | "inviteStaff"
   | "unlinkStaff"
   | "saveStaffPay"
   | "saveStaffHours"
@@ -105,7 +105,7 @@ const FALLBACK: Record<OwnerAction, string> = {
   enableCatalogService: "Couldn't update.",
   createStaff: "Couldn't add staff.",
   saveStaff: "Some changes couldn't be saved — please try again.",
-  linkStaff: "Couldn't link that account. Check the email and try again.",
+  inviteStaff: "Couldn't send that invite. Check the email and try again.",
   unlinkStaff: "Couldn't unlink.",
   saveStaffPay: "Couldn't save pay.",
   saveStaffHours: "Couldn't save these hours.",
@@ -207,9 +207,15 @@ export function ownerErrorMessage(action: OwnerAction, error: unknown): string {
         // 'this shop is not running a queue' / 'service not found for this business'
         // — each names the thing to fix.
         return messageOf(error, fallback);
-      case "linkStaff":
-        // 'Could not link this account. Ask the person to create an account first, then
-        // link.' — already a sentence written for a human, and the only useful reply.
+      case "inviteStaff":
+        // 'enter a valid email address' (22023) · 'this staff member already has a linked
+        // account' / 'staff member not found' (P0001) · 'only the salon owner can invite
+        // staff' (42501). Each names the thing to fix.
+        //
+        // **None of them reveals whether the address belongs to an account** — the RPC
+        // answers identically either way, on purpose (it would otherwise be an
+        // account-existence oracle). Passing the message straight through is safe here
+        // *because* of that; do not add a friendlier branch on the client either.
         return messageOf(error, fallback);
       case "saveStaffHours":
         // 'overlapping working hours on the same day' / 'each interval needs day 0-6 and

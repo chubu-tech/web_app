@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { fetchMyBusinesses } from "../api/owner";
 import { homeForRole } from "../auth";
-import { getAccount } from "../session";
+import { requireLiveAccount } from "../session";
 import { createClient } from "../supabase/server";
 import type { Business } from "../types/salon";
 import { ACTIVE_BUSINESS_COOKIE, resolveActiveBusinessId } from "./active-business";
@@ -39,7 +39,9 @@ export type OwnerContext = {
 };
 
 export const getOwnerContext = cache(async (): Promise<OwnerContext> => {
-  const account = await getAccount();
+  // Blocked before role, matching `auth_gate.dart:127`. A suspended owner reaching the
+  // console would find every write refused with no explanation on screen.
+  const account = await requireLiveAccount();
 
   // A visitor or a guest has no role to check yet. `?next=` brings them back here.
   if (account.state !== "registered") {

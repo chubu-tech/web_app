@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Icons, IconSize } from "@/components/ui/icons";
+import { ReportButton } from "@/components/ui/report-button";
+import { TermsGate } from "@/components/ui/terms-gate";
 import { fetchMessages, markConversationRead, sendMessage } from "@/lib/api/chat";
+import { hasAcceptedTerms } from "@/lib/api/moderation";
 import { isMine } from "@/lib/chat-logic";
 import { createClient } from "@/lib/supabase/client";
 import { THIMPHU_TZ } from "@/lib/time";
@@ -35,6 +38,9 @@ export function ChatThread({
   const [failed, setFailed] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
+  /** The message held while the terms gate is up. A ref — nothing renders it. */
+  const pendingDraft = useRef<string | null>(null);
 
   const tick = usePollTick(3_000);
   const bottom = useRef<HTMLDivElement>(null);
@@ -74,6 +80,20 @@ export function ChatThread({
     if (text.length === 0 || sending) return;
     setSending(true);
     try {
+      /*
+        The terms gate, on the **first** message only.
+
+        `messages_insert` requires accepted terms since `20260807000012`, so without this
+        the first thing anybody says to a salon fails with a bare `P0004`. The draft is
+        held rather than cleared, so agreeing does not cost them what they typed.
+      */
+      if (!(await hasAcceptedTerms(createClient(), viewerId))) {
+        pendingDraft.current = text;
+        setTermsOpen(true);
+        setSending(false);
+        return;
+      }
+
       const sent = await sendMessage(createClient(), {
         conversationId,
         senderId: viewerId,
@@ -182,13 +202,38 @@ export function ChatThread({
           <Icons.send style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
         </button>
       </form>
+
+      {/* Asked once, ever, and only in front of the first message — after which
+          `terms_accepted_at` is set and this never opens again. */}
+      <TermsGate
+        open={termsOpen}
+        onClose={() => setTermsOpen(false)}
+        action="send this message"
+        onAccepted={() => {
+          const held = pendingDraft.current;
+          pendingDraft.current = null;
+          if (held) void send(held);
+        }}
+      />
     </div>
   );
 }
 
+/**
+ * One message.
+ *
+ * **The report control is on the other side's messages only.** `chat_thread_screen.dart:278`
+ * gives the reason and it is not squeamishness: offering it on your own message reads as a
+ * bug, and there is nothing there to report — `report_content` refuses `target = 'user'`
+ * pointed at yourself, and a report of your own message would simply file against you.
+ *
+ * The app hides it behind a long press. This does not, because there is no honest web
+ * equivalent: a hover reveal is invisible on a touchscreen, which is where most of chat
+ * happens, so the control is present and quiet instead. Same trade as the review tile's.
+ */
 function Bubble({ message, mine }: { message: Message; mine: boolean }) {
   return (
-    <div className={cn("flex", mine ? "justify-end" : "justify-start")}>
+    <div className={cn("gap-xs flex items-start", mine ? "justify-end" : "justify-start")}>
       <div
         className={cn(
           "px-base py-sm max-w-[80%] rounded-md",
@@ -210,6 +255,17 @@ function Bubble({ message, mine }: { message: Message; mine: boolean }) {
           })}
         </time>
       </div>
+
+      {/* After the bubble in the DOM as well as beside it on screen, so a screen reader
+          reads the message before the control that acts on it. */}
+      {mine ? null : (
+        <ReportButton
+          target="message"
+          targetId={message.id}
+          label="this message"
+          className="size-8"
+        />
+      )}
     </div>
   );
 }

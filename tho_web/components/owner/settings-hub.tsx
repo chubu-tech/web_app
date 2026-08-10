@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DeleteAccountCard } from "@/components/auth/delete-account";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import {
   BACK_OFFICE_DESTINATIONS,
@@ -133,6 +134,11 @@ export function SettingsHub({
           looking at. Your salon, your bookings and your team are untouched.
         </p>
         <SignOutButton label="Log out" fullWidth={false} destructive />
+
+        {/* The owner's own account, same sheet as the customer's. `delete_account` raises
+            `P0001` naming how many salons they still own, so an owner with a live salon
+            is refused in the server's own words rather than by a guess made here. */}
+        <DeleteAccountCard />
       </div>
     </div>
   );

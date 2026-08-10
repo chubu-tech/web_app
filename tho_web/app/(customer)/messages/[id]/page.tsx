@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChatThread } from "@/components/customer/chat-thread";
+import { ThreadSafetyMenu } from "@/components/customer/thread-safety-menu";
 import { HeroCircleButton } from "@/components/ui/detail-bits";
 import { Icons } from "@/components/ui/icons";
 import { fetchConversationById, fetchMessages } from "@/lib/api/chat";
@@ -55,6 +56,23 @@ export default async function MessageThreadPage({
             View salon
           </Link>
         </div>
+
+        {/*
+          Report or block the salon — in the thread's own header, which
+          `chat_thread_screen.dart:212` argues is the only place it belongs.
+
+          **Rendered only when the owner id came back**, because every item in it needs a
+          person to act on. The embed is empty for a salon that is not publicly readable
+          (`businesses_select` requires `status = 'approved'` on its public branch), which is
+          the same condition that leaves `businessName` null above. Individual messages are
+          still reportable from the transcript either way.
+        */}
+        {conversation.businessOwnerId ? (
+          <ThreadSafetyMenu
+            counterpartyId={conversation.businessOwnerId}
+            counterpartyName={conversation.businessName ?? "this salon"}
+          />
+        ) : null}
       </div>
 
       <ChatThread

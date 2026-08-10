@@ -3,7 +3,7 @@ import { CartBar } from "@/components/customer/cart-bar";
 import { CustomerHeader } from "@/components/customer/customer-nav";
 import { InLineBar } from "@/components/customer/in-line-bar";
 import { SiteFooter } from "@/components/customer/site-footer";
-import { getAccount } from "@/lib/session";
+import { requireLiveAccount } from "@/lib/session";
 
 /**
  * The cream canvas, so the browser chrome matches the page rather than the owner
@@ -32,7 +32,12 @@ export default async function CustomerLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   // A guest counts as not signed in: they hold a session but no account, so the
   // nav should still offer the way in.
-  const account = await getAccount();
+  //
+  // `requireLiveAccount` rather than `getAccount`: a deleted or suspended session is
+  // stopped here, before the shell, exactly as `auth_gate.dart:127` stops it before the
+  // role switch. Anonymous visitors and guests pass straight through — there is no
+  // profile row to judge — so the public site is untouched.
+  const account = await requireLiveAccount();
 
   return (
     /*

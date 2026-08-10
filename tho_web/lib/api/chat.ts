@@ -17,8 +17,16 @@ import { toConversation, toMessage } from "./mappers";
  * in front of sending — not after the failure.
  */
 
-/** The embeds the thread list needs: the salon's name and cover for the row. */
-const CONVERSATION_SELECT = "*, businesses(name, cover_url)";
+/**
+ * The embeds a thread needs: the salon's name and cover for the row, and its **owner id**.
+ *
+ * The owner is the customer's counterparty, so it is who a report or a block is *about* —
+ * without it the thread can only offer "report this message" and not "report this salon".
+ * `businesses.owner_id` is an ordinary column on a row the customer can already read, and
+ * the block it feeds is enforced in RLS on `conversations` and `messages`
+ * (`20260807000011`), not here.
+ */
+const CONVERSATION_SELECT = "*, businesses(name, cover_url, owner_id)";
 
 /**
  * The caller's own threads, newest activity first.

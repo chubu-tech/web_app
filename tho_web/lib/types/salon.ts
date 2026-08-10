@@ -202,6 +202,20 @@ export function isLinked(s: Pick<StaffMember, "profileId">): boolean {
   return s.profileId != null;
 }
 
+/**
+ * One photograph on a review.
+ *
+ * **The id is nullable and that is not defensive padding** — it is what a report control
+ * hangs off. `report_content` takes a `review_photo` *id*, so a query that selected only
+ * the url cannot report the photo it is showing. Rather than let that produce a button
+ * that always raises `P0002`, a photo with no id falls back to reporting the review that
+ * carries it, exactly as `business_detail_screen.dart:777-786` does.
+ */
+export type ReviewPhoto = {
+  id: string | null;
+  url: string;
+};
+
 export type Review = {
   id: string;
   rating: number;
@@ -216,7 +230,7 @@ export type Review = {
    * no ordering promise on an embedded resource, and the first photo the
    * customer picked should lead the strip.
    */
-  photoUrls: string[];
+  photos: ReviewPhoto[];
 };
 
 export type Offer = {

@@ -4,7 +4,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { fetchMyStaffMember } from "../api/staff";
 import { homeForRole } from "../auth";
-import { getAccount } from "../session";
+import { requireLiveAccount } from "../session";
 import { createClient } from "../supabase/server";
 import type { StaffMember } from "../types/salon";
 
@@ -34,7 +34,9 @@ export type StaffContext = {
 };
 
 export const getStaffContext = cache(async (): Promise<StaffContext> => {
-  const account = await getAccount();
+  // Blocked before role, matching `auth_gate.dart:127`: a suspended stylist must meet
+  // the explanation, not an empty rota they cannot act on.
+  const account = await requireLiveAccount();
 
   // A visitor or a guest has no role to check yet. `?next=` brings them back here.
   if (account.state !== "registered") {

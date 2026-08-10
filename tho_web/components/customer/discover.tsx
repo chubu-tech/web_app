@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BusinessCard } from "@/components/ui/business-card";
 import { Button } from "@/components/ui/button";
@@ -315,6 +316,18 @@ export function Discover({
             requestAnimationFrame(() => searchInput.current?.focus());
           }}
         />
+        {/* Scan, in the app's own position — an action beside search on the home surface
+            (`customer_home.dart:72`). A `Link`, not a toggle: it goes to a route rather than
+            opening something here, and the camera has no business being on this page. Hidden
+            below `tablet` only if it ever crowds; at 390px this row is a segmented control plus
+            three 48px buttons, which fits. */}
+        <Link
+          href="/scan"
+          aria-label="Scan a salon's queue QR"
+          className="text-ink hover:bg-surface-soft relative flex size-12 shrink-0 items-center justify-center rounded-full"
+        >
+          <Icons.qr style={{ width: IconSize.md, height: IconSize.md }} aria-hidden />
+        </Link>
         {onProducts ? (
           <IconToggle
             icon={Icons.filter}
@@ -399,7 +412,13 @@ export function Discover({
               <RecommendedRow ranked={ranked} priority />
               <NearbyRow nearby={nearby} />
               <OffersRow offers={offers} />
-              <TopRatedRow businesses={topRated(inRange)} />
+              {/* `total` is every rated salon in the current set, so the row knows whether
+                  its 5 are all of them — `topRated`'s own filter, applied twice rather than
+                  guessed at from a length. */}
+              <TopRatedRow
+                businesses={topRated(inRange)}
+                total={inRange.filter((b) => b.avgRating != null).length}
+              />
             </div>
           ) : null}
 

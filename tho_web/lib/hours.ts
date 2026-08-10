@@ -92,6 +92,47 @@ export function hmsFromMinutes(minutes: number): string {
 /** Re-exported under the Dart's name so the two files read alike side by side. */
 export const minutesFromHms = minutesOfDay;
 
+/**
+ * Closing time, as minutes from the start of the day. `24:00:00` is a valid Postgres
+ * `time` and `hmsFromMinutes(1440)` produces it, so a stylist really can work until
+ * midnight.
+ */
+export const END_OF_DAY_MIN = 24 * 60;
+
+/**
+ * What `<input type="time">` shows for a stretch's **end**.
+ *
+ * `24:00` is not a value the control accepts — it rejects it and renders empty — so a
+ * stylist whose day closes at midnight would have appeared to have no closing time at all,
+ * and the first edit to any other field would have written 23:59 back. That is not cosmetic:
+ * `20260807000036_bookable_window_midnight` exists so a 22:30–24:00 booking fits, and an end
+ * of 1439 is the one minute that stops it fitting. Losing the last slot of every late day
+ * silently is the same defect from the other side.
+ *
+ * So midnight is written `00:00` on the end field — which is what it is, the hour the day
+ * closes at — and {@link endMinutesFromInput} reads it back as 1440. The editor labels it, so
+ * the convention is stated rather than hidden. Everywhere else 1440 formats as `24:00`
+ * (see {@link formatSegment}), which is the right reading for a human and impossible for the
+ * control.
+ */
+export function endInputValue(minutes: number): string {
+  return minutes === END_OF_DAY_MIN ? "00:00" : formatMinutesOfDay(minutes);
+}
+
+/**
+ * Minutes for a value typed into a stretch's **end** field — the inverse of
+ * {@link endInputValue}.
+ *
+ * `00:00` means the end of the day, never the start of it: a stretch ending the instant it
+ * could begin is not something an owner can mean, and `dayHasOverlap` rejects it as inverted
+ * anyway, so the reading loses nothing and gains the only expression of midnight the control
+ * has.
+ */
+export function endMinutesFromInput(value: string): number {
+  const minutes = minutesOfDay(value);
+  return minutes === 0 ? END_OF_DAY_MIN : minutes;
+}
+
 export function emptyWeek(): WeekHours {
   return Array.from({ length: 7 }, (_, dayOfWeek) => ({ dayOfWeek, segments: [] }));
 }
@@ -157,12 +198,60 @@ export function weekHasErrors(week: WeekHours): boolean {
 }
 
 /**
+ * The stretches a booking must fit **inside one of** — contiguous runs coalesced into one.
+ *
+ * `private.is_bookable_window` requires a booking to fit entirely within a single
+ * `staff_working_hours` row, so `09:00–18:00` + `18:00–19:00` was not a 9-to-7 day: it was
+ * two days, and a 90-minute service could start no later than 16:30 in the first and never
+ * at all in the second. `20260807000034_merge_touching_working_hours` fixed that by
+ * coalescing touching runs before insert, so **the stored shape is not always the shape the
+ * editor holds** — and anything here reasoning about what is bookable has to reason about
+ * the stored one.
+ *
+ * A port of that migration's gaps-and-islands grouping, and the running maximum is the part
+ * that matters: the SQL compares against `max(end) over (… unbounded preceding …)`, not
+ * against the previous row's end, so `09:00–18:00` + `10:00–11:00` + `11:00–12:00` is one
+ * island rather than two. Comparing with the immediate predecessor gets the two-segment case
+ * right and the nested case wrong.
+ *
+ * **A strict gap is untouched**, which is the whole lunch mechanism: `11:00`/`12:00` fails
+ * `start <= runningMaxEnd` and starts a new island, and a booking straddling it stays
+ * refused.
+ *
+ * This is not the client claiming authority — the server merges whatever it is sent. It is
+ * so `weekToPayload` sends the shape that will exist and `bookingsOutsideHours` warns about
+ * the day that will exist.
+ */
+export function bookableStretches(day: DayHours): Segment[] {
+  const sorted = enabledSegments(day).sort(
+    (a, b) => a.startMin - b.startMin || a.endMin - b.endMin,
+  );
+  const out: Segment[] = [];
+  // The SQL's window has no preceding row for the first segment, so `st <= max(end)` is
+  // NULL there and the CASE falls through to "new island". `-Infinity` is that.
+  let runningMaxEnd = Number.NEGATIVE_INFINITY;
+  for (const s of sorted) {
+    const island = out[out.length - 1];
+    if (island && s.startMin <= runningMaxEnd) {
+      island.endMin = Math.max(island.endMin, s.endMin);
+    } else {
+      out.push({ ...s });
+    }
+    runningMaxEnd = Math.max(runningMaxEnd, s.endMin);
+  }
+  return out;
+}
+
+/**
  * The complete weekly set for `set_staff_working_hours`. Disabled segments are omitted, so
  * an all-disabled week yields an empty array — which **clears** the hours, deliberately.
+ *
+ * Contiguous stretches are coalesced first, so what is sent is what will be stored. See
+ * {@link bookableStretches}.
  */
 export function weekToPayload(week: WeekHours): IntervalPayload[] {
   return week.flatMap((day) =>
-    enabledSegments(day).map((s) => ({
+    bookableStretches(day).map((s) => ({
       day: day.dayOfWeek,
       start: hmsFromMinutes(s.startMin),
       end: hmsFromMinutes(s.endMin),
@@ -254,6 +343,18 @@ export function openWeekdaysFrom(businessHours: WorkingHour[]): Set<number> {
  * Changing hours never invalidates an existing booking — `is_bookable_window` only runs at
  * create and reschedule time — so this is what warns an owner before they save a lunch
  * break straight across a confirmed appointment.
+ *
+ * Two things make this agree with `private.is_bookable_window` rather than merely resemble
+ * it, and both are load-bearing:
+ *
+ * - It judges against {@link bookableStretches}, not the raw segments, because the server
+ *   coalesces contiguous runs on save. Without that, an owner extending a day with a second
+ *   touching stretch would be warned that every long booking across the join no longer fits
+ *   — about a day that, once saved, contains all of them.
+ * - `endMin` is an **offset from the start of the local day**, so a booking running to
+ *   midnight has an end of exactly 1440 and fits a stretch closing at 24:00. That is the
+ *   comparison `20260807000036_bookable_window_midnight` moved the SQL to, and it is why a
+ *   booking overrunning midnight (1470) still does not fit anything.
  */
 export function bookingsOutsideHours(
   bookings: Booking[],
@@ -268,7 +369,7 @@ export function bookingsOutsideHours(
     const startMin = thimphuMinutesOfDay(b.startTs);
     const endMin = startMin + (b.endTs.getTime() - b.startTs.getTime()) / 60_000;
     const dow = thimphuWeekday(thimphuDayOf(b.startTs));
-    const fits = enabledSegments(week[dow]!).some(
+    const fits = bookableStretches(week[dow]!).some(
       (s) => startMin >= s.startMin && endMin <= s.endMin,
     );
     if (!fits) count++;
