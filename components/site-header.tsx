@@ -10,7 +10,7 @@ import {
 } from "motion/react";
 import Image from "next/image";
 import { Menu, X } from "lucide-react";
-import { brand, nav, signIn, waitlist } from "@/lib/content";
+import { brand, nav, waitlist } from "@/lib/content";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { useWaitlist } from "./waitlist-provider";
@@ -131,10 +131,17 @@ export function SiteHeader() {
 
           <div className="flex items-center gap-2">
             {/*
-              Both CTAs are the same control now — same `primary` fill, same
-              magnetic hover, same height. This was a quiet bare `<a>` whose 42.5px
-              height against the Button's 48px was the hierarchy; the brief asks for
-              them to match, so the hierarchy is carried by order and label instead.
+              **The Sign in pill is removed until `../tho_web` is deployed.** It sat
+              first here, and it pointed at `brand.appUrl` — which with no
+              `NEXT_PUBLIC_APP_URL` set falls back to `http://localhost:3000`, so the
+              header's primary action sent a visitor to their own machine. See `signIn`
+              in `lib/content.ts` for the restore, which is this block back.
+
+              What that leaves is one CTA, which is also the honest hierarchy right now:
+              there is nothing to sign in to, and the waitlist is the only thing the site
+              can actually do. The pair used to be deliberately identical — same
+              `primary` fill, same magnetic hover, same height — with order and label
+              carrying the hierarchy instead of size. Keep that if the pill comes back.
 
               It has to be `Button` rather than a styled `<a>`: the "animation" is
               the pointer-tracking spring inside that component, not a CSS
@@ -142,11 +149,6 @@ export function SiteHeader() {
             */}
             {/* The wrapper carries the breakpoint: a `hidden` passed into
                 Button would lose to its own `inline-flex` in the cascade. */}
-            <span className="hidden sm:inline-flex">
-              <Button href={signIn.href} arrow={false}>
-                {signIn.label}
-              </Button>
-            </span>
             <span className="hidden sm:inline-flex">
               <Button arrow={false} onClick={() => openWaitlist("header")}>
                 {waitlist.cta}
@@ -245,23 +247,17 @@ export function SiteHeader() {
                 >
                   {waitlist.cta}
                 </Button>
-                {/* No `onClick` to close the sheet first, unlike the nav links
-                    above: `Button`'s link branch types `onClick` as `never`. It
-                    does not matter here and did when this jumped to an anchor —
-                    a cross-document navigation takes the whole overlay with it,
-                    where scrolling to `#salon-plans` left the page moving behind
-                    an opaque sheet. */}
-                {/* `primary` here too, matching the bar. Two full-width brand pills
-                    stacked is a lot of red — but the sheet's job is to offer both
-                    doors equally, and the brief asks them to look alike. */}
-                <Button
-                  href={signIn.href}
-                  size="lg"
-                  arrow={false}
-                  className="w-full justify-center"
-                >
-                  {signIn.label}
-                </Button>
+                {/* The sheet's Sign in button was here, and is removed with the bar's
+                    pill — same reason, same restore (`signIn` in `lib/content.ts`). Two
+                    notes to keep for whoever puts it back, because both were learned the
+                    hard way: it took no `onClick` to close the sheet, unlike the nav
+                    links above, because `Button`'s link branch types `onClick` as
+                    `never` — harmless for a cross-document navigation, which takes the
+                    whole overlay with it, but it mattered when this jumped to
+                    `#salon-plans` and left the page scrolling behind an opaque sheet. And
+                    it wore `primary` to match the bar: two full-width brand pills stacked
+                    is a lot of red, and it was accepted because the sheet's job is to
+                    offer both doors equally. With one door there is nothing to balance. */}
               </div>
             </div>
           </motion.div>

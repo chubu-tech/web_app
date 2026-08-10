@@ -75,12 +75,13 @@ export function Pricing() {
           </div>
         </Reveal>
 
-        {/* 2. Salons — the three plans. `#salon-plans` is still reached from the
-            footer's "List your shop" (`lib/content.ts`), the `for-salons.tsx`
-            CTA and the JSON-LD in `app/page.tsx` — the header used to jump here
-            too, but its button now goes to the app's sign-in. The anchor sits on
-            the heading, not the section, so the scroll-margin below lands the
-            heading clear of the fixed header. */}
+        {/* 2. Salons — the three plans. `#salon-plans` is reached from the footer's
+            "List your shop" (`lib/content.ts`), the `for-salons.tsx` CTA and the
+            JSON-LD in `app/page.tsx`. The header used to jump here as well, then
+            pointed at the app's sign-in instead; that button is now removed until
+            `../tho_web` is deployed, so the header reaches this section not at all.
+            The anchor sits on the heading, not the section, so the scroll-margin
+            below lands the heading clear of the fixed header. */}
         <div id="salon-plans" style={{ scrollMarginTop: "7rem" }}>
           <Reveal className="mt-16 flex items-center gap-4 sm:mt-20">
             <h3 className="text-ink inline-flex shrink-0 items-center gap-2.5 text-subheading font-semibold">

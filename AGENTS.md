@@ -107,9 +107,15 @@ It is not part of this app.
 - **Plain words only.** No "dashboard", "admin", "analytics", "CRM", "roster",
   "storefront". Say "one screen", "your customer list", "how the week went". A
   salon owner in Thimphu should not have to decode anything.
-- **Say who pays.** Customers never pay; only salons subscribe, and Basic is
-  free. That appears in the hero chip, the pricing lead panel, the FAQ and the
-  download band — don't remove any of them.
+- **Say who pays. "Customers never pay" — and no salon plan is free.** This rule used
+  to end "and Basic is free", which was wrong on the page and wrong here: upstream's
+  `plans_config.dart` states the final launch prices (**Nu 399 / 699 / 1,499** a month,
+  set 2026-08-03) and says in as many words that **there is no free tier** — Basic is the
+  entry price, not a giveaway. The page had also drifted to **Nu 799** for Growth, a price
+  the product has never charged. Never describe a *salon* plan as free.
+  The customer half is the part that is free, and it is a separate claim carried by
+  separate copy: the hero chip, the Nu 0 customer panel beside the plans, the first FAQ
+  answer and the download band. Don't remove any of those four.
 - **Don't invent proof.** Testimonials and stat figures were deliberately
   removed once because they were made up. Numbers go back only when they are
   real and measured.

@@ -83,8 +83,12 @@ const jsonLd = {
       description: pricing.body,
       brand: { "@id": `${SITE}/#organization` },
       offers: pricing.tiers.map((tier) => {
-        // A free tier carries no digits ("Free"), and an empty price string is
-        // invalid structured data — emit an explicit zero.
+        // Strips "Nu " and the thousands comma: "Nu 1,499" → "1499". Every salon tier
+        // now carries digits — Basic is Nu 399, not "Free" — so the `|| "0"` fallback
+        // is unreachable and stays only because an empty `price` is invalid structured
+        // data, which is a worse failure than a wrong-looking zero. Do NOT read it as
+        // evidence that a free tier exists; `plans_config.dart` upstream says there is
+        // none.
         const amount = tier.price.replace(/[^\d]/g, "") || "0";
         return {
           "@type": "Offer",

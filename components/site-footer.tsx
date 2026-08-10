@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { Mail, MapPin, Phone } from "lucide-react";
-import { brand, footer, signIn } from "@/lib/content";
+import { brand, footer } from "@/lib/content";
 import { cn } from "@/lib/utils";
 import { TextileRule } from "./ui/bhutan";
 import { Reveal, RevealGroup } from "./ui/reveal";
@@ -145,13 +145,15 @@ export function SiteFooter() {
                     <FooterLink href={link.href}>{link.label}</FooterLink>
                   </li>
                 ))}
-                {/* Sign in is the one off-site destination left here. "Admin portal"
-                    sat below it and is gone: the operators' console is internal, and a
-                    public marketing footer is the wrong place to advertise the door to
-                    it. Operators reach it by URL. */}
-                <li>
-                  <FooterLink href={signIn.href}>{signIn.label}</FooterLink>
-                </li>
+                {/* Sign in was the one off-site destination left here, and is removed
+                    until `../tho_web` is deployed — see `signIn` in `lib/content.ts`,
+                    which is also the restore. With it gone, every link in this footer is
+                    same-origin, so nothing here can strand a visitor on a host that is
+                    not serving.
+
+                    "Admin portal" sat below it and is gone for a different reason: the
+                    operators' console is internal, and a public marketing footer is the
+                    wrong place to advertise the door to it. Operators reach it by URL. */}
               </ul>
             </nav>
           </Reveal>

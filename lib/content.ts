@@ -113,22 +113,35 @@ export const nav = [
 ] as const;
 
 /**
- * The one link off this site and into the product (`../tho_web`). The header
- * renders it twice — the quiet pill in the bar and the sheet's footer — and both
- * read from here, so the label and the destination cannot drift apart.
+ * The link off this site and into the product (`../tho_web`) — **parked, and
+ * currently rendered nowhere.**
  *
- * Deliberately not a row in `nav` above: that array feeds the underline-animation
- * links and the 2rem sheet list, so a sign-in row would land in the wrong visual
- * group and lose its own treatment.
+ * `../tho_web` is not deployed yet, so `brand.appUrl` resolves to its fallback
+ * `http://localhost:3000` on every real visit: the button did not lead to a sign-in
+ * page, it led to *the visitor's own machine*. That is worse than a 404 — a
+ * connection-refused screen in the middle of a marketing site, and on a phone it can
+ * hit whatever else happens to answer on that port. There is nothing to sign in to
+ * yet, so the honest number of doors is none.
  *
- * It replaced "Salon sign in", which pointed at `#salon-plans` and signed nobody
- * in — there was nothing to sign in to when it was written. One label serves both
- * audiences because tho_web's `/sign-in` does: it picks the landing route from the
- * account's role (owner → `/business`, customer → `/`).
+ * Kept here rather than deleted, because the constant is the whole restore. When
+ * tho_web ships:
  *
- * No `?next=` on purpose. tho_web's `safeNext` reduces the parameter to a
- * same-origin path and drops absolute URLs, so one pointing back at this site
- * could not work.
+ * 1. Set `NEXT_PUBLIC_APP_URL` (and rebuild — see `brand.appUrl`; the value is inlined
+ *    at `next build`, so a redeploy of the same bundle keeps the old one).
+ * 2. Re-add the three render sites, all of which read from here: the bar's pill and
+ *    the sheet's footer in `components/site-header.tsx`, and the quick-links row in
+ *    `components/site-footer.tsx`. Each carries a comment naming this constant.
+ *
+ * Two things worth keeping from the original note, because they are still the reason
+ * the href has the shape it does. One label serves both audiences, since tho_web's
+ * `/sign-in` picks the landing route from the account's role (owner → `/business`,
+ * customer → `/`). And there is deliberately no `?next=`: tho_web's `safeNext`
+ * reduces the parameter to a same-origin path and drops absolute URLs, so one
+ * pointing back at this site could not work.
+ *
+ * It is also deliberately not a row in `nav` above: that array feeds the
+ * underline-animation links and the 2rem sheet list, so a sign-in row would land in
+ * the wrong visual group and lose its own treatment.
  */
 export const signIn = {
   label: "Sign in",
@@ -303,10 +316,28 @@ export const forSalons = {
   ],
 } as const;
 
+/**
+ * **Prices are mirrored from `../tho/app/lib/business/plans/plans_config.dart`, never
+ * set here.** That file is what a salon owner actually sees inside the app, and it is
+ * explicit: the final launch prices set 2026-08-03 are **Nu 399 / 699 / 1,499** a month,
+ * and **there is no free tier** — Basic is the entry price, not a giveaway, so no copy
+ * anywhere may describe any *salon* plan as free. `../tho_web/lib/plans.ts` carries the
+ * same three figures.
+ *
+ * This block had drifted from both of them on two counts: Basic read *"Free"*, and
+ * Growth read *"Nu 799"* — a price no version of the product has ever charged. Since the
+ * whole page's claim is "customers never pay, only salons do", a wrong salon price is
+ * the one number here that has to be right.
+ *
+ * **What is still free is the customer**, and that is a different claim carried by
+ * different copy: `hero.freeNote`, the `customer` panel below (Nu 0, forever), the first
+ * FAQ answer and the download band. None of those changed and none of them should — see
+ * the "Say who pays" rule in `AGENTS.md`.
+ */
 export const pricing = {
   eyebrow: "Who pays what",
   title: "Customers never pay. Only salons do.",
-  body: "Booking a chair and joining a queue cost you nothing — no booking fee, no charge at the door. Salons start free, and pay only if they want more.",
+  body: "Booking a chair and joining a queue cost you nothing — no booking fee, no charge at the door. Salons pay a monthly plan, starting at Nu 399.",
   note: "Paid salon plans are billed monthly in Ngultrum. Pay by bank transfer or mBoB — we switch your plan on within a day. Customers are never charged anything.",
   /** The free-for-customers panel that sits beside the salon plans. */
   customer: {
@@ -321,8 +352,8 @@ export const pricing = {
   tiers: [
     {
       name: "Basic",
-      price: "Free",
-      period: "",
+      price: "Nu 399",
+      period: "/mo",
       tagline: "Get found and take bookings.",
       features: [
         "Listed in the app",
@@ -336,7 +367,7 @@ export const pricing = {
     },
     {
       name: "Growth",
-      price: "Nu 799",
+      price: "Nu 699",
       period: "/mo",
       tagline: "For a full team and a full book.",
       features: [
@@ -373,7 +404,7 @@ export const pricing = {
 export const faq = [
   {
     q: "Does it cost anything to book a haircut?",
-    a: "No — never. Searching, booking, joining the walk-in queue and getting reminders are all free for customers. There is no booking fee and nothing extra to pay at the salon. Salons start on a free plan too; only the ones who want more pay, from Nu 799 a month.",
+    a: "No — never. Searching, booking, joining the walk-in queue and getting reminders are all free for customers. There is no booking fee and nothing extra to pay at the salon. Salons are the ones who pay, from Nu 399 a month.",
   },
   {
     q: "Do I need the app to join a queue?",

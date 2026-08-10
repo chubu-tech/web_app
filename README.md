@@ -56,25 +56,37 @@ Two behaviours worth knowing before changing them:
 - **"When" filters on opening hours, not free slots** — there is no public
   availability lookup, so the copy must not imply one.
 
-## The link into the app
+## The link into the app — currently none
 
-The header's "Sign in" button is the only link off this site and into the
-product (`../tho_web`, a separate origin).
+**There is no longer any link off this site.** The "Sign in" button is removed until
+`../tho_web` is deployed, from all three places it appeared: the header bar's pill, the
+mobile sheet's footer and the footer's quick-links row. Every link on the site is now
+same-origin.
+
+The reason is not tidiness. `brand.appUrl` falls back to `http://localhost:3000` when
+`NEXT_PUBLIC_APP_URL` is unset, and it is inlined at `next build` — so a production build
+made without that variable shipped a primary CTA pointing at **the visitor's own
+machine**. Not a 404 on a known host: a connection-refused screen, or on a phone whatever
+else answers on that port.
+
+`signIn` in `lib/content.ts` is kept, unreferenced, with the restore written on it. To
+put the button back:
 
 | Variable | Notes |
 | --- | --- |
 | `NEXT_PUBLIC_APP_URL` | Origin of the web app. Defaults to `http://localhost:3000` |
 
-`brand.appUrl` in `lib/content.ts` holds it and `signIn.href` builds
-`${appUrl}/sign-in`; both header controls — the bar's pill and the mobile
-sheet's footer — read from `signIn`, so the label and the destination cannot
-drift apart. Being `NEXT_PUBLIC_`, it is inlined at `next build`, so changing it
-needs a rebuild. Locally both apps run `next dev` on 3000, so whichever starts
-second gets 3001; if that is tho_web, put
-`NEXT_PUBLIC_APP_URL=http://localhost:3001` in `.env.local`.
+1. Set `NEXT_PUBLIC_APP_URL` **and rebuild** — being `NEXT_PUBLIC_`, it is frozen into
+   the bundle at `next build`, so a redeploy of the same bundle keeps the old value.
+   Locally both apps run `next dev` on 3000, so whichever starts second gets 3001; if
+   that is tho_web, put `NEXT_PUBLIC_APP_URL=http://localhost:3001` in `.env.local`.
+2. Re-add the three render sites. Each carries a comment naming `signIn` and the layout
+   notes that were learned the hard way — read them before rewriting the markup.
 
-No `?next=` is sent: tho_web routes by role after sign-in, and its `safeNext`
-helper drops absolute URLs anyway.
+Two facts that still hold whenever it returns: one label serves both audiences, because
+tho_web's `/sign-in` picks the landing route from the account's role (owner →
+`/business`, customer → `/`); and no `?next=` is sent, because tho_web's `safeNext` drops
+absolute URLs, so a parameter pointing back at this site could not work.
 
 ## Page architecture
 
