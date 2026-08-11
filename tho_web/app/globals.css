@@ -1,0 +1,639 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens.
+
+   **Two systems, one file, and a rule for choosing between them.**
+
+   `:root` is the *product* system — colour, radii and motion ported from
+   `tho/app/lib/ui/tokens.dart`, mirroring tho's DESIGN.md. The **owner console** renders
+   in it: white canvas, 8/14px radii, because it is a dense operational tool somebody
+   works at a till.
+
+   The **type scale is not a port** — see the block below. `theme.dart`'s phone metrics
+   were the wrong numbers for a browser.
+
+   `[data-shell="customer"]` re-points three colours to the marketing site's editorial
+   layer (cream canvas) so a visitor arriving from bhutansalons.com sees one continuous
+   product rather than a website and then an app. This file used to say "do not reach for
+   landing_page's globals.css"; that changed deliberately, for the customer side only.
+
+   **The typeface is not part of that split.** `--font-sans` below puts Inter on all 51
+   routes, and it is the same face `../landing_page` and the Flutter app use. The scope
+   block decides colour and nothing else.
+
+   THE RULE FOR ADDING A TOKEN:
+
+     Override a shared name only when both shells mean the same *role* and differ
+     only in *value*. When they mean different *sizes*, add a new name.
+
+   `--color-canvas` is "the page behind everything" in both → overridden below.
+   `--radius-slab` (2rem) and `--radius-md` (14px) are different *sizes* → two names,
+   opted into per element. Re-pointing `--radius-md` at the slab value would have
+   reshaped every shared card, Sheet, Chip and SelectTile with nothing in the diff to
+   show it.
+
+   Light only. DESIGN.md has no dark mode.
+
+   Do not hardcode a hex, radius or duration in a component. Add it here.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* --- Brand ------------------------------------------------------------- */
+  /* Rausch. Used scarcely: accents, active states, links, badges, tints. */
+  --color-rausch: #ff385c;
+  --color-rausch-active: #e00b41;
+  --color-rausch-disabled: #ffd1da;
+
+  /* The background for a *filled* CTA carrying white text.
+     NOT --color-rausch: white on #FF385C measures 3.53:1 and fails WCAG AA.
+     This is the same hue a step deeper — 4.89:1, which passes — and is used
+     only where white sits on top of it. This is an accessibility fix, not a
+     style preference: using rausch for a filled button reintroduces the bug. */
+  --color-rausch-cta: #e00b41;
+  --color-rausch-cta-pressed: #be0937; /* 6.40:1 on white */
+
+  /* --- Ink / text -------------------------------------------------------- */
+  --color-ink: #222222; /* headlines, body, most links — never pure black */
+  --color-body: #3f3f3f; /* secondary running text */
+  --color-muted: #6a6a6a; /* sub-labels, inactive tabs */
+  --color-muted-soft: #929292; /* disabled text */
+
+  /* --- Hairlines & borders ---------------------------------------------- */
+  --color-hairline: #dddddd;
+  --color-hairline-soft: #ebebeb;
+  --color-border-strong: #c1c1c1;
+
+  /* --- Surfaces --------------------------------------------------------- */
+  --color-canvas: #ffffff;
+  --color-surface-soft: #f7f7f7;
+  --color-surface-strong: #f2f2f2;
+  --color-on-primary: #ffffff;
+
+  /* --- Semantic --------------------------------------------------------- */
+  --color-error-text: #c13515;
+  --color-error-text-hover: #b32505;
+  --color-error-soft: #fbe9e3;
+  --color-success-text: #0b6b3a;
+  --color-success-soft: #e3f3ea;
+
+  /* Gold: the one warm accent in a coral-and-ink system, reserved for
+     ratings. Every star in the app is this colour, so a rating always reads
+     as the same thing. Never use it for anything else. */
+  --color-star: #e8a317;
+
+  /* --- Radii ------------------------------------------------------------ */
+  /* sm buttons + inputs · md cards/dialogs · lg sheet tops and the salon browse
+     card · full pills.
+
+     The browse card takes `lg` (20px) rather than a new 18px token: it wanted
+     something in the 16-20px band, and re-pointing `md` was not available — that
+     one is 14px at 40-odd call sites across BOTH shells, including every Sheet,
+     Chip and SelectTile, so widening it would have reshaped the owner console to
+     restyle one customer card. Reusing an existing value beats minting a token
+     two pixels from one we already have. */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 32px;
+
+  /* --- Spacing (4px base, 2px micro-step) -------------------------------
+
+     **These names collide with Tailwind's width scale. Never write a named
+     `max-w-*` or `w-*` in this repo — always an arbitrary value.**
+
+     A named size resolves against the **spacing** namespace first and only falls
+     through to `--container-*` when there is no spacing key of that name. So with
+     `--spacing-lg` declared here, `max-w-lg` compiles to `max-width:
+     var(--spacing-lg)` — 24px, not 32rem. Read out of the emitted stylesheet.
+
+     It cost a broken booking flow: `Sheet` was `tablet:max-w-lg`, so every dialog in
+     the app was a 24px sliver at 744 and up, with its title and buttons spilling out
+     beside it. Phones were fine, because the variant never applied there, which is
+     why it survived so long. `max-w-sm` (8px) and `max-w-md` (12px) were wrong at
+     three more call sites for the same reason; `4xl` was accidentally correct only
+     because no `--spacing-4xl` exists.
+
+     Renaming these was the alternative and it is the wrong trade: they are the
+     project's spacing vocabulary at hundreds of call sites, and `p-lg` / `gap-lg`
+     have to keep meaning 24px. An arbitrary width is four characters longer and
+     cannot be misread. */
+  --spacing-xxs: 2px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-base: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+  --spacing-section: 64px;
+
+  /* --- Motion ----------------------------------------------------------- */
+  /* The rule these tiers encode: the smaller the thing, the faster it moves.
+     Anything slower than --duration-page starts to feel like waiting. */
+  --duration-fast: 120ms; /* chip fills, press scales, colour swaps */
+  --duration-base: 180ms; /* segmented controls, toggles, small reveals */
+  --duration-slow: 260ms; /* a card expanding, a sheet settling */
+  --duration-page: 220ms; /* route transitions */
+
+  --ease-enter: cubic-bezier(0.215, 0.61, 0.355, 1); /* easeOutCubic */
+  --ease-exit: cubic-bezier(0.55, 0.055, 0.675, 0.19); /* easeInCubic */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* easeOutBack */
+
+  /* --- Type scale -------------------------------------------------------
+     **A web scale, not a port.** This used to be `theme.dart`'s `AppText`
+     one-to-one: 14px titles, 12px secondary text, 11px captions, line-heights
+     from 1.18 to 1.29. Those are the numbers THO-57 arrived at for a phone held
+     at arm's length, and they are the wrong numbers for a browser window — 762
+     usages across ten tokens rendered the whole product a size too small with
+     the leading pulled tight, which is most of what read as dense and generic.
+
+     Same deliberate divergence already made for the breakpoints and the
+     editorial canvas: the Flutter screens are phone-only, so their metrics are
+     not the web's. Ten tokens carry all 762 call sites, so this file is the only
+     place the scale exists and not one class string changes.
+
+     Three rules the numbers follow:
+
+     1. **Leading opens as size drops.** 1.15 at 32px up to 1.6 at 16px. Long
+        measures of small text need the room; a headline does not.
+     2. **Tracking tightens as size grows, and only above 18px.** Inter is drawn
+        for negative tracking at display sizes and needs none below that. The two
+        smallest steps go slightly *positive*, which is what keeps 11-12px legible.
+     3. **16px is the prose floor.** `body-md` is what paragraphs use, so it is
+        the one step that may not go below the accessibility floor.
+
+     `badge` holds at 11px, as it did: it lives inside count pills whose size is
+     fixed by the glyph beside them. It earns its legibility from 600 weight and
+     +0.02em instead. */
+
+  /* Page hero, and the one or two big figures in the console. */
+  --text-display-xl: 2rem; /* 32px */
+  --text-display-xl--line-height: 1.15;
+  --text-display-xl--letter-spacing: -0.02em;
+
+  /* Page title. */
+  --text-display-lg: 1.5rem; /* 24px */
+  --text-display-lg--line-height: 1.2;
+  --text-display-lg--letter-spacing: -0.018em;
+
+  /* Section title. */
+  --text-display-md: 1.25rem; /* 20px */
+  --text-display-md--line-height: 1.25;
+  --text-display-md--letter-spacing: -0.012em;
+
+  /* Card and sub-section title. */
+  --text-display-sm: 1.125rem; /* 18px */
+  --text-display-sm--line-height: 1.3;
+  --text-display-sm--letter-spacing: -0.008em;
+
+  /* The UI voice: nav, buttons, labels, table headers. Carries 500 or 600. */
+  --text-title: 0.9375rem; /* 15px */
+  --text-title--line-height: 1.4;
+  --text-title--letter-spacing: -0.006em;
+
+  /* Prose. The accessibility floor — do not take this below 16px. */
+  --text-body-md: 1rem; /* 16px */
+  --text-body-md--line-height: 1.6;
+
+  /* Secondary prose and dense rows. */
+  --text-body-sm: 0.875rem; /* 14px */
+  --text-body-sm--line-height: 1.55;
+
+  /* Captions and metadata, usually in `text-muted`. */
+  --text-caption: 0.8125rem; /* 13px */
+  --text-caption--line-height: 1.45;
+
+  /* The smallest label. Positive tracking is what keeps it readable. */
+  --text-caption-sm: 0.75rem; /* 12px */
+  --text-caption-sm--line-height: 1.4;
+  --text-caption-sm--letter-spacing: 0.01em;
+
+  /* Count pills only. Fixed by the glyph beside it, so it earns legibility from
+     weight and tracking rather than size. */
+  --text-badge: 0.6875rem; /* 11px */
+  --text-badge--line-height: 1.2;
+  --text-badge--letter-spacing: 0.02em;
+
+  /* --- Animation -------------------------------------------------------- */
+  /* The skeleton sweep. `app_skeleton.dart` runs a ShaderMask across a grey
+     block; this is the same left-to-right pass as a background gradient.
+     `prefers-reduced-motion` below neutralises it app-wide. */
+  --animate-shimmer: shimmer 1300ms linear infinite;
+
+  @keyframes shimmer {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: -100% 0;
+    }
+  }
+
+  /* --- Breakpoints (DESIGN.md:518-537) ---------------------------------- */
+  /* Mobile <744 · Tablet 744–1128 · Desktop 1128–1440 · Wide >1440.
+     The rule: always reduce columns, never reflow rows. */
+  --breakpoint-tablet: 744px;
+  /* A fifth tier, and the only one not in DESIGN.md: the width at which the owner
+     console's five destinations are inline and its hamburger is gone. It exists
+     because the console collapses on a different axis from the customer shell — five
+     labelled tabs *plus* a salon switcher and a bell, where the customer header carries
+     a two-character wordmark — so the tablet tier that fits the customer's five is 280px
+     short of fitting these. Declared in ascending order with the rest; Tailwind emits
+     the variants in declaration order and an out-of-order one would lose to `tablet:`.
+
+     `components/owner/owner-nav.tsx` repeats the number once, for a matchMedia that
+     cannot read a CSS variable. Change both together. */
+  --breakpoint-console: 1024px;
+  --breakpoint-desktop: 1128px;
+  --breakpoint-wide: 1440px;
+
+  /* --- The customer shell's editorial layer -------------------------------
+     From landing_page's `@theme`. Declared globally so the utilities exist;
+     applied only under `[data-shell="customer"]` (below) or by being named
+     explicitly in a customer component.
+
+     Unused tokens cost nothing — Tailwind prunes any theme variable no utility
+     and no rule references. Measured in the compiled sheet: `--radius-xl` and
+     `--spacing-section` are declared above and absent from the emitted `:root`.
+     That pruning is also why the chrome heights live *outside* `@theme`. */
+
+  /* Paper is "a thing lifted off the page". In the owner console it equals
+     --color-canvas, so reclassifying a shared surface from `bg-canvas` to
+     `bg-paper` is a no-op there and the correct white-on-cream card here. */
+  --color-paper: #ffffff;
+  --color-canvas-deep: #efe9e1;
+  --color-sand: #e6ded2;
+  --color-rausch-soft: #ffe8ec;
+  --color-obsidian: #141312;
+  --color-obsidian-soft: #201e1c;
+
+  /* Bhutanese accents. Decorative only — rausch stays the single action colour,
+     and --color-star stays the product's #e8a317 for every rating. */
+  --color-saffron: #e8a33d;
+  --color-saffron-soft: #fbeed6;
+  --color-maroon: #722030;
+  --color-jade: #1f6f5c;
+
+  /* **This is what puts Inter on every route.** Preflight declares
+     `font-family: var(--default-font-family)` on `html, :host`, and
+     `--default-font-family` resolves `--font-sans` at `:root` — which is the same
+     element `inter.variable` lands on in `app/layout.tsx`.
+
+     It used to say "`--font-sans` is deliberately NOT set: it would put DM Sans on
+     all 26 owner routes", and the customer shell set `font-family` directly to
+     compensate. That is exactly the split that left the console on the visitor's OS
+     font. One family everywhere is the point now, so the token is set here and the
+     scope block below no longer touches `font-family` at all. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* `--font-display`, `--font-serif` and the four `--text-editorial-*` clamps used
+     to live here, for Bricolage Grotesque and Instrument Serif. **Nothing in the
+     repo ever referenced any of the six** — no `font-display`, `font-serif` or
+     `text-editorial-*` class exists in any component — so two webfonts were being
+     declared for call sites that never arrived. Deleted with their loaders rather
+     than repointed at Inter: one family needs no display alias, and hierarchy here
+     comes from the weight and size steps above. */
+
+  /* Generous radii for the editorial layer. Do NOT re-point --radius-md (14px)
+     at these: it would reshape every shared card, Sheet, Chip and SelectTile. */
+  --radius-slab: 2rem;
+  --radius-slab-lg: 2.75rem;
+
+  /* landing_page's single easing curve, used for every transition there. */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* The collapse nav's two animations. Written with the curve inlined rather
+     than `var(--ease-out-expo)`: a theme variable whose only reference is
+     another theme variable's value is not worth betting the pruner on. */
+  --animate-nav-reveal: nav-reveal 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-nav-row: nav-row 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  /* The circle reveal. The origin is a custom property so the panel opens from
+     whichever button opened it, set from that button's bounding rect. */
+  @keyframes nav-reveal {
+    from {
+      clip-path: circle(0% at var(--nav-origin-x, 92%) var(--nav-origin-y, 2rem));
+    }
+    to {
+      clip-path: circle(150% at var(--nav-origin-x, 92%) var(--nav-origin-y, 2rem));
+    }
+  }
+
+  @keyframes nav-row {
+    from {
+      opacity: 0;
+      transform: translateY(28px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* The browse grid's entrance, staggered per card by an inline `--i` off the same
+     pattern `NavRow` uses. A grid of 13 salons then arrives as one wave instead of
+     13 simultaneous pops.
+     TWO THINGS ARE LOAD-BEARING:
+     1. `both` fill holds the closing frame for ever, and that frame sets
+        `transform: none`. An animation's filled value beats a specified one, so
+        whichever element carries this class can never be transformed again — which
+        is why the class goes on the list item and the hover lift on the card
+        surface inside it. Put both on one element and the lift silently stops
+        working, with nothing in the diff to show why.
+     2. It is applied under `motion-safe` rather than left to the reduced-motion
+        block below. That block neutralises duration AND delay, so this would
+        resolve instantly and correctly either way — but an opening frame at
+        opacity 0 behind a stagger delay is exactly the shape that made the nav
+        render blank once, and not relying on it twice is cheap. */
+  --animate-card-in: card-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes card-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Chrome measurements.
+
+   Deliberately NOT in `@theme`. Tailwind prunes theme variables nothing
+   references, and these are consumed only from arbitrary values —
+   `h-[calc(100svh-var(--header-height))]` — which the pruner cannot see.
+   Declaring them here makes the emission unconditional.
+
+   They exist at all because the removed bottom bar's height was written as the
+   literal `62px` in eight files plus two `pb-40`s, and getting one of them wrong
+   is invisible until someone opens that page at 390px.
+--------------------------------------------------------------------------- */
+:root {
+  /* One top bar, at every width. Constant on purpose: the header condenses
+     visually *inside* a fixed box, so nothing has to re-measure it on scroll.
+
+     76px, not 64px — matching `../landing_page`'s expanded header (a 36px lockup
+     inside 20px of vertical padding). At 64px the same content read as clustered
+     next to the marketing site's, which is the whole complaint this closes. Every
+     consumer reads the token, so `/map`'s height subtraction and `/salon/[id]`'s
+     sticky rail offset followed without either being touched — which is the reason
+     it is a token and not a literal in eight files. */
+  --header-height: 76px;
+
+  /* Clearance for a fixed CTA footer: p-base twice + min-h-12 + a note line.
+     A floor rather than a measurement, the same trade the map page states. */
+  --cta-clearance: 96px;
+}
+
+/* ---------------------------------------------------------------------------
+   The customer shell. Same utilities, different values.
+
+   Every generated colour utility resolves through `var()` — verified in the
+   compiled stylesheet: `.bg-canvas { background-color: var(--color-canvas) }`.
+   So re-pointing three variables re-skins 86 call sites (62 in customer files,
+   24 in the shared UI kit) with **no class strings changed**, and the shared kit
+   adapts to whichever shell renders it.
+
+   `:root` above IS the product system, so the owner console needs no attribute
+   and gets no override. An attribute that changes nothing is a thing to misread.
+
+   Two things here are load-bearing:
+
+   1. The `body:has()` half is what makes the whole viewport cream.
+      `body { background: var(--color-canvas) }` resolves the variable *on body*,
+      so body must be inside the scope or iOS overscroll reveals white.
+
+   2. Unlayered on purpose. `@theme` lands in `@layer theme`, and an unlayered
+      rule beats a layered one whatever the specificity — which matters, because
+      `:root` and `[data-shell="customer"]` are both (0,1,0) and specificity
+      alone would leave this to source order.
+
+   And never add `@theme inline` to this file: it substitutes declared values
+   into utilities instead of `var()`, which would make this entire block a no-op.
+--------------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------------
+   Every shell, not just the customer's.
+
+   This selector used to be `[data-shell="customer"]` alone, on the reasoning that
+   "a dense operational console loses legibility on an editorial canvas". That was
+   asserted, never measured, and it left the product visibly split down the middle:
+   a customer arriving from bhutansalons.com saw one continuous design language and
+   an owner saw a different one, on the same domain, from the same nav.
+
+   It is now attribute-*presence*, so any shell that declares itself gets the
+   editorial layer — `customer`, `owner`, `staff`. The attribute still records which
+   shell is rendering, because `not-found.tsx` and the layouts read as documentation
+   and a bare `data-shell` would say less.
+
+   Nothing about the mechanism changed, which is the point: every colour utility
+   resolves through `var()`, so this re-skins the console with **no class strings
+   touched** in 26 routes' worth of components. It is also one line to revert.
+--------------------------------------------------------------------------- */
+[data-shell],
+body:has([data-shell]) {
+  --color-canvas: #f6f3ee;
+  --color-surface-soft: #efe9e1; /* canvas-deep: a tint OF cream, not of white */
+  --color-surface-strong: #e6ded2; /* sand */
+
+  /* No `font-family` here any more. This block used to set DM Sans directly,
+     which is what made the typeface a property of *one shell* and left the
+     console on the OS font. `--font-sans` in `@theme` now reaches both, so this
+     scope is purely about colour — which is the only thing the two shells were
+     ever meant to disagree about. */
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-size: var(--text-body-md);
+    /* The token's own leading, not a second hardcoded 1.5 beside it. They used to
+       disagree silently — `--text-body-md--line-height` said one thing and this
+       line overrode it for every element that never sets a `text-` utility. */
+    line-height: var(--text-body-md--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Inter's contextual alternates fix the 'ti'/'tt' collisions its default
+       spacing leaves at UI sizes. `cv11` gives the single-storey 'a' a straight
+       tail, which is what keeps 12-13px labels from muddying. */
+    font-feature-settings: "cv11", "calt";
+    /* Numerals line up in tables, price columns and the calendar. This product is
+       mostly figures — an owner reading a payroll column should not see the digits
+       shift width between rows. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Prose gets proportional figures back: tabular digits in a sentence read as a
+     spreadsheet. Only the tables, pills and time strings want the monospaced set,
+     and they inherit it from body. */
+  p {
+    font-variant-numeric: normal;
+  }
+
+  /* One visible focus treatment for the whole app. */
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* Material 3 ships icon buttons at 40x40, under both the 48dp floor and the
+     iOS 44pt one; tokens.dart documents fixing that in the app. Keep every
+     interactive target at 48px here too — see `min-h-12` in the UI kit. */
+  button,
+  [role="button"],
+  a[href] {
+    touch-action: manipulation;
+  }
+}
+
+/* The single shadow tier from DESIGN.md. A surface either has this one shadow
+   or none — there are no progressive elevation tiers. */
+@utility shadow-card {
+  box-shadow:
+    rgba(0, 0, 0, 0.02) 0 0 0 1px,
+    rgba(0, 0, 0, 0.04) 0 2px 6px,
+    rgba(0, 0, 0, 0.1) 0 4px 8px;
+}
+
+/* The second tier, and the only one — for a surface floating *above* the page
+   rather than resting on it: an open facet panel, a featured card. Customer
+   shell only; the product system still has exactly one tier. */
+@utility shadow-lift {
+  box-shadow:
+    rgba(0, 0, 0, 0.02) 0 0 0 1px,
+    rgba(0, 0, 0, 0.28) 0 18px 40px -12px;
+}
+
+/* Scrim behind sheets and dialogs — black at 50%, as applied at render time. */
+@utility scrim {
+  background-color: rgb(0 0 0 / 0.5);
+}
+
+/* A scroll container with no visible scrollbar.
+   Two declarations because no single one is supported everywhere: `scrollbar-width`
+   is the standard and is Firefox's only lever, `::-webkit-scrollbar` is what Chrome
+   and Safari read. Neither has a Tailwind utility, which is the whole reason this is
+   here rather than in a class string.
+
+   **The scrolling itself is untouched** — this hides the indicator, not the overflow.
+   Wheel, trackpad, touch swipe, keyboard and `scrollBy` all still work; see
+   `components/ui/carousel.tsx`, which is the only thing that should use this, because
+   hiding a scrollbar without replacing the affordance it provided is how a row of
+   cards becomes a row of cards nobody knows is scrollable. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* --- The map ----------------------------------------------------------------
+   The only component CSS in this file, and it is here because it has nowhere
+   else to go: every rule below targets DOM that **leaflet** generates — its tile
+   pane, and the inside of a marker, which is set from an HTML string. A utility
+   class cannot reach either. See `components/customer/salon-map.tsx`. */
+
+/* The grey basemap. `map_view.dart:54` does this with a luminance ColorFilter
+   matrix over the tile layer; one CSS filter is the same result. */
+.salon-map .leaflet-tile-pane {
+  filter: grayscale(1);
+}
+
+/* A salon bubble: a ringed circle holding the seeded gradient and its initial,
+   with the cover photo layered over both. Colours and size come from the inline
+   style, because they depend on the salon and on selection. */
+.salon-bubble {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(34 34 34 / 0.55);
+  font-weight: 700;
+  line-height: 1;
+  box-shadow:
+    rgba(0, 0, 0, 0.02) 0 0 0 1px,
+    rgba(0, 0, 0, 0.04) 0 2px 6px,
+    rgba(0, 0, 0, 0.1) 0 4px 8px;
+  /* The app pops each bubble in with an easeOutBack scale over 350ms plus a
+     per-marker stagger (`_SalonBubble`). Here it is the `slow` token and no
+     stagger: leaflet re-creates a marker's DOM whenever its icon changes, so a
+     staggered delay would replay on every selection instead of only on arrival.
+     The global reduced-motion block above neutralises it for anyone who asks. */
+  animation: salon-pop var(--duration-slow) cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes salon-pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* One confetti particle — the port of `confetti_burst.dart`'s per-particle tween.
+   The Dart animates a `CustomPainter`; here each particle is a `<span>` carrying its own
+   `--dx`/`--dy`/`--spin` as custom properties, so 24 of them are one keyframe rather than a
+   render loop. `prefers-reduced-motion` is handled by the app-wide rule at the foot of this
+   file, and `ConfettiBurst` additionally declines to mount at all under it — a 0.01ms burst
+   would be 24 dots appearing and vanishing in one frame, which is worse than nothing. */
+@keyframes confetti-fly {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--spin)) scale(0.4);
+  }
+}
+
+/* "You are here". Google's blue rather than a brand colour on purpose: a rausch
+   dot among rausch-ringed salon bubbles reads as another salon. */
+.salon-user-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  background: rgb(66 133 244 / 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.salon-user-dot > span {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #4285f4;
+  border: 2.5px solid var(--color-canvas);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    /* `animation-delay` matters as much as duration once anything staggers, and
+       it was missing. The collapse nav's rows use
+       `animation-delay: calc(var(--i) * 45ms)` with `both` fill — so without
+       this line a reduced-motion user holds the `from` keyframe (opacity 0)
+       through the full delay and sees a nav that is simply blank. Dormant until
+       that shipped; not dormant now. */
+    animation-delay: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
