@@ -37,6 +37,7 @@ import {
   Inbox,
   Landmark,
   Link2,
+  Loader2,
   LogOut,
   Menu,
   MoreHorizontal,
@@ -250,6 +251,15 @@ export const Icons = {
   bookingRescheduled: CalendarSync,
   clock: Clock,
   timer: Timer,
+  /**
+   * Work in flight. Needs `animate-spin` at the call site — an icon map returns a glyph,
+   * not a behaviour, and the same shape is wanted static in a few places.
+   *
+   * `Button` reaches for `Loader2` directly, which predates this entry and is the one
+   * exception to the "never `lucide-react` in a component" rule left in the kit. Point new
+   * call sites here.
+   */
+  spinner: Loader2,
 
   // ---------------------------------------------------------------- the till --
   gift: Gift,

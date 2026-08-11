@@ -583,6 +583,23 @@ body:has([data-shell]) {
   }
 }
 
+/* One confetti particle — the port of `confetti_burst.dart`'s per-particle tween.
+   The Dart animates a `CustomPainter`; here each particle is a `<span>` carrying its own
+   `--dx`/`--dy`/`--spin` as custom properties, so 24 of them are one keyframe rather than a
+   render loop. `prefers-reduced-motion` is handled by the app-wide rule at the foot of this
+   file, and `ConfettiBurst` additionally declines to mount at all under it — a 0.01ms burst
+   would be 24 dots appearing and vanishing in one frame, which is worse than nothing. */
+@keyframes confetti-fly {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--spin)) scale(0.4);
+  }
+}
+
 /* "You are here". Google's blue rather than a brand colour on purpose: a rausch
    dot among rausch-ringed salon bubbles reads as another salon. */
 .salon-user-dot {

@@ -67,6 +67,7 @@ export type OwnerAction =
   | "removePhoto"
   // 3c — the back office. Almost all of these are `P0001` raises whose message is better
   // than anything written here, because each one names a plan gate or a state machine.
+  | "recordPayment"
   | "loadClientBook"
   | "saveClientNote"
   | "orderReady"
@@ -108,6 +109,7 @@ const FALLBACK: Record<OwnerAction, string> = {
   inviteStaff: "Couldn't send that invite. Check the email and try again.",
   unlinkStaff: "Couldn't unlink.",
   saveStaffPay: "Couldn't save pay.",
+  recordPayment: "Couldn't record that payment. Please try again.",
   saveStaffHours: "Couldn't save these hours.",
   saveSalonHours: "Couldn't save your opening hours.",
   saveSalon: "Couldn't save. Please try again.",
@@ -206,6 +208,37 @@ export function ownerErrorMessage(action: OwnerAction, error: unknown): string {
       case "addWalkIn":
         // 'this shop is not running a queue' / 'service not found for this business'
         // — each names the thing to fix.
+        return messageOf(error, fallback);
+      case "recordPayment":
+        /*
+          `'payments require Pro'` · `'amount must be non-zero'` · `'invalid method'` ·
+          `'invalid kind'` · `'booking not in this business'`. Every one names the thing to fix
+          and the first is a plan gate, so the server's own words beat anything written here.
+          The sheet validates the amount and constrains method and kind to the four values
+          each, so in practice only the plan gate is reachable — from a salon downgraded
+          between the render and the press.
+        */
+        return messageOf(error, fallback);
+      case "createStaff":
+      case "saveStaff":
+        /*
+          **The Basic stylist cap, which used to arrive as "please try again".**
+
+          `20260807000004_basic_stylist_cap` added a trigger raising
+          `'the Basic plan allows one active stylist — upgrade to add more'` on an insert that
+          lands active *or* an update that flips inactive → active. Before that the cap was
+          Dart-only and failed open, so this file had no `P0001` case for either action and
+          both fell to their fallbacks: *"Couldn't add staff."* and *"Some changes couldn't be
+          saved — please try again."*
+
+          Telling somebody to retry an action that can never succeed is the worst available
+          answer — worse than the raw message, which at least names the plan. So the server's
+          own sentence goes through. The Flutter app still shows its fallback here.
+
+          `staff-list.tsx` checks the cap before opening the create form and
+          `staff-editor.tsx` before flipping Active, so reaching this is a stale page or a
+          second till — not the normal path.
+        */
         return messageOf(error, fallback);
       case "inviteStaff":
         // 'enter a valid email address' (22023) · 'this staff member already has a linked

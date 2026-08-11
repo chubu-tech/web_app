@@ -1,33 +1,31 @@
 # Feature parity — THO app (`../tho`) vs THO Web (`tho_web`)
 
-Audited **2026-08-10** against `../tho/app/lib` (183 Dart files, `Api` with 152 methods and 5
-getters) and `tho_web` (70 route entries, 559 tests across 28 files).
+Audited **2026-08-11** against `../tho/app/lib` and `tho_web` (71 route entries, 639 tests
+across 30 files).
 
-Supersedes the 2026-08-06 audit, which was a batch behind: between 2026-08-07 and 2026-08-09
-upstream landed six commits and ~30 migrations (`20260807000002` … `20260807000036`) that
-introduced a whole moderation, legal and account-deletion layer plus a staff-invite consent
-handshake. Eight of that audit's rows are now wrong, and §7 lists every correction — including
-two figures the audit itself got wrong before anything changed.
+**Every client-facing RPC in the schema is now called.** The five the app calls and this does
+not are three `admin_*`, one retired and one deferred by decision — see below.
+
+## Twice a batch behind, and how
+
+This document has now been wrong in the same way twice, which is worth stating before any of its
+claims are trusted again.
+
+The **2026-08-06** audit missed the 2026-08-07 batch: ~30 migrations introducing moderation,
+legal, account deletion and the staff-invite handshake. The **2026-08-10** rewrite fixed that and
+then missed the *next* one — two migrations and fourteen app commits dated 2026-08-08 and
+2026-08-09 that reworked Discover. It opened by claiming *"the app calls 54 RPCs, tho_web calls
+48, all six of the rest are accounted for"*; the real figures were 55 / 48 / **seven**, and the
+unlisted seventh, `salons_available_today`, was the only client-facing RPC in the whole schema
+with no web caller.
+
+Both times the miss had the same shape: the audit window was set from the *previous* audit's date
+rather than from `git log`. §7 lists every correction.
 
 ## The measure that does the work
 
-Screen-by-screen matching is how the 2026-08-06 audit was built, and it is the weaker test: a
-web page can look equivalent and call nothing. **The sharp test is the RPC diff** — every
-`.rpc(...)` in `../tho/app/lib/data/api.dart` against every `.rpc(...)` in `tho_web/lib`. That
-is what found the eleven-RPC hole the last audit opened with, and it is reproducible in one
-command.
-
-The app calls **54** distinct RPCs. `tho_web` calls **48** of them. All six of the rest are
-accounted for:
-
-| RPC | Status |
-| --- | --- |
-| `link_staff_member` | **Retired, correctly.** `ee413c6` replaced it with the invite handshake; it has no caller in the app either. Calling it would let an owner convert a stranger's account into their stylist without asking — the defect that commit removed. |
-| `record_payment` | **A real gap, and its premise changed.** See §5. |
-| `register_device` | Push notifications, deferred by decision — the in-app inbox is the channel. Delivery needs a Firebase web config and an `FCM_SERVICE_ACCOUNT` that exist for no platform. |
-| `admin_content_reports`, `admin_resolve_report`, `admin_remove_reported_content` | The app ships an **in-app admin moderation queue** (`moderation/admin_reports_screen.dart`, reachable from `profile_screen.dart:192`). Not a gap here: this repo sends `admin` users to `../admin`. Worth knowing it exists, because the last audit filed all `admin_*` RPCs as "belong to `../admin`" without noticing three of them have a Flutter screen. |
-
-Reproduce:
+Screen-by-screen matching is the weaker test — a web page can look equivalent and call nothing.
+**The sharp test is the RPC diff**, and it is one command:
 
 ```bash
 grep -ohE "rpc\('[a-z_]+'" ../tho/app/lib/data/api.dart | sed "s/rpc('//;s/'//" | sort -u > /tmp/app
@@ -35,9 +33,22 @@ grep -rohE 'rpc\("[a-z_]+"' lib/ | sed 's/rpc("//;s/"//' | sort -u > /tmp/web
 comm -23 /tmp/app /tmp/web
 ```
 
+The app calls **55** distinct RPCs. `tho_web` calls **50**. All five of the rest are accounted
+for, and none is a gap:
+
+| RPC | Status |
+| --- | --- |
+| `link_staff_member` | **Retired, correctly.** `ee413c6` replaced it with the invite handshake; it has no caller in the app either. Calling it would let an owner convert a stranger's account into their stylist without asking — the defect that commit removed. |
+| `register_device` | Push notifications, deferred by decision — the in-app inbox is the channel. Delivery needs a Firebase web config and an `FCM_SERVICE_ACCOUNT` that exist for no platform. |
+| `admin_content_reports`, `admin_resolve_report`, `admin_remove_reported_content` | The app ships an **in-app admin moderation queue** (`moderation/admin_reports_screen.dart`, reachable from `profile_screen.dart:192`). Not a gap here: this repo sends `admin` users to `../admin`. Worth knowing it exists, because the 2026-08-06 audit filed all `admin_*` RPCs as "belong to `../admin`" without noticing three of them have a Flutter screen. |
+
+**`record_payment` and `salons_available_today` moved off this list on 2026-08-11** — the first
+because Norzin going Pro made it exercisable, the second because it had never been noticed. Both
+are §1.
+
 ---
 
-## 1. Closed since 2026-08-06
+## 1. Closed by this project
 
 Every gap the audit found. Nothing on this list is outstanding.
 
@@ -133,6 +144,142 @@ fallback. The table now mirrors `bookingFailureMessage` in `booking_guards.dart`
 
 ---
 
+### The unabsorbed Discover rework (Batch A, 2026-08-11)
+
+Two migrations and fourteen app commits from 2026-08-08/09 that **no previous audit saw**.
+
+| # | Capability | Where it lives |
+| --- | --- | --- |
+| A1 | **`salons_available_today`** — one round trip for what every salon can offer today, replacing the app's abandoned N+1 (`earliestSlotsFor`: a services read, a staff read, then one `compute_availability` per stylist per salon) | `fetchSalonsAvailableToday`, `toSalonAvailability`, `SalonAvailability` |
+| A2 | **"Available today"** row — next slot vs live walk-in wait, ranked on one scale, distance as tiebreak | `lib/available-today.ts` (18 tests), `AvailableTodayRow` |
+| A3 | **"Book again"** — resolves a past booking against the salon's **current** menu and opens the flow at the right step, with a note when a service has gone | `lib/rebook.ts` (22 tests), `BookAgainRow`, `startRebook` |
+| A4 | **`/salons`** with Nearest / Top-rated chips, replacing an expand-in-place grid that had no sort and no URL | `app/(customer)/salons/`, `AllSalonsList`, `sortedBy` |
+| A5 | **Service-step gender chips**, seeded from Discover's filter through `?gender=` | `filterByGender`, `GENDER_SERVICE_KINDS` shared with `serviceGenders` |
+
+The `queue_line` the RPC returns is deliberately **raw**, not a computed wait: the estimate comes
+from the same `queueShopSummary` the join sheet uses, so a card reading *"Walk in · ~15 min"*
+cannot disagree with the sheet the customer opens next. Two implementations of one estimate is
+the bug that shape avoids.
+
+`GENDER_SERVICE_KINDS` is the same correction in miniature: Discover's server-side query and the
+booking step's chips were separate literals, which is exactly how they would have come to
+disagree about what "Women" admits.
+
+### Correctness and consent (Batch B, 2026-08-11)
+
+| # | What was wrong | Fix |
+| --- | --- | --- |
+| B1 | **`/bookings/[id]/reschedule` had no ownership check.** `bookings_select` OR-matches business membership, so a salon member could open a customer's reschedule flow and move their appointment — and it made the detail page's disabled button bypassable by URL. The **seventh** instance of the OR-policy rule. | `notFound()` on `customerProfileId !== account.user?.id`, matching its sibling |
+| B2 | Customer order notifications were dead ends behind a comment reading *"until 2f"* — which shipped. *"Your order is ready for pickup"* had nothing to press. | `/orders/[id]` |
+| B3 | The stylist page's back link sent `?tab=Specialists`, a parameter **nothing reads** | `#team` |
+| B4 | A product card linked to the salon root, so the customer landed above the fold and had to hunt for the shelf | `#shop` |
+| B8 | **The Basic stylist cap's refusal read as "please try again"**, on an action that can never succeed. `20260807000004` made the cap a trigger; `owner-errors.ts` had no `P0001` case for `saveStaff`/`createStaff`, and the Active checkbox flipped inactive → active with no check at all. | The server's own sentence passes through; the checkbox is guarded by `otherActiveCount` |
+| N1 | **The server composes notification copy now** (`20260807000020`/`…21`, by trigger, branching on audience) and `tho_web` ignored both columns, re-composing the words from a premise those migrations invalidated. Measured: all 92 rows carry `title` and `body`, and the owner voice this repo invented is already upstream. | The row's words win; the local composer is the fallback and keeps the icon/accent/filter chain, which has no server equivalent |
+
+### The money writer (Batch C, 2026-08-11)
+
+**`record_payment` — the last owner write in the app with no web equivalent.** Skipped through
+three slices because it refuses any salon that is not `pro` and none was; Norzin is, so the
+editable branch has one real example and the other sixteen salons keep the refusal path honest.
+`recordPayment` + `RecordPaymentSheet`, gated on the same `deposits` entitlement the app gates
+its own button on.
+
+A refund is **entered as a positive number** and the kind carries the direction, because asking
+an owner to type a minus sign to give money back is a trap the sign would be forgotten from.
+
+Two blocks the app has and this did not: *"No payments recorded yet."* and the **retained-deposit
+pill** on a no-show. `depositNu` counts deposits only, net of refunds — a balance handed over
+after the cut is not no-show cover, and naming the total paid would name a figure the
+entitlement has nothing to do with.
+
+**And a real bug, which only a writer could expose.** `outstandingNu` negated a refund's amount,
+but `record_payment` stores it **negative** — so a refund *increased* what the customer appeared
+to have paid. Measured on the first live row: a Nu 1,200 booking with a Nu 400 deposit and a Nu
+150 refund read **Outstanding Nu 650** against a signed sum of 250, so the truth was 950. Wrong
+for three slices; the doc comment on `fetchBookingPayments` asserted the opposite of the truth
+about `total_paid`, and the tests encoded the same wrong assumption as the code. Nothing could
+catch it while `payments` had zero rows platform-wide.
+
+Also: the insights header states its active-stylist count (`insights_tab.dart:110`), and the
+calendar's List cap went 200 → 500 — the app is unbounded, so any cap is a divergence; at 500 it
+is unreachable (the busiest live salon has 56 bookings) while the guard stays.
+
+### The error and loading layer (Batch D, 2026-08-11)
+
+**There was no `error.tsx` anywhere in the app**, and the consequence was not that failures
+crashed — it was that seven list routes *avoided* crashing by catching every read into `[]` and
+branching on length. **A Supabase outage rendered "No upcoming appointments — book a salon and it
+will show up here" to somebody with four bookings.**
+
+Four boundaries on one shared `ErrorState`: the customer group, the console, the staff shell, and
+a root `global-error.tsx`. Three things worth knowing:
+
+- **`unstable_retry()`, never `reset()`.** Both are handed to an `error.tsx` in Next 16 and they
+  are not interchangeable: `reset()` re-renders *without re-fetching*, so it cannot recover a
+  Server Component error — which is every failure this app produces. A `reset()` button would
+  have been a Try-again that provably could not work. Proved by measurement: retry recovered in
+  1000ms, a round trip.
+- **A route group's `error.tsx` does catch**, unlike `not-found.tsx`. Verified with a
+  throw-on-first-render, because this repo has been burned by the opposite —
+  `app/(customer)/not-found.tsx` never rendered once, since `not-found` resolves by URL path and
+  the group contributes no segment.
+- **`global-error.tsx` uses inline styles and not one Tailwind class.** It replaces the root
+  layout, so it arrives without the stylesheet — and a last-resort boundary that needs the
+  pipeline which just broke has a shared failure mode. **Not exercised**: reaching it means
+  throwing from the root layout, and the revert risk outweighed the value.
+
+`fetchMyFavourites` needed the *reader* fixed as well: it destructured `data` and dropped
+`error`, so its catch was dead code and a permission failure already rendered as "Nothing saved
+yet". **Third instance of that shape** after the `payments` receipt and the `businesses` anon
+grant — an empty result that is also a plausible answer.
+
+`loading.tsx` for all three shells. Every route reads cookies, so all of them are dynamic and
+none had a Suspense boundary; the skeleton primitives existed and were used only inside client
+components, where the data was already in flight.
+
+### Presentation (Batch E, 2026-08-11)
+
+Morning / Afternoon / Evening grouping in **both** slot surfaces (`dayPartOf`, `groupByDayPart`,
+in Thimphu time — A1-11 upstream: a chip labelled 22:30 must not be filed under Morning because
+the viewer is six hours behind) · `noSlotsForSelection`, which distinguishes *"the day is full"*
+from *"your basket needs one unbroken block"* and only suggests fewer services when there is more
+than one to drop · inline **Cancel** and **Leave a review** on the booking card
+(`booking_rich_card.dart:329`), extracted into two shared components so the card and the detail
+page cannot drift · **View upcoming** on the empty archive · the **relative-day chip** on the
+detail page, with `relativeDayLabel` moved to `lib/` and taking `now` as an argument ·
+a **confetti burst** at the two peaks the app celebrates.
+
+The celebration diverges in one place, deliberately: the app plays it when Redeem is *pressed*,
+which on the web is a `router.push` that would cut the burst off mid-flight — and it would be
+celebrating a request rather than a reward. It fires here when the salon **confirms**, which is
+the same instant the copy flips to *"Enjoy your reward."* Only on the transition, never on a
+revisit.
+
+### What the closing sweep found (2026-08-11)
+
+Sixty-four route entries, three roles, two passes each — all clean. Every named flow verified
+against a figure computed from SQL **first**. Three things the sweep produced that the green gate
+could not:
+
+- **A bug in Batch B's own stylist cap.** On a Basic salon the Active checkbox unticked and then
+  **disabled itself**, so an owner could not restore the value they had just removed without
+  reloading. It affects all nine Basic salons, every one of which is already over the cap. The
+  guard was reading local state only, which makes an *undo* indistinguishable from an
+  *activation*; it now also requires the saved row to be inactive. Both branches were then driven
+  on screen — the paywall still refuses a genuinely new active stylist, with the sentence naming
+  the cap and offering *See plans*.
+- **A prediction that lost to the database, correctly.** The gender-chip check was computed from
+  `services` and failed: two of Norzin's five have **no active stylist in `service_staff`**, so the
+  booking flow never lists them and discloses them instead. The page was right and the expectation
+  was wrong. Recorded because it is the discipline working, not a near-miss.
+- **A restore that the server refused.** Deactivating a stylist to reach the paywall branch could
+  not be undone — `staff_members_basic_cap` blocks the reactivation, the very rule being tested.
+  The way back was a momentary plan lift, since the trigger reads `businesses.plan` at write time
+  and there is no trigger on `businesses`. **A write is only restorable if the inverse write is
+  also legal.** Check that before making it, not after.
+
+---
+
 ## 2. Implemented and confirmed at parity
 
 **Customer.** Discover, shared search, all five filter facets, product filters, category chips,
@@ -146,7 +293,7 @@ redemption code, saved, profile edit, sign in / up / guest upgrade, notification
 and mark-read, the four legal pages, report, block, blocked list, delete account, `/scan`,
 `/recommended`, `/top-rated`.
 
-**Owner.** All eleven of the app's drawer items are reachable and all five tabs are live:
+**Owner.** All **ten** of the app's drawer items are reachable and all five tabs are live:
 calendar day / week / list with the week paywall, booking detail and the full lifecycle plus
 inline actions, the payments ledger, queue board with Call next, counter walk-in, services,
 catalogue, products, staff roster and editor, staff invites, stylist hours, salon opening
@@ -189,6 +336,29 @@ Nine places, each because upstream removed or never built something a browser ca
 
 ---
 
+
+**Five more, found by the 2026-08-11 sweep and in no previous list:**
+
+10. **The app's create-salon form cannot work at all.** `Api.createBusiness` does
+    `.insert(…).select().single()`, and the live `businesses_select` requires
+    `status = 'approved'` on its public branch while `private.is_business_member` is `STABLE` —
+    so the `RETURNING` cannot see the row being inserted and fails RLS. `createBusiness` here
+    splits the insert and the read back. This changes how to read "parity" on that screen
+    entirely.
+11. **The paywall sheet offers a way onward.** `paywall_sheet.dart:168` ends at *"Close"*;
+    `components/owner/paywall-sheet.tsx` links to `/business/plans`.
+12. **Queue rows link to a client record only when one exists.** `queue_board.dart:562` pushes
+    `ClientDetailScreen` for any entry with a profile id and then hides both of its sections;
+    here the link appears only when the profile is in `client_book` **and** the salon has the
+    feature.
+13. **The printed QR works without the app.** `queue_links.dart:36` emits
+    `bhutansalons://q/<id>` — a custom scheme, useless to a customer with no install. The
+    console prints `https://<host>/q/<id>`, which `QueueDeepLink.businessIdFrom` also parses.
+    **Consequence worth knowing: a QR printed from the app and one printed from the console are
+    different codes**, and only the web one works for somebody without the app.
+14. **The map pin can be placed by hand.** `business_settings_tab.dart:147` offers only *"Use my
+    location"*; `pin-picker.tsx` offers tap, drag, GPS and Clear.
+
 ## 4. Deliberately not ported — reasons verified, not assumed
 
 | App feature | Why not |
@@ -213,24 +383,40 @@ Nine places, each because upstream removed or never built something a browser ca
 
 ## 5. What genuinely remains
 
-**`record_payment` — a writer, and the reason to skip it has expired.**
-`payments/record_payment_sheet.dart:50` records a payment against a booking; `tho_web` reads
-payments and cannot write one. This was skipped on the grounds that it is Pro-gated with zero
-rows and therefore unexercisable. **Norzin Salon & Spa is now `pro`** — one live salon, so the
-editable branch has a real example for the first time. `payments` is still 0 rows, so anything
-built here must create its own first row. Re-deciding this is a scoping call, not a technical
-one; nothing about it is blocked.
-
 **A1-08 — the cancellation rule is shown on no screen in the booking flow.** Upstream's own
 argument for *blocking* a late cancellation rather than charging for one is that the customer is
 never shown the window before committing: it first appears **after** the booking exists. On
 `tho_web` that is still true — `booking-confirmed-sheet.tsx` states it at confirmation, which is
-after. Not one of the five re-synced rules and not in any batch, but now that the rule bites it
-is a better-founded gap than it was.
+after. It has never been in a batch, and now that the rule bites it is better founded than it
+was: `/salon/[id]/book`'s summary rail is where it belongs, beside the price the customer is
+about to commit to.
+
+**`global-error.tsx` is unexercised.** It follows the documented shape and typechecks, but
+reaching it means throwing from the root layout and that was not attempted. Know before relying
+on it.
+
+**Five surfaces still have no live example**, so their populated states rest on unit tests and on
+writes that were made and then removed: `offers` (0 rows), `staff_time_off` (0 rows and no Dart
+file references it — an owner cannot mark a holiday on any platform), `content_reports`,
+`user_blocks` and `staff_invites`. `payments` is back to 0 by design after Batch C's verification.
+
+Two more, found by the closing sweep and both narrower than they look:
+
+- **`loyalty_redemptions` is 0 rows platform-wide**, so `/rewards/[id]` has no populated example
+  and `RedemptionCode` — including the confetti on the confirm transition — rests on its tests. The
+  route's *refusal* is swept: a missing id returns the 404 page rather than throwing.
+- **"Available today" has no live walk-in example.** `salons_available_today` returns
+  `queue_line: []` for every salon, so `availableLabel`'s *"Walk in · ~N min"* branch is
+  tests-only. The **slot** branch is now verified end to end: Norzin's Tuesday close was moved to
+  23:30 for one run, the RPC returned `next_slot 2026-08-11 12:30:00+00`, and the badge read
+  **Today 18:30** — Thimphu, not the headless browser's UTC 12:30, which is the A1-11 bug the port
+  exists to avoid. Hours restored to 18:00 immediately after.
+
+**The anon grant** is §8, and it is the one thing here that cannot be fixed from this repo.
 
 ---
 
-## 6. Live data, as of 2026-08-10
+## 6. Live data, as of 2026-08-11
 
 Verification depends on these, and several changed under this project.
 
@@ -242,8 +428,12 @@ Verification depends on these, and several changed under this project.
   `P0001` for every account that existed.
 - `owner@bhutansalons.test` owns **nine** salons, which is what makes the salon switcher
   load-bearing rather than theoretical.
-- **`payments` is still 0 rows.** Rows created during Batch 3's verification were removed with
-  the rest of that run's state; do not assume a live example exists.
+- **`payments` is 0 rows, and now deliberately so.** Batch C's verification created a deposit and
+  a refund on Norzin's no-show booking, proved the owner ledger and the customer receipt agree
+  (both read Nu 950 outstanding), and removed both. The writer is live; the table is empty. Do not
+  assume a live example exists.
+- **All 93 `notifications` rows carry server-composed `title` and `body`**, branching on audience.
+  `lib/notification-copy.ts` is a fallback, not the source.
 - **`review_photos` has 1 row** (created 2026-08-05, by another client — the database has other
   people on it). The review photo strip is no longer without a live case.
 - Still zero: `offers`, `staff_time_off`, `loyalty_redemptions`, `content_reports`,
@@ -265,7 +455,7 @@ Verification depends on these, and several changed under this project.
 
 ---
 
-## 7. Corrections to the 2026-08-06 audit
+## 7. Corrections
 
 Recorded because that document was trusted while stale, and two of its errors were arithmetic
 rather than drift.
@@ -290,6 +480,28 @@ rather than drift.
     An earlier report of "69 routes" was a miscount of the same tree.
 
 ---
+
+
+### To the 2026-08-10 rewrite — that is, to this document
+
+11. **"The app calls 54 RPCs, tho_web calls 48, all six of the rest are accounted for."** It was
+    55 / 48 / **seven**. The unlisted one was `salons_available_today`.
+12. **The 2026-08-08/09 window was missed entirely** — two migrations and fourteen app commits.
+    §1's Batch A block is what was owed.
+13. **"Every sheet in the app has an equivalent"** was false while `record_payment_sheet.dart`
+    had none, which §5 of the same document conceded two screens later. Both are now true.
+14. **"Eleven drawer items."** Ten (`business_home.dart:190-245`). The eleventh is the sign-out
+    footer, which is not a destination. `components/owner/destinations.ts` said eleven too.
+15. **§2 claimed Discover was at parity.** Two of its rows did not exist.
+16. **§2 claimed "my bookings with segments, cancel, reschedule"** — cancel and review existed
+    only on the detail route; the list card had no actions at all until Batch E.
+17. **§3 listed nine "web is ahead" places and `AGENTS.md` listed six.** Neither included the
+    five now numbered 10–14, the most consequential being that the app cannot create a salon.
+18. **The staff booking detail was filed as plain parity.** The app's staff view also carries the
+    payments ledger and a working **Adjust points** — `adjust_points` authorises any business
+    member. Deliberately **not** matched: a stylist reading a salon's payment records and moving
+    a customer's points balance is broader access than the role needs. A divergence, recorded
+    here rather than a gap.
 
 ## 8. Known blocker, unrelated to this work
 

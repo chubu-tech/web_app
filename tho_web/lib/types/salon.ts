@@ -1,4 +1,6 @@
 import { hasFeature, type Plan } from "../entitlements";
+// `queue.ts` imports nothing, so this direction cannot cycle.
+import type { QueueEntry } from "./queue";
 
 /**
  * Salon-side types, ported from `tho/app/lib/data/models.dart`.
@@ -288,4 +290,38 @@ export type Hairstyle = {
   name: string;
   imageUrl: string | null;
   gender: string | null;
+};
+
+/**
+ * What one salon can offer **today** — `salons_available_today`, added upstream by
+ * `20260808000001` and secured by `20260808000002`.
+ *
+ * One round trip for the whole platform. The row it replaces was an N+1: a services read,
+ * a staff read, and then one `compute_availability` per stylist per salon, which is why
+ * `Api.earliestSlotsFor` was abandoned rather than ported.
+ *
+ * **The RPC returns the raw line, not a wait.** That is deliberate on both sides: the
+ * estimate comes from `queueShopSummary` in `lib/queue-logic.ts`, the same function behind
+ * the join sheet's *"You'd be #4 · ~45 min"* and the salon page's badge — so a card reading
+ * *"Walk in · ~15 min"* cannot disagree with the sheet the customer opens next. Two
+ * implementations of one estimate is the bug this shape avoids.
+ *
+ * **`queueLine` is empty for any salon that cannot run a line**, not just for an empty one:
+ * the RPC returns `[]` below Growth and when `queue_enabled` is false. So an empty array
+ * means *"no walk-in answer"* here, which is the opposite of `fetchActiveLine`'s
+ * `[] means empty / null means unknown` rule — do not carry that distinction across.
+ *
+ * `nextSlot` is null when nothing is bookable for the rest of the day. A row with **neither**
+ * a slot nor a line has no answer at all and is dropped by `availableToday`.
+ */
+export type SalonAvailability = {
+  businessId: string;
+  /** The soonest bookable start left today, in UTC. */
+  nextSlot: Date | null;
+  /** How many of the salon's stylists are working now. Not currently rendered. */
+  openCount: number;
+  /** `queue_active_line`'s exact PII-free projection, or empty. */
+  queueLine: QueueEntry[];
+  /** Barbers the ETA divides across — `queueShopSummary` needs it. */
+  barberCount: number;
 };

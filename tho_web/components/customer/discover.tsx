@@ -10,9 +10,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Sheet } from "@/components/ui/sheet";
+import { fetchServices, fetchServiceStaff, fetchStaff } from "@/lib/api/salon";
+import { availableToday } from "@/lib/available-today";
 import { formatKm, kmTo, nearestSalons, withinDistance } from "@/lib/discover-logic";
 import { resolveLocation, type Fix } from "@/lib/geo";
+import { rebookable, resolveRebook } from "@/lib/rebook";
 import { rank, topRated } from "@/lib/recommendations";
+import { createClient } from "@/lib/supabase/client";
 import {
   EMPTY_FILTERS,
   hasDistance,
@@ -29,14 +33,23 @@ import {
   productFilterToParams,
   type ProductFilter,
 } from "@/lib/product-filter";
-import { cardMetaLine, type Business, type Category, type Offer, type Product } from "@/lib/types/salon";
-import type { WorkingHour } from "@/lib/types/booking";
+import {
+  cardMetaLine,
+  type Business,
+  type Category,
+  type Offer,
+  type Product,
+  type SalonAvailability,
+} from "@/lib/types/salon";
+import type { Booking, WorkingHour } from "@/lib/types/booking";
 import { cn } from "@/lib/utils";
 import { FavouriteButton } from "./favourite-button";
 import { FilterPanel } from "./filter-panel";
 import { ProductFilterSheet } from "./product-filter-sheet";
 import { ProductsBrowse } from "./products-browse";
 import {
+  AvailableTodayRow,
+  BookAgainRow,
   NearbyRow,
   OffersRow,
   RecommendedRow,
@@ -65,6 +78,8 @@ export function Discover({
   products,
   productFilter,
   tab,
+  availability,
+  pastBookings,
 }: {
   businesses: Business[];
   categories: Category[];
@@ -73,6 +88,13 @@ export function Discover({
   offers: Offer[];
   favouriteIds: string[];
   filters: SalonFilters;
+  /**
+   * `salons_available_today`, or empty. Empty is the ordinary state for a signed-out
+   * visitor — the RPC is revoked from `anon` — so the row is absent rather than broken.
+   */
+  availability: SalonAvailability[];
+  /** The customer's own history, unfiltered. `rebookable` does the narrowing. */
+  pastBookings: Booking[];
   /** Every buyable product, across every salon — the Products segment's whole catalogue. */
   products: Product[];
   /** From `?sort=&min=&max=`, already reconciled against the loaded bounds by the page. */
@@ -97,6 +119,14 @@ export function Discover({
    */
   const [expanded, setExpanded] = useState(false);
   const [fix, setFix] = useState<Fix | null>(null);
+  /**
+   * The booking whose rebook is being resolved, if any.
+   *
+   * Non-null freezes **every** card in the Book again row, not just the pressed one. That is
+   * the re-entrancy guard: without it an impatient second press starts an overlapping fetch
+   * and pushes a second booking flow, which is the defect upstream fixed in `a25af1a`.
+   */
+  const [rebooking, setRebooking] = useState<string | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const location = fix?.coords ?? null;
 
@@ -197,6 +227,79 @@ export function Discover({
   );
 
   /**
+   * "Available today", ranked against the same salon set every other row uses.
+   *
+   * `inRange` rather than `businesses`, so the rating and distance filters narrow this row
+   * too — upstream made the same correction in `5482b57` after shipping it fed by the
+   * unfiltered list, which put salons the customer had filtered out back on the page.
+   */
+  const availableEntries = useMemo(
+    () => availableToday(inRange, availability, { from: location, now: new Date() }),
+    [inRange, availability, location],
+  );
+
+  /** How many salons have *any* answer, so "See all salons" is only offered when it leads on. */
+  const availableTotal = useMemo(
+    () =>
+      availableToday(inRange, availability, {
+        from: location,
+        now: new Date(),
+        limit: Number.MAX_SAFE_INTEGER,
+      }).length,
+    [inRange, availability, location],
+  );
+
+  const bookAgain = useMemo(() => rebookable(pastBookings), [pastBookings]);
+
+  /**
+   * Resolve a past booking against the salon's **current** menu, then open the flow there.
+   *
+   * The destination is not knowable before the press, which is why the card is a button:
+   * a service may have been retired or the stylist may have left, and the customer has to
+   * be told rather than dropped into a basket that quietly lost something.
+   *
+   * **It fails open.** If the salon's menu will not load there is nothing to resolve
+   * against, so it navigates with the booking's own service ids and lets the wizard sort it
+   * out — which it can, because the wizard already validates every id in the URL against the
+   * real menu and roster on render and lands on the furthest reachable step. Losing the
+   * *sentence* is a much smaller cost than refusing the rebook over a failed read.
+   */
+  async function startRebook(booking: Booking) {
+    if (rebooking != null || !booking.businessId) return;
+    const businessId = booking.businessId;
+    setRebooking(booking.id);
+
+    const bookedIds = (booking.items ?? [])
+      .map((i) => i.serviceId)
+      .filter((id): id is string => id != null);
+
+    try {
+      const supabase = createClient();
+      const [menu, staff, staffByService] = await Promise.all([
+        fetchServices(supabase, businessId),
+        fetchStaff(supabase, businessId),
+        fetchServiceStaff(supabase, businessId).catch(() => ({})),
+      ]);
+
+      const r = resolveRebook({ booking, menu, staff, staffByService });
+      const params = new URLSearchParams();
+      params.set("step", r.step);
+      for (const s of r.services) params.append("service", s.id);
+      if (r.staff) params.set("staff", r.staff.id);
+      if (r.changeNote) params.set("changed", "1");
+      router.push(`/salon/${businessId}/book?${params}`);
+    } catch {
+      const params = new URLSearchParams();
+      for (const id of bookedIds) params.append("service", id);
+      router.push(`/salon/${businessId}/book?${params}`);
+    } finally {
+      // Not cleared on success: the push is in flight and re-enabling the row mid-navigation
+      // is exactly the second press this guard exists to stop. The component unmounts.
+      setRebooking((current) => (current === booking.id ? null : current));
+    }
+  }
+
+  /**
    * "0.4 km" per salon for the card's distance chip.
    *
    * Built here rather than off `nearby`, which looks like the same thing and is not:
@@ -233,6 +336,14 @@ export function Discover({
       <BusinessCard
         id={b.id}
         name={b.name}
+        /*
+          The gender filter travels with the link, so the booking flow's service step opens on
+          the choice already made on Discover. `/salon/[id]` passes it straight through to the
+          Book CTA and nothing on that page filters by it — the salon's whole menu is still
+          shown, which is the app's behaviour too (`initialGender` reaches the flow, not the
+          detail screen).
+        */
+        href={filters.gender !== "any" ? `/salon/${b.id}?gender=${filters.gender}` : undefined}
         subtitle={b.addressText ?? b.description}
         meta={cardMetaLine(b)}
         imageUrl={b.coverUrl}
@@ -407,6 +518,24 @@ export function Discover({
                 selectedId={filters.categoryId}
                 onSelect={(id) => apply({ ...filters, categoryId: id })}
               />
+              {/*
+                Book again, first of the salon rows and above the browse.
+
+                Most sessions in this category are a rebooking rather than a shopping trip,
+                which is what earns it the position — and it renders nothing at all for a
+                customer with no completed booking, so a first-time visitor sees the browse
+                exactly as before.
+
+                **The app's 2026-08-08 rework put this above the category row too**; here it
+                stays below, because the two rows answer different questions and Services is
+                how somebody with no history starts. That is the one place this deliberately
+                keeps tho_web's order rather than adopting the app's.
+              */}
+              <BookAgainRow
+                bookings={bookAgain}
+                onRebook={startRebook}
+                busyBookingId={rebooking}
+              />
               {/* The first row on the page, so its first cover is the LCP element —
                   see `priority` on `SalonScroller`. */}
               <RecommendedRow ranked={ranked} priority />
@@ -419,6 +548,11 @@ export function Discover({
                 businesses={topRated(inRange)}
                 total={inRange.filter((b) => b.avgRating != null).length}
               />
+              {/* Last of the rows, as upstream has it: it is the most time-sensitive thing
+                  on the page and the one worth arriving at after the browse has failed to
+                  decide anything. Absent entirely for a signed-out visitor — the RPC is
+                  revoked from `anon`. */}
+              <AvailableTodayRow entries={availableEntries} total={availableTotal} />
             </div>
           ) : null}
 
@@ -538,6 +672,32 @@ export function Discover({
                   ))}
                 </ul>
               )}
+
+              {/*
+                The route, offered **beside** the expand toggle rather than instead of it.
+
+                `/salons` is what the app's "See all salons" opens, and it carries the two
+                sort chips this section has never had. The header's "View all" is a web-only
+                convenience that expands the row into a grid of the same salons in the same
+                order — genuinely useful and not worth removing, but it answers a different
+                question, so this is a second affordance rather than a replacement.
+
+                Placed under the section, not in the header: every other `SectionHeader` on
+                this page carries exactly one action, and a second control in one of them
+                would be the odd row out.
+              */}
+              {showSections ? (
+                <Link
+                  href="/salons"
+                  className="text-caption text-rausch-cta px-sm hover:bg-rausch/10 mt-base gap-xs inline-flex min-h-11 items-center rounded-full font-medium transition-colors duration-[var(--duration-fast)]"
+                >
+                  See all salons, sorted
+                  <Icons.forward
+                    style={{ width: IconSize.xxs, height: IconSize.xxs }}
+                    aria-hidden
+                  />
+                </Link>
+              ) : null}
             </section>
           )}
         </div>

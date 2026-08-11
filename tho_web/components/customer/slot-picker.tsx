@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { groupByDayPart } from "@/lib/booking-basket";
 import { SlotChip } from "@/components/ui/slot-chip";
 import { fetchAvailability } from "@/lib/api/booking";
 import { createClient } from "@/lib/supabase/client";
@@ -190,25 +191,38 @@ export function SlotPicker({
             message="Nothing free that day — try another date."
           />
         ) : (
+          /*
+            Grouped into Morning / Afternoon / Evening, the same three blocks the booking flow's
+            time step uses and the app uses in both places. One `fieldset` around all of them,
+            not one per block: the radio group is a single choice of time, and splitting it into
+            three would announce three separate questions.
+          */
           <fieldset>
             <legend className="sr-only">Choose a time</legend>
-            <ul className="gap-md grid grid-cols-3 tablet:grid-cols-4">
-              {current.slots.map((slot) => {
-                const key = slot.start.toISOString();
-                return (
-                  <li key={key}>
-                    <SlotChip
-                      name="slot"
-                      value={key}
-                      label={formatMinutesOfDay(thimphuMinutesOfDay(slot.start))}
-                      selected={selected?.start.getTime() === slot.start.getTime()}
-                      disabled={disabled}
-                      onSelect={() => onSelect(slot)}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="gap-base flex flex-col">
+              {groupByDayPart(current.slots, (s) => s.start).map((group) => (
+                <div key={group.part}>
+                  <h4 className="text-caption text-muted mb-sm font-medium">{group.label}</h4>
+                  <ul className="gap-md grid grid-cols-3 tablet:grid-cols-4">
+                    {group.slots.map((slot) => {
+                      const key = slot.start.toISOString();
+                      return (
+                        <li key={key}>
+                          <SlotChip
+                            name="slot"
+                            value={key}
+                            label={formatMinutesOfDay(thimphuMinutesOfDay(slot.start))}
+                            selected={selected?.start.getTime() === slot.start.getTime()}
+                            disabled={disabled}
+                            onSelect={() => onSelect(slot)}
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </fieldset>
         )}
       </div>

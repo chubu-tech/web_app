@@ -2,9 +2,17 @@ import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { StatusPill } from "@/components/ui/status-pill";
-import { bookingCode, canRemind, isActive, type Booking } from "@/lib/types/booking";
+import {
+  bookingCode,
+  canRemind,
+  isActive,
+  relativeDayLabel,
+  type Booking,
+} from "@/lib/types/booking";
 import { cn, formatNu } from "@/lib/utils";
+import { CancelBookingButton } from "./cancel-booking-button";
 import { ReminderToggle } from "./reminder-toggle";
+import { ReviewBookingButton } from "./review-booking-button";
 
 /**
  * The customer booking card, ported from
@@ -36,7 +44,7 @@ import { ReminderToggle } from "./reminder-toggle";
  *   as nothing rather than as a locked control: a customer cannot upgrade someone else's
  *   salon, and which plan the shop is on is not their business.
  */
-export function BookingCard({ booking }: { booking: Booking }) {
+export function BookingCard({ booking, now }: { booking: Booking; now: Date }) {
   const dead = booking.status === "cancelled" || booking.status === "no_show";
   const active = isActive(booking);
 
@@ -47,8 +55,16 @@ export function BookingCard({ booking }: { booking: Booking }) {
       ? "bg-success-text"
       : "bg-rausch";
 
-  const relative = active ? relativeDay(booking.startTs) : null;
+  const relative = active ? relativeDayLabel(booking.startTs, now) : null;
   const summary = servicesLine(booking);
+  /*
+    A review is offered on the card as well as the detail page. `alreadyReviewed` is NOT known
+    here — the list does not read `fetchMyReviewedBookingIds` — so a customer who has already
+    reviewed still sees the button and `create_review_with_photos` refuses the duplicate. The
+    detail page, which does read it, hides the button instead. Offering and letting the server
+    decide is the same fail-open direction Cancel takes here.
+  */
+  const canReview = booking.status === "completed" && booking.businessId != null;
 
   return (
     <article className="border-hairline bg-canvas shadow-card relative flex overflow-hidden rounded-md border">
@@ -121,6 +137,27 @@ export function BookingCard({ booking }: { booking: Booking }) {
             </span>
           ) : null}
         </div>
+
+        {/*
+          **The action on the row, which the app has and this card did not.**
+
+          `booking_rich_card.dart:329` puts Cancel (or Leave a review) beside View E-Receipt, and
+          here both were one navigation deeper — two taps for the single most common thing anybody
+          does to a booking. The card's title is a stretched link (`after:inset-0`), so anything
+          interactive inside it needs `relative z-10` to sit above that; both buttons carry it.
+
+          Shared components, not copies: `/bookings/[id]` renders the same two, so a change to the
+          confirm copy or the terms gate happens once. **Cancel is not disabled here** — this card
+          has not read the salon, so it does not know the window; the RPC refuses with P0015 and
+          `bookingErrorMessage` quotes the salon's own hour count. The detail page, which has read
+          the business, disables it instead.
+        */}
+        {active || canReview ? (
+          <div className="gap-sm mt-md flex flex-wrap">
+            {active ? <CancelBookingButton booking={booking} variant="quiet" /> : null}
+            {canReview ? <ReviewBookingButton booking={booking} variant="quiet" /> : null}
+          </div>
+        ) : null}
       </div>
     </article>
   );
@@ -137,24 +174,6 @@ function servicesLine(b: Booking): string | null {
   }
   if (b.staffName) parts.push(`with ${b.staffName}`);
   return parts.length > 0 ? parts.join(" · ") : null;
-}
-
-/**
- * "Today" / "Tomorrow" / "In n days", within the next week.
- *
- * Compared as **Thimphu** calendar days, not the browser's: at 23:00 UTC it is already
- * tomorrow in Bhutan, and a card that says "Today" for an appointment that has moved
- * to tomorrow is worse than one that says nothing.
- */
-function relativeDay(start: Date): string | null {
-  const day = (d: Date) =>
-    Math.floor((d.getTime() + 6 * 60 * 60_000) / 86_400_000);
-  const days = day(start) - day(new Date());
-  if (days < 0) return null;
-  if (days === 0) return "Today";
-  if (days === 1) return "Tomorrow";
-  if (days <= 7) return `In ${days} days`;
-  return null;
 }
 
 /** Calendar-tile date. Fixed width so a column of cards aligns down the page. */

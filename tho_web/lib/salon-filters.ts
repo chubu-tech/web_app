@@ -82,18 +82,32 @@ export function isActive(f: SalonFilters): boolean {
 }
 
 /**
- * The service genders satisfying the gender filter. **Unisex counts for
- * everyone**, so it is always included; 'any' means no constraint at all.
+ * The `services.gender` values each customer-facing choice admits.
+ *
+ * **Unisex appears in both lists**, because a unisex service genuinely serves everyone —
+ * which is also why there is no Unisex chip anywhere: a third choice would present those
+ * services as a separate menu rather than as part of both.
+ *
+ * A key that is not here (including `any`) means **no constraint**. That is the safe
+ * direction: an unrecognised value must show too much, never too little.
+ *
+ * Exported because two surfaces read it — this file's {@link serviceGenders} for Discover's
+ * server-side query, and `filterByGender` in `lib/booking-basket.ts` for the booking flow's
+ * service step. They were separate literals until the step was built, which is exactly how
+ * Discover's filter and the step would have come to disagree about what "Women" means.
+ * `service_filters.dart:23` makes the same point about the same map.
+ */
+export const GENDER_SERVICE_KINDS: Record<string, readonly string[]> = {
+  women: ["female", "unisex"],
+  men: ["male", "unisex"],
+};
+
+/**
+ * The service genders satisfying the gender filter, or null for no constraint.
  */
 export function serviceGenders(f: SalonFilters): string[] | null {
-  switch (f.gender) {
-    case "women":
-      return ["female", "unisex"];
-    case "men":
-      return ["male", "unisex"];
-    default:
-      return null;
-  }
+  const kinds = GENDER_SERVICE_KINDS[f.gender];
+  return kinds ? [...kinds] : null;
 }
 
 /* ---------------------------------------------------------------------------

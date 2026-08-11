@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { usePollTick } from "@/components/customer/use-poll";
 import { Button } from "@/components/ui/button";
+import { ConfettiBurst } from "@/components/ui/confetti-burst";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { cancelRedemption } from "@/lib/api/owner-back-office";
 import { fetchMyRedemptionById } from "@/lib/api/shop";
@@ -44,6 +45,23 @@ export function RedemptionCode({
   const settled = redemption.status !== "pending";
   const tick = usePollTick(4000, settled);
 
+  /**
+   * The celebration, and **it fires when the salon confirms rather than when Redeem is pressed.**
+   *
+   * The app plays `Celebration.play` on the press (`loyalty_card.dart:80`) and then pops the
+   * screen. On the web that press is a `router.push`, so a burst there would be cut off
+   * mid-flight by the navigation — and it would be celebrating a *request*, not a reward. The
+   * moment worth marking is somebody behind the counter honouring it, which this screen already
+   * watches for: `confirmed` arriving on a poll is the same instant the copy flips to *"Enjoy
+   * your reward."*
+   *
+   * Only on the **transition**, never on a revisit — `initial.status` is what the page arrived
+   * with, so opening an already-confirmed reward is quiet. Confetti every time somebody reopens
+   * a spent coupon would be noise.
+   */
+  const [celebrated, setCelebrated] = useState(initial.status === "confirmed");
+  const celebrate = redemption.status === "confirmed" && !celebrated;
+
   useEffect(() => {
     if (tick === 0 || settled) return;
     let live = true;
@@ -79,6 +97,7 @@ export function RedemptionCode({
   if (redemption.status === "confirmed") {
     return (
       <div className="py-xl flex flex-col items-center text-center">
+        {celebrate ? <ConfettiBurst onDone={() => setCelebrated(true)} /> : null}
         <Icons.success
           className="text-success-text"
           style={{ width: IconSize.hero, height: IconSize.hero }}

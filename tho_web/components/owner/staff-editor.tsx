@@ -24,7 +24,7 @@ import {
   updateStaff,
   uploadOwnerImage,
 } from "@/lib/api/owner-setup";
-import { hasFeature } from "@/lib/entitlements";
+import { hasFeature, maxActiveStylists } from "@/lib/entitlements";
 import {
   bookingsOutsideHours,
   openWeekdaysFrom,
@@ -37,7 +37,7 @@ import { downscaleImage, imageRejection, releasePreview } from "@/lib/images";
 import { createClient } from "@/lib/supabase/client";
 import type { Booking, WorkingHour } from "@/lib/types/booking";
 import type { Business, BusinessPhoto, ServiceItem, StaffMember } from "@/lib/types/salon";
-import { formatDuration, formatNu } from "@/lib/utils";
+import { cn, formatDuration, formatNu } from "@/lib/utils";
 
 /**
  * Everything about one stylist — a port of `staff_edit_screen.dart`.
@@ -69,9 +69,21 @@ export function StaffEditor({
   upcoming,
   pendingInvite,
   storedPay,
+  otherActiveCount,
 }: {
   business: Business;
   member: StaffMember;
+  /**
+   * How many **other** stylists at this salon are active.
+   *
+   * Needed to check the Basic cap before flipping Active on, and counted on the server
+   * because this editor only ever loads one staff row. Since
+   * `20260807000004_basic_stylist_cap` the cap is a real trigger raising `P0001` on an
+   * inactive → active update, so without this the checkbox offers a write that can only be
+   * refused — and until `owner-errors.ts` grew a case for it, refused as *"please try
+   * again"*.
+   */
+  otherActiveCount: number;
   services: ServiceItem[];
   initialServiceIds: string[];
   initialHours: WorkingHour[];
@@ -94,9 +106,26 @@ export function StaffEditor({
   storedPay: { commissionPct: number; baseSalaryNu: number } | null;
 }) {
   const router = useRouter();
+  /**
+   * The cap, and whether the other stylists have already used it up.
+   *
+   * `maxActiveStylists` returns null for unlimited, which is Growth and above — so
+   * `capReached` is false there without a special case.
+   */
+  const activeCap = maxActiveStylists(business.plan);
+  const capReached = activeCap != null && otherActiveCount >= activeCap;
+
   const [name, setName] = useState(member.displayName);
   const [isActive, setIsActive] = useState(member.isActive);
   const [photoUrl, setPhotoUrl] = useState(member.photoUrl);
+  /**
+   * Whether Active is genuinely locked off — see the note on the checkbox.
+   *
+   * All three conditions are load-bearing: the cap is used up, this stylist is currently
+   * unticked, **and** the saved row is inactive too. Without the last one, unticking an
+   * already-active stylist disabled the box that had just been unticked.
+   */
+  const lockedOff = capReached && !isActive && !member.isActive;
   const [serviceIds, setServiceIds] = useState<string[]>(initialServiceIds);
   const [week, setWeek] = useState<WeekHours>(() => weekFromWorkingHours(initialHours));
   const [photos, setPhotos] = useState(initialPhotos);
@@ -266,10 +295,38 @@ export function StaffEditor({
         <Field label="Name" value={name} onChange={setName} />
       </div>
 
-      <label className="gap-base mt-base flex cursor-pointer items-start">
+      {/*
+        Activating is capped; deactivating never is.
+
+        `capReached` is about the *other* stylists, so turning this one **off** is always
+        allowed and turning it back on is refused only when the salon is already at its
+        limit. That asymmetry is the whole point: the paywall stops a new active stylist, it
+        does not undo an existing one — which matters because nine Basic salons are already
+        over the cap and would otherwise be locked out of editing anybody.
+
+        Checked here as well as in SQL. The trigger is the authority
+        (`20260807000004_basic_stylist_cap`); this is so the answer arrives before the write
+        rather than as a refusal, and the sentence names the cap instead of the plan.
+
+        **`!member.isActive` is the third condition, and it was missing.** Measured in the
+        browser on Menjong (Basic, two active stylists, cap one): the box unticked fine and
+        then **disabled itself**, so the owner could not put back the value they had just
+        taken off without reloading the page. Reading only local `isActive` made an *undo*
+        indistinguishable from an *activation*. It is not: the persisted row is already
+        active, so saving it active changes nothing and the trigger — which fires on
+        inactive → active — never sees an update. Gating on the persisted state as well is
+        what the comment above always claimed the code did.
+      */}
+      <label
+        className={cn(
+          "gap-base mt-base flex items-start",
+          lockedOff ? "cursor-not-allowed" : "cursor-pointer",
+        )}
+      >
         <input
           type="checkbox"
           checked={isActive}
+          disabled={lockedOff}
           onChange={(e) => setIsActive(e.target.checked)}
           className="accent-rausch-cta mt-1 size-5"
         />
@@ -279,6 +336,16 @@ export function StaffEditor({
             An inactive stylist can&apos;t be booked and doesn&apos;t count towards your plan&apos;s
             stylist limit.
           </span>
+          {lockedOff ? (
+            <span className="text-caption text-muted mt-xxs block">
+              {business.plan === "basic" ? "The Basic plan" : "Your plan"} allows{" "}
+              {activeCap === 1 ? "one active stylist" : `${activeCap} active stylists`}, and{" "}
+              {otherActiveCount === 1 ? "one is" : `${otherActiveCount} are`} already active.{" "}
+              <Link href="/business/plans" className="text-rausch-cta font-medium underline">
+                See plans
+              </Link>
+            </span>
+          ) : null}
         </span>
       </label>
 

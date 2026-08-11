@@ -68,6 +68,7 @@ export function BusinessCard({
   distanceLabel,
   chip,
   favourite,
+  href,
   sizes = "(min-width: 744px) 420px, 100vw",
   compact = false,
   framed = false,
@@ -76,6 +77,18 @@ export function BusinessCard({
 }: {
   id: string;
   name: string;
+  /**
+   * Where the title goes. Omit for the default `/salon/<id>`; pass **null** to render the
+   * name as plain text with no stretched link at all.
+   *
+   * `null` exists for one caller and one reason: "Book again" wraps this card in a
+   * `<button>`, because a rebook's destination is not knowable until `resolveRebook` has
+   * read the salon's current menu. A link inside a button is invalid markup and the link
+   * would swallow the press, so the card has to be able to stop being one. Same optional-
+   * `href` shape `SpecialistCard` and `OwnerBookingCard` already take, for the same reason:
+   * a card is not always a navigation.
+   */
+  href?: string | null;
   /** Line two — the address. */
   subtitle?: string | null;
   /** Line three — what the place is and how many have rated it. */
@@ -158,12 +171,16 @@ export function BusinessCard({
       <div className={cn("gap-md flex items-start", framed ? "p-base" : "mt-md")}>
         <div className="min-w-0 flex-1">
           <h3 className="text-title text-ink truncate font-semibold">
-            <Link
-              href={`/salon/${id}`}
-              className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
-            >
-              {name}
-            </Link>
+            {href === null ? (
+              name
+            ) : (
+              <Link
+                href={href ?? `/salon/${id}`}
+                className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
+              >
+                {name}
+              </Link>
+            )}
           </h3>
           {subtitle ? (
             <p className="text-body-sm text-muted mt-xxs truncate">{subtitle}</p>

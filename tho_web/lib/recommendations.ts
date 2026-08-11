@@ -288,3 +288,57 @@ export function topRated(businesses: Business[], limit = 5): Business[] {
     .sort((a, b) => (b.avgRating ?? 0) - (a.avgRating ?? 0) || a.name.localeCompare(b.name))
     .slice(0, limit);
 }
+
+/** The orderings `/salons` offers. Mirrors `SalonSort` in `all_salons_screen.dart`. */
+export type SalonSort = "nearest" | "topRated";
+
+export const SALON_SORTS: readonly SalonSort[] = ["nearest", "topRated"];
+
+export const SALON_SORT_LABELS: Record<SalonSort, string> = {
+  nearest: "Nearest",
+  topRated: "Top rated",
+};
+
+/**
+ * Every salon, ordered — a port of `AllSalonsScreen.sortedBy`
+ * (`../tho/app/lib/customer/all_salons_screen.dart:52`).
+ *
+ * Distinct from {@link topRated}, which is a **shortlist** for a Discover row: this keeps
+ * every salon, including the unrated and the unlocated, because a browse that silently
+ * dropped them would be a filter pretending to be a sort. On live data 12 of the 14
+ * approved salons have coordinates and most are unrated, so both tails are the common case
+ * rather than an edge one.
+ *
+ * **Unknown sorts last in both orderings.** A salon with no rating has not been rated
+ * badly, and one with no coordinates is not nearby — the same rule
+ * `available-today.ts` follows for its distance tiebreak.
+ *
+ * With no fix, `nearest` cannot be computed and the input order is returned untouched
+ * rather than falling back to another ordering: silently showing top-rated under a chip
+ * reading "Nearest" would be worse than showing the order the page already had. The caller
+ * is responsible for not offering the chip when it has no fix — see `/salons`.
+ *
+ * Never mutates `businesses`.
+ */
+export function sortedBy(
+  businesses: Business[],
+  sort: SalonSort,
+  from?: Coords | null,
+): Business[] {
+  const out = [...businesses];
+  if (sort === "topRated") {
+    return out.sort((a, b) => {
+      if (a.avgRating == null) return b.avgRating == null ? 0 : 1;
+      if (b.avgRating == null) return -1;
+      return b.avgRating - a.avgRating || a.name.localeCompare(b.name);
+    });
+  }
+  if (!from) return out;
+  return out.sort((a, b) => {
+    const ka = kmTo(a, from);
+    const kb = kmTo(b, from);
+    if (ka == null) return kb == null ? 0 : 1;
+    if (kb == null) return -1;
+    return ka - kb || a.name.localeCompare(b.name);
+  });
+}

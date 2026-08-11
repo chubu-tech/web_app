@@ -12,7 +12,7 @@ import type { NavMatch } from "@/lib/nav";
  * what an owner's day is made of. 3a landed **Calendar** and **Queue**, 3b turned on
  * Settings, and 3c turns on **Insights** and **Messages**: every tab is now real.
  *
- * **Settings is a hub, and that is where the app's drawer went.** The app reaches eleven
+ * **Settings is a hub, and that is where the app's drawer went.** The app reaches **ten**
  * things from a drawer; here they are the hub's two groups, which keeps the phone's bottom
  * bar short and keeps the split the app already draws: the tabs are the day, the rest is
  * work you do in bursts. Each is a real route rather than an accordion section — on the web a

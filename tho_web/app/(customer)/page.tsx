@@ -8,7 +8,9 @@ import {
   fetchAllBusinessHours,
   fetchBusinesses,
   fetchCategories,
+  fetchSalonsAvailableToday,
 } from "@/lib/api/discovery";
+import { fetchMyBookings } from "@/lib/api/booking";
 import { fetchMyFavouriteIds } from "@/lib/api/favourites";
 import { fetchLiveOffers } from "@/lib/api/salon";
 import { fetchProducts } from "@/lib/api/shop";
@@ -103,6 +105,8 @@ export default async function DiscoverPage({
     favouriteIds,
     products,
     staffInvites,
+    availability,
+    pastBookings,
   ] = await Promise.all([
       fetchBusinesses(supabase, {
         categoryId: filters.categoryId,
@@ -136,6 +140,30 @@ export default async function DiscoverPage({
         anonymous caller, so the `catch` covers a visitor rather than an error.
       */
       fetchMyStaffInvites(supabase).catch(() => []),
+      /*
+        What every salon can offer for the rest of today, in one round trip.
+
+        Decorative in the strict sense: `salons_available_today` is revoked from `anon`, so a
+        signed-out visitor gets a rejection here on **every** load and the catch is the normal
+        path, not the exceptional one. The row is then absent rather than empty, which is the
+        honest rendering of "we cannot tell you".
+      */
+      fetchSalonsAvailableToday(supabase).catch(() => []),
+      /*
+        The customer's own history, for "Book again".
+
+        The user id is **passed in**, not left to RLS: `bookings_select` OR-matches
+        `is_business_member`, so an unfiltered read hands a salon member their salons'
+        bookings. That is the repeated bug this repo has now fixed six times, and it would be
+        especially bad here — a "Book again" row offering an owner their customers'
+        appointments.
+
+        `account.user` is null for a visitor and for a guest with no session, and neither has
+        a history, so the read is skipped rather than sent and failed.
+      */
+      account.user
+        ? fetchMyBookings(supabase, account.user.id).catch(() => [])
+        : Promise.resolve([]),
     ]);
 
   // Reconciled against the loaded bounds here rather than in the component: a bound that does not
@@ -162,6 +190,8 @@ export default async function DiscoverPage({
         hoursByBusiness={hoursByBusiness}
         categoriesByBusiness={categoriesByBusiness}
         offers={offers}
+        availability={availability}
+        pastBookings={pastBookings}
         favouriteIds={[...favouriteIds]}
         filters={filters}
         products={products}

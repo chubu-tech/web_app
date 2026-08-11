@@ -84,6 +84,13 @@ export default async function OwnerBookingPage({
         <BookingMoney
           payments={payments}
           totalPrice={booking.totalPrice}
+          businessId={active.id}
+          bookingId={booking.id}
+          /* The app's own gate on its Record-payment button (`Feature.deposits`).
+             `record_payment` refuses a non-Pro salon in SQL too, so this decides whether the
+             control is offered, not whether the rule holds. */
+          canRecord={hasFeature(active.plan, "deposits")}
+          isNoShow={booking.status === "no_show"}
           loyalty={
             balance && customerId
               ? {

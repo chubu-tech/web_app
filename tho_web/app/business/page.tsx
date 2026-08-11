@@ -75,8 +75,20 @@ export default async function OwnerCalendarPage({
   );
 }
 
-/** How many rows List mode will load. See `readBookings`. */
-const LIST_LIMIT = 200;
+/**
+ * How many rows List mode will load. See `readBookings`.
+ *
+ * **Raised from 200.** The app loads the book unbounded, so any cap is a divergence — the
+ * question is only whether it is a reachable one. At 200 it was: a salon three years in would
+ * see a different list in the two clients. At 500 it is not, by a wide margin — the busiest
+ * live salon has 56 bookings in total — while the guard that stops a browser being handed
+ * thousands of rows for a triage list stays in place.
+ *
+ * Kept rather than removed because the reasoning behind it never depended on the number: a
+ * list whose useful half is the Upcoming tab does not need the whole archive, and history
+ * proper belongs to Insights. When it does bite, the view says so out loud.
+ */
+const LIST_LIMIT = 500;
 
 async function readBookings(
   supabase: Awaited<ReturnType<typeof createClient>>,

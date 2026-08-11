@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { groupByDayPart, noSlotsForSelection } from "@/lib/booking-basket";
 import { addDays, formatMinutesOfDay, thimphuMinutesOfDay, toIsoDay } from "@/lib/time";
+import type { ServiceItem } from "@/lib/types/salon";
 import { cn } from "@/lib/utils";
 import type { SlotOption } from "./use-availability";
 
@@ -51,6 +53,7 @@ export function BookingTimeStep({
   onRetry,
   staffLabel,
   onChangeStaff,
+  services,
 }: {
   /** Thimphu's today, resolved on the server so two renders cannot disagree. */
   today: Date;
@@ -64,6 +67,13 @@ export function BookingTimeStep({
   onRetry: () => void;
   /** The stylist chip's text — a name, or "Any professional". */
   staffLabel: string;
+  /**
+   * The basket, for the empty state's sentence only — see `noSlotsForSelection`.
+   *
+   * Optional so a caller with nothing chosen falls back to the generic line rather than
+   * claiming "no slot fits 0 min".
+   */
+  services?: ServiceItem[];
   /** Jumps back to step 2. Fresha puts the same control here. */
   onChangeStaff: () => void;
 }) {
@@ -166,14 +176,40 @@ export function BookingTimeStep({
           action={<Button onClick={onRetry}>Try again</Button>}
         />
       ) : slots.length === 0 ? (
+        /*
+          **Two different problems, and they used to share one sentence.**
+
+          `is_bookable_window` needs the whole basket inside a single working-hours interval, so
+          a long basket finds nothing on a day with plenty of short gaps. The old generic line
+          sent that customer to try every other day in turn, when dropping one service would
+          have worked at once. `noSlotsForSelection` names the block, the stylist and the day,
+          and only suggests fewer services when there is more than one to drop.
+
+          It needs the basket, so the wizard passes it; without it the message falls back to the
+          generic one rather than inventing a duration.
+        */
         <EmptyState
           icon={Icons.clock}
           title="Nothing free that day"
-          message="Try another date, or pick a different professional."
+          message={
+            services && services.length > 0
+              ? noSlotsForSelection({ services, staffName: staffLabel, day })
+              : "Try another date, or pick a different professional."
+          }
         />
       ) : (
-        <ul className="gap-sm flex flex-col">
-          {slots.map((slot) => {
+        /*
+          Grouped into the app's three blocks (`time_step.dart:444`). A flat list of fifteen
+          times is a wall of numbers; "Afternoon" over four of them is how somebody scans for
+          "after work". Blocks with nothing in them are omitted, so a salon opening at 13:00
+          shows Afternoon first rather than an empty Morning heading.
+        */
+        <div className="gap-lg flex flex-col">
+          {groupByDayPart(slots, (s) => s.start).map((group) => (
+            <section key={group.part}>
+              <h3 className="text-title text-muted mb-sm font-medium">{group.label}</h3>
+              <ul className="gap-sm flex flex-col">
+                {group.slots.map((slot) => {
             const selected = selectedStart?.getTime() === slot.start.getTime();
             return (
               <li key={slot.start.toISOString()}>
@@ -202,8 +238,11 @@ export function BookingTimeStep({
                 </button>
               </li>
             );
-          })}
-        </ul>
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
     </div>
   );

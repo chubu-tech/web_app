@@ -5,7 +5,9 @@ import {
   canRemind,
   hasNote,
   isActive,
+  depositNu,
   outstandingNu,
+  relativeDayLabel,
   servicesSummary,
   serviceIds,
   type Booking,
@@ -180,29 +182,133 @@ describe("canRemind", () => {
   });
 });
 
+/*
+  `outstandingNu` — and the convention it used to get backwards.
+
+  **`record_payment` stores a refund as a NEGATIVE `amount_nu`.** These tests used to pass a
+  refund as a positive magnitude and expect it to be negated, which matched the implementation
+  and matched nothing the database can hold. `payments` had 0 rows on every platform, so neither
+  the code nor the tests were ever confronted with a real row — the bug surfaced within minutes
+  of a writer existing: a Nu 1,200 booking with a Nu 400 deposit and a Nu 150 refund rendered
+  **Outstanding Nu 650** where the truth is 950.
+
+  The factory now takes the amount as the column stores it, so a wrong sign is a failing test.
+*/
 describe("outstandingNu", () => {
   it("is the total when nothing has been paid", () => {
     expect(outstandingNu(500, [])).toBe(500);
   });
 
-  it("subtracts payments and deposits", () => {
+  it("subtracts a deposit and a balance", () => {
     expect(outstandingNu(500, [payment("deposit", 200)])).toBe(300);
-    expect(outstandingNu(500, [payment("deposit", 200), payment("balance",300)])).toBe(0);
+    expect(outstandingNu(500, [payment("deposit", 200), payment("balance", 300)])).toBe(0);
   });
 
-  it("adds a refund back to what is owed", () => {
-    expect(outstandingNu(500, [payment("balance",500), payment("refund", 200)])).toBe(200);
+  it("adds a refund back to what is owed — stored negative", () => {
+    expect(outstandingNu(500, [payment("balance", 500), payment("refund", -200)])).toBe(200);
+  });
+
+  it("gets the live case right", () => {
+    // The exact numbers the browser run produced, which is what caught this.
+    expect(
+      outstandingNu(1200, [payment("deposit", 400), payment("refund", -150)]),
+    ).toBe(950);
+  });
+
+  it("a deposit fully refunded leaves the whole total owed", () => {
+    expect(outstandingNu(500, [payment("deposit", 500), payment("refund", -500)])).toBe(500);
   });
 
   it("never goes negative — an overpayment is the salon's to settle", () => {
-    expect(outstandingNu(500, [payment("balance",800)])).toBe(0);
+    expect(outstandingNu(500, [payment("balance", 800)])).toBe(0);
   });
 
   it("never exceeds the total, even with a refund larger than the price", () => {
-    expect(outstandingNu(500, [payment("refund", 900)])).toBe(500);
+    expect(outstandingNu(500, [payment("refund", -900)])).toBe(500);
   });
 
   it("rounds the total rather than showing chetrum", () => {
-    expect(outstandingNu(349.5, [])).toBe(350);
+    expect(outstandingNu(499.6, [])).toBe(500);
+  });
+});
+
+/*
+  `depositNu` — what the salon keeps if nobody turns up.
+
+  Deposits only, net of refunds. The distinction from "everything paid" is the point: a balance
+  handed over after the cut is not no-show cover, and the pill this feeds names an entitlement
+  (`deposits`) that is specifically about money taken up front.
+*/
+describe("depositNu", () => {
+  it("sums the deposits", () => {
+    expect(depositNu([payment("deposit", 200), payment("deposit", 300)])).toBe(500);
+  });
+
+  it("ignores a balance and a full payment", () => {
+    // The case that separates this from `outstandingNu`. Nu 1,000 has been paid; none of it is
+    // cover.
+    expect(depositNu([payment("balance", 600), payment("full", 400)])).toBe(0);
+  });
+
+  it("nets a refund off, so a returned deposit is not still cover", () => {
+    // Negative, as `record_payment` writes it.
+    expect(depositNu([payment("deposit", 500), payment("refund", -200)])).toBe(300);
+    expect(depositNu([payment("deposit", 500), payment("refund", -500)])).toBe(0);
+  });
+
+  it("is insensitive to the refund's sign, unlike outstandingNu", () => {
+    // This one subtracts explicitly rather than summing, so `Math.abs` is what stops the two
+    // cancelling out. Pinned because the asymmetry between the two functions is deliberate and
+    // looks like an inconsistency.
+    expect(depositNu([payment("deposit", 500), payment("refund", 200)])).toBe(300);
+  });
+
+  it("clamps at zero rather than reporting negative cover", () => {
+    expect(depositNu([payment("deposit", 100), payment("refund", -400)])).toBe(0);
+  });
+
+  it("is zero with no payments at all", () => {
+    expect(depositNu([])).toBe(0);
+  });
+});
+
+/*
+  `relativeDayLabel` — moved out of `booking-card.tsx`, where it read `new Date()` inside the
+  render. Both surfaces that show it now take the same `now`, which is what these pin: the
+  boundaries are **Thimphu** calendar days, so a UTC evening is already tomorrow in Bhutan.
+*/
+describe("relativeDayLabel", () => {
+  // 2026-08-10T04:00Z is 10:00 on the 10th in Thimphu.
+  const now = new Date("2026-08-10T04:00:00.000Z");
+
+  it("names today, tomorrow and the week", () => {
+    expect(relativeDayLabel(new Date("2026-08-10T09:00:00.000Z"), now)).toBe("Today");
+    expect(relativeDayLabel(new Date("2026-08-11T03:00:00.000Z"), now)).toBe("Tomorrow");
+    expect(relativeDayLabel(new Date("2026-08-13T03:00:00.000Z"), now)).toBe("In 3 days");
+    expect(relativeDayLabel(new Date("2026-08-17T03:00:00.000Z"), now)).toBe("In 7 days");
+  });
+
+  it("is null beyond a week — a chip reading 'In 23 days' is not a chip", () => {
+    expect(relativeDayLabel(new Date("2026-08-18T03:00:00.000Z"), now)).toBeNull();
+  });
+
+  it("is null for anything already past", () => {
+    expect(relativeDayLabel(new Date("2026-08-09T03:00:00.000Z"), now)).toBeNull();
+  });
+
+  it("crosses the day boundary in THIMPHU, not UTC", () => {
+    /*
+      The case the whole helper exists for. 19:00Z on the 10th is 01:00 on the **11th** in
+      Thimphu, so an appointment then is "Tomorrow" — while a UTC reading would still call the
+      10th today and say "Today" for an appointment that has moved to the next day.
+    */
+    expect(relativeDayLabel(new Date("2026-08-10T19:00:00.000Z"), now)).toBe("Tomorrow");
+  });
+
+  it("is Today for an appointment later on the same Thimphu day, read from a UTC evening", () => {
+    // now = 23:00Z on the 9th, which is 05:00 on the 10th in Thimphu. An 08:00Z appointment on
+    // the 10th (14:00 Thimphu) is the same Thimphu day.
+    const lateUtc = new Date("2026-08-09T23:00:00.000Z");
+    expect(relativeDayLabel(new Date("2026-08-10T08:00:00.000Z"), lateUtc)).toBe("Today");
   });
 });

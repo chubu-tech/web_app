@@ -133,7 +133,7 @@ export default async function StylistPage({
           <HeroCircleButton
             icon={Icons.back}
             label={`Back to ${business.name}`}
-            href={`/salon/${business.id}?tab=Specialists`}
+            href={`/salon/${business.id}#team`}
           />
           <span className="flex-1" />
           <ShareButton name={staff.displayName} variant="hero" />

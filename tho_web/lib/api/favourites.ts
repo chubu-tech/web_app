@@ -32,10 +32,22 @@ export async function fetchMyFavourites(
   // role, which holds table-level SELECT — but an embedded star has the identical failure
   // waiting in it the moment another column is withheld, and `/saved` renders
   // `BusinessCard`, which reads none of the withheld three. See `BUSINESS_PUBLIC_SELECT`.
-  const { data } = await supabase
+  /*
+    **`error` is read, not dropped.** This destructured `data` alone, which meant a permission
+    failure, a withheld column or a missing grant all returned an empty list — and `/saved`
+    rendered that as *"Nothing saved yet"*, which is also the correct answer for somebody with
+    no favourites. The two states were indistinguishable, on a page whose whole content is the
+    difference between them.
+
+    Same class as the `payments` receipt (a customer could not see their own deposit) and the
+    `businesses` anon grant (every public route 500ing). All three were a dropped `error` on a
+    read whose empty result is plausible.
+  */
+  const { data, error } = await supabase
     .from("favorites")
     .select(`businesses(${BUSINESS_PUBLIC_SELECT})`)
     .order("created_at", { ascending: false });
+  if (error) throw error;
 
   // `favorites → businesses` is a to-one FK, so PostgREST returns an object.
   // Without generated DB types supabase-js can't know that and types the embed

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Icons, IconSize } from "@/components/ui/icons";
-import { serviceCategories } from "@/lib/booking-basket";
+import { filterByGender, serviceCategories } from "@/lib/booking-basket";
+import { GENDER_SERVICE_KINDS } from "@/lib/salon-filters";
 import type { ServiceItem } from "@/lib/types/salon";
 import { cn, formatDuration, formatNu } from "@/lib/utils";
 
@@ -35,6 +36,7 @@ export function BookingServiceStep({
   unbookableCount,
   selectedIds,
   onToggle,
+  initialGender = "any",
 }: {
   /** Already narrowed to what somebody performs — see `bookableServices`. */
   services: ServiceItem[];
@@ -42,12 +44,38 @@ export function BookingServiceStep({
   unbookableCount: number;
   selectedIds: string[];
   onToggle: (id: string) => void;
+  /**
+   * The gender chip to open on, carried from Discover's filter through `?gender=`.
+   *
+   * Somebody who narrowed Discover to "Women" and then opened a salon has already said what
+   * they are looking for; making them say it again in the flow is the hand-off
+   * `book_flow_screen.dart:54` exists to avoid. `any` when nothing was filtered, which is
+   * the common case.
+   */
+  initialGender?: string;
 }) {
   const categories = serviceCategories(services);
   const [category, setCategory] = useState<string | null>(null);
+  /**
+   * Seeded once, from the URL, then owned here.
+   *
+   * Not derived from `initialGender` on every render: the customer must be able to widen a
+   * seeded filter back to "All" without the URL fighting them, and the URL does not change
+   * when they do — this narrows what is *shown*, not what was fetched.
+   */
+  const [gender, setGender] = useState(() =>
+    GENDER_SERVICE_KINDS[initialGender] ? initialGender : "any",
+  );
 
+  /*
+    Gender first, then category. The order is not arbitrary: the category chips are built
+    from the salon's own `services.category` values across the **whole** menu, so filtering
+    by category first and then by gender could leave a selected category chip showing an
+    empty list. Narrowing by gender first keeps every visible chip meaningful.
+  */
+  const byGender = filterByGender(services, gender);
   const shown =
-    category == null ? services : services.filter((s) => s.category?.trim() === category);
+    category == null ? byGender : byGender.filter((s) => s.category?.trim() === category);
 
   if (services.length === 0) {
     return (
@@ -59,6 +87,32 @@ export function BookingServiceStep({
 
   return (
     <div>
+      {/*
+        All · Women · Men — and no Unisex chip, deliberately. A unisex service serves
+        everyone and appears under both, so a third chip would present those services as a
+        separate menu rather than as part of both (`service_filters.dart:23`).
+
+        Always shown, unlike the category row: gender is a question every salon's menu can
+        answer, because `filterByGender` reads an absent `services.gender` as unisex — and 24
+        of the 34 live services have none, so a chip row gated on the column being filled
+        would almost never appear.
+      */}
+      <ul className="gap-sm scrollbar-none mb-lg flex overflow-x-auto" aria-label="Who it is for">
+        {[
+          { value: "any", label: "All" },
+          { value: "women", label: "Women" },
+          { value: "men", label: "Men" },
+        ].map((option) => (
+          <li key={option.value}>
+            <CategoryChip
+              label={option.label}
+              selected={gender === option.value}
+              onClick={() => setGender(option.value)}
+            />
+          </li>
+        ))}
+      </ul>
+
       {categories.length > 0 ? (
         <ul className="gap-sm scrollbar-none mb-lg flex overflow-x-auto" aria-label="Categories">
           <li>
@@ -80,17 +134,40 @@ export function BookingServiceStep({
         </ul>
       ) : null}
 
-      <ul className="gap-md flex flex-col">
-        {shown.map((s) => (
-          <li key={s.id}>
-            <ServiceRow
-              service={s}
-              selected={selectedIds.includes(s.id)}
-              onToggle={() => onToggle(s.id)}
-            />
-          </li>
-        ))}
-      </ul>
+      {/*
+        A filter that matches nothing needs saying, and it is a reachable state rather than a
+        defensive one: a barbershop whose services are all `male` shows nothing under Women.
+        An unexplained blank between two chip rows reads as a failed load, and the way out —
+        widening the filter — is the one thing the sentence has to name.
+      */}
+      {shown.length === 0 ? (
+        <p className="text-body-md text-muted">
+          Nothing on this salon&apos;s menu matches that. Try{" "}
+          <button
+            type="button"
+            onClick={() => {
+              setGender("any");
+              setCategory(null);
+            }}
+            className="text-rausch-cta cursor-pointer font-medium underline"
+          >
+            all services
+          </button>
+          .
+        </p>
+      ) : (
+        <ul className="gap-md flex flex-col">
+          {shown.map((s) => (
+            <li key={s.id}>
+              <ServiceRow
+                service={s}
+                selected={selectedIds.includes(s.id)}
+                onToggle={() => onToggle(s.id)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
 
       {unbookableCount > 0 ? (
         <p className="text-caption-sm text-muted mt-lg">

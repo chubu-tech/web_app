@@ -127,10 +127,16 @@ export default async function SalonPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ service?: string | string[] }>;
+  searchParams: Promise<{ service?: string | string[]; gender?: string | string[] }>;
 }) {
   const { id } = await params;
-  const { service: serviceParam } = await searchParams;
+  const { service: serviceParam, gender: genderParam } = await searchParams;
+  /*
+    Discover's gender filter, in transit. Not validated here beyond taking the first value:
+    `BookingServiceStep` falls back to "any" for anything `GENDER_SERVICE_KINDS` does not
+    know, which is the one place that decision belongs.
+  */
+  const gender = (Array.isArray(genderParam) ? genderParam[0] : genderParam) ?? "any";
   const supabase = await createClient();
 
   const business = await fetchBusinessById(supabase, id);
@@ -584,6 +590,7 @@ export default async function SalonPage({
           </div>
 
           <SalonBooking
+            gender={gender}
             key={initialServiceId ?? "none"}
             salonId={id}
             services={services}

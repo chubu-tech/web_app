@@ -10,7 +10,9 @@ The Bhutan Salons product in a browser: customers book chairs and join walk-in
 queues, owners run their salon, staff see their day. Next.js 16 (App Router),
 React 19, Tailwind 4, TypeScript.
 
-**Status: all three roles complete, and current with `../tho` as of 2026-08-10.** The
+**Status: all three roles complete, and current with `../tho` as of 2026-08-11.** Every
+client-facing RPC in the schema now has a caller here — the five the app calls and this does not
+are three `admin_*`, the retired `link_staff_member` and the deferred `register_device`. The
 customer role works end to end — browse, sign in, book, reschedule, cancel, review, take a place in
 a walk-in line, read notifications, message a salon, find a shop on the map, read a stylist's
 profile, edit your own, and now **buy things**: a cross-salon products browse, a salon's Shop tab, a
@@ -25,7 +27,7 @@ book, product orders, the storefront, offers, loyalty and its redemption counter
 message inbox and notification bell, payroll, the tax estimate, and plan & billing **with the
 upgrade request put back** (3c).
 
-**All five owner tabs are live and nothing is left of the app's eleven-item drawer.** 2f closed the
+**All five owner tabs are live and nothing is left of the app's ten-item drawer.** 2f closed the
 other end of what 3c reads: `place_order` and `request_redemption` were the last two customer-facing
 RPCs in the schema with no caller here, and Norzin's storefront, order inbox and loyalty programme
 now all have a customer on the far side of them.
@@ -48,8 +50,15 @@ rather than a permission.
 
 **Phase 5 closed the 2026-08-07 upstream batch** — moderation, legal, account deletion, the
 staff-invite consent handshake, the role gaps, the ergonomics gaps, and a re-sync of ported
-logic against five changed server rules. `PARITY.md` is the audit: what shipped, what is
-deliberately not ported, and the two things that genuinely remain.
+logic against five changed server rules.
+
+**Phase 6 closed the 2026-08-08/09 batch, which Phase 5's own audit missed** — the Discover
+rework (`salons_available_today`, "Available today", "Book again" with a resolver that re-checks a
+past booking against the salon's current menu, `/salons` with sort chips, the service-step gender
+filter), the `record_payment` writer, a seventh instance of the OR-policy leak on
+`/bookings/[id]/reschedule`, server-composed notification copy, and the error/loading layer this
+app had none of. `PARITY.md` is the audit — including a section on how it came to be a batch
+behind twice, which is worth reading before trusting it a third time.
 
 Two shared components took additive changes for this and are worth knowing about:
 `OwnerBookingCard` takes an optional `href` (it hard-coded a console URL), and `AppHeader`'s
@@ -425,7 +434,7 @@ would be a tab that is nearly always a dead end.
 are live**: Insights · Calendar · Queue · Messages · Settings, the app's own set in the app's own
 order.
 
-Settings is a **hub with two groups**, which is where the whole of the app's eleven-item drawer
+Settings is a **hub with two groups**, which is where the whole of the app's ten-item drawer
 went: `SETUP_DESTINATIONS` (Salon details, Opening hours, Services, Staff) and
 `BACK_OFFICE_DESTINATIONS` (Client book, Product orders, Products, Offers, Loyalty, Payroll, Tax
 estimate, Plan & billing). Two groups rather than one list of twelve because they answer different
@@ -702,13 +711,20 @@ and points at the price list; the **request** lives on `/business/plans`, where 
 by side (see `components/owner/plan-cards.tsx` for the 3.1.1 story and the three things the
 request has to get right).
 
-**Not every gate is real, and the code says which.** Three of the six locked surfaces are gated in
-SQL too — `client_book`, `payroll_report` and `tax_estimate` each raise `P0001`. The other three
-are **client-side only**: `analytics_dashboard` and `analytics_peak_heatmap` never look at
-`businesses.plan` at all (measured: a `basic` salon gets the complete payload), and
-`loyalty_programs_write_owner` checks ownership and stops while
-`loyalty_programs_select_public` publishes any active program regardless of tier. Never describe
-the Insights or Loyalty paywall as enforced. Reported upstream; not worked around.
+**Not every gate is real, and this paragraph was wrong about which.** It used to say the Insights
+paywall was client-side only, on the measured grounds that `analytics_dashboard` and
+`analytics_peak_heatmap` never read `businesses.plan`. **`20260807000005_analytics_plan_gate`
+added that read to both** — in the very batch Phase 5 absorbed — so they now raise `P0001` below
+growth in the same auth → authz → plan order every sibling uses. No client change was needed
+(`app/business/insights/page.tsx` skips the call on Basic anyway), but do not repeat the old
+claim.
+
+So: **five of the six locked surfaces are gated in SQL** — `client_book`, `payroll_report`,
+`tax_estimate` and now both analytics RPCs. The remaining one is **Loyalty, and only partly**:
+`loyalty_programs_write_owner` checks ownership and stops, and `loyalty_programs_select_public`
+publishes any active program regardless of tier — but the feature *is* gated at the point of use,
+because `request_redemption` refuses unless the programme is active **and** the plan is
+growth/pro (`20260729000003_loyalty_rpcs.sql:88`). A customer cannot redeem at a Basic salon.
 
 ### `staff_members` had it too — the third instance
 
@@ -776,12 +792,32 @@ with there being none in the database. And **no migration in `../tho` adds `stat
 to that policy**: it exists only on the live database, applied out of band, so a rebuild from
 `supabase/migrations` would both publish unreviewed salons and make this problem vanish.
 
-### The Basic stylist cap is client-side only
+### The Basic stylist cap is a real trigger now
 
-`maxActiveStylists` is a `Feature`-derived gate in both clients and `staff_insert` has no count
-check — so the seed itself is over it: **all nine Basic salons have two active stylists.** The
-roster names the cap rather than saying "upgrade", and the paywall stops a *new* stylist rather
-than undoing an existing one.
+This heading read *"is client-side only"* and that stopped being true in the 2026-08-07 batch.
+**`20260807000004_basic_stylist_cap` added `staff_members_basic_cap`**, which raises
+`P0001 'the Basic plan allows one active stylist — upgrade to add more'` on an insert that lands
+active **or an update that flips inactive → active**. It fires on the *capacity transition* rather
+than on every write, precisely because the seed is already over the cap: **all nine Basic salons
+have two active stylists** and would otherwise be uneditable.
+
+Two consequences, both handled as of 2026-08-11 and both worth knowing before touching the roster:
+
+- **The Active checkbox is a capped write, and the guard has *three* conditions.**
+  `staff-editor.tsx` disables it on `capReached && !isActive && !member.isActive` — the cap is used
+  up, the box is currently unticked, **and the saved row is inactive too**. The third one was
+  missing until it was caught in the browser on Menjong: the box unticked fine and then disabled
+  itself, so an owner could not put back a value they had just taken off without reloading. Reading
+  only local state made an *undo* look like an *activation*. It is not one — the persisted row is
+  already active, so saving it active is not an `inactive → active` update and the trigger never
+  sees it. Counting the *other* stylists is what makes deactivation always allowed.
+- **`owner-errors.ts` maps `P0001` for `saveStaff` and `createStaff`.** Without that case the
+  server's sentence fell to *"Some changes couldn't be saved — please try again"* — a permanent
+  plan limit dressed as a transient fault, on an action that can never succeed on retry. The
+  Flutter app still has that hole.
+
+The roster still names the cap rather than saying "upgrade", and the paywall stops a *new* active
+stylist rather than undoing an existing one.
 
 ### Exactly one salon is on Pro, and this section used to say none was
 
@@ -1347,12 +1383,22 @@ that the console must not *appear* to have switched.
 
 ## Live data is messier than it looks
 
-**Counted 2026-08-10, and several of these moved during Phase 5.** The database is shared and
+**Counted 2026-08-11.** The database is shared and
 has other people on it, so re-count rather than trusting a figure here that a decision depends
 on. Check assumptions against it before trusting a column:
 
 - **17 businesses, 14 approved.** Plans across all 17: **basic 13 · growth 3 · pro 1**; across
   the approved 14: basic 10 · growth 3 · pro 1. Earlier notes said 13 salons and no Pro.
+- **Every `notifications` row carries server-composed `title` and `body`** — 93 of 93, and the SQL
+  branches on audience, so the same `booking_created` reads *"Booking confirmed / Your appointment
+  is set for Fri 7 Aug, 09:00"* for the customer and *"New booking / A customer booked Fri 7 Aug,
+  09:00"* for the salon. `20260807000020`/`…21` did that by trigger and backfilled. It is why
+  `lib/notification-copy.ts` is a **fallback** now rather than the source — and why the note in it
+  about the app rendering a `payload.message` key nothing writes describes history, not the
+  present.
+- **`payments` is 0 rows and that is deliberate.** Batch C's verification created a deposit and a
+  refund on Norzin's no-show booking, proved both sides of the ledger, and removed them. The
+  `record_payment` writer is live; the table is empty.
 - **`businesses.city` contradicts `address_text` on 12 of the 14 approved salons**
   ("Norzin Lam, Thimphu" filed under Paro). `addressText` is the field owners
   actually maintain; the mapper deliberately omits `city`.
@@ -1477,6 +1523,130 @@ on. Check assumptions against it before trusting a column:
   `owner@bhutansalons.test` is also the counterparty on the customer's thread, which makes it
   the right account to check the owner-inbox leak with in 3c.
 
+## A failed read must never render as empty
+
+There was no `error.tsx` anywhere in this app until 2026-08-11, and the damage was not crashes —
+it was the opposite. Seven list routes *avoided* Next's default error page by catching every read
+into `[]` and then branching on length, so **an outage rendered "No upcoming appointments — book a
+salon and it will show up here" to somebody with four bookings**. The empty state and the failure
+state were the same pixels.
+
+Four boundaries now: `app/(customer)/error.tsx`, `app/business/error.tsx`, `app/staff/error.tsx`
+and a root `app/global-error.tsx`, all on `components/ui/error-state.tsx`. Six things about them
+are load-bearing.
+
+- **`unstable_retry()`, never `reset()`.** Next 16 hands an `error.tsx` both, and they are not
+  interchangeable: `reset()` clears the error state and re-renders **without re-fetching**, so it
+  cannot recover a Server Component error — which is every failure this app can produce. A
+  `reset()` button is a Try-again that provably cannot work. Measured: `unstable_retry()` recovered
+  in 1000ms, a round trip. The `unstable_` prefix is the API's, not an opt-in flag.
+- **A route group's `error.tsx` *does* catch, unlike `not-found.tsx`.** Verified with a
+  throw-on-first-render rather than assumed, because this repo has been burned by the mirror
+  image: `app/(customer)/not-found.tsx` never rendered once, since `not-found` resolves by **URL
+  path** and `(customer)` contributes no segment. `error.tsx` is part of the rendered tree, so it
+  wraps the group's pages normally.
+- **`error.tsx` does not wrap the layout in its own segment.** So a throw from
+  `app/(customer)/layout.tsx`'s `requireLiveAccount()`, or from either role context, bubbles past
+  the shell boundary to `global-error.tsx`. That is the right split: the chrome is gone at that
+  point, and a friendly card inside a layout that failed to render would be a lie about how much
+  of the page works.
+- **`global-error.tsx` uses inline styles and not one Tailwind class.** It replaces the root
+  layout, so it arrives without the stylesheet, the font variable and the `data-shell` wrapper.
+  Importing `globals.css` there would usually work and is deliberately not done: a last-resort
+  boundary that needs the pipeline which just broke has a shared failure mode. It is also
+  **unexercised** — reaching it means throwing from the root layout.
+- **The digest is rendered.** In production a Server Component's `error.message` is replaced by a
+  generic string so nothing leaks, which makes `error.digest` the only thing connecting what
+  somebody saw to what was logged. An owner reading it down the phone beats a tidier card.
+- **`unstable_catchError`** (`next/error`, 16.2) is the programmatic equivalent for
+  component-level recovery, if a boundary is ever wanted somewhere that is not a route segment.
+  Nothing needs it yet.
+
+The rule that follows: **either let a read throw to the boundary, or catch it into an explicit
+error state — never into the same shape as "no rows".** A `.catch(() => [])` is only honest where
+the empty result is genuinely the answer, which on these seven routes it never was.
+
+`fetchMyFavourites` needed the *reader* fixed, not just the page: it destructured `data` and
+dropped `error`, so its catch was dead code and a permission failure already rendered as "Nothing
+saved yet". **Third instance of that exact shape** after the `payments` receipt and the
+`businesses` anon grant. Before adding a `.catch` anywhere, check whether the reader can even
+reject.
+
+`/saved` deliberately keeps **no** sign-in wall where its six siblings have one: a *guest* can
+hold favourites (`favorites_insert` requires no `is_real_user()`, and an upgrade keeps the user
+id), so gating on `registered` would hide a list somebody actually has.
+
+### `loading.tsx` exists for all three shells
+
+Every route in this app reads cookies, so all of them are dynamic and none had a Suspense
+boundary — the browser held the previous page, or a blank document on a cold arrival, until the
+whole server render finished. The skeleton primitives had existed since 2a and were used only
+*inside* client components, where the data was already in flight.
+
+Note from the docs: `loading.tsx` does not by itself make client navigation instant — that needs an
+`unstable_instant` export per route. Deliberately not adopted: it changes caching semantics on 71
+routes, and the problem being fixed is the first paint.
+
+#### It also turned every `notFound()` into a soft 404, and that is a deliberate trade
+
+**A `notFound()` under a `loading.tsx` answers HTTP 200, not 404.** The right page renders — the
+customer sees *"This page isn't here"* either way — but the status line says the page was found.
+
+Established by measurement, not inference. Parking `app/(customer)/loading.tsx` for one run:
+
+| | with `loading.tsx` | parked |
+| --- | --- | --- |
+| `/rewards/<missing>` | 200 | **404** |
+| `/salon/<missing>` | 200 | **404** |
+| `/no-such-route-xyz` | 404 | 404 |
+
+The control is the third row: an unmatched URL is answered by the **root** boundary, which has no
+`loading.tsx` above it, and it stays 404 throughout. So the cause is the Suspense boundary — it
+flushes the shell before the page decides, and a status cannot be changed once the response has
+begun.
+
+**This is inherent, not a bug to fix.** Early paint and a status set during render are mutually
+exclusive for a route that discovers "not found" *while rendering*. There is also no way to exempt a
+subtree: a `loading.tsx` covers every descendant segment, and Discover lives at the group root, so
+the only boundary that can give `/` a skeleton is the one that also covers `/salon/[id]`.
+
+Kept, with the cost stated. Of the eleven customer routes that call `notFound()`, nine are
+`noindex` or behind auth, where nothing reads the status. **Two are indexable — `/salon/[id]` and
+`/stylist/[id]`** — so a deleted salon is a soft 404 to a crawler. Against that: the skeleton on
+`/salon/[id]` is the first paint of the single most-travelled navigation in the product. If the SEO
+side ever wins, the fix is to move the boundary down to the list segments and give Discover an
+in-page `<Suspense>` — about twelve one-line files, and `/salon/[id]` loses its skeleton.
+
+## The `payments` sign convention
+
+**`record_payment` stores a refund as a negative `amount_nu`.** One signed column, no separate
+direction field — so `sum(amount_nu)` is the amount paid and `booking_payments.total_paid` is
+correct as it stands.
+
+This is worth its own section because getting it backwards survived three slices. `outstandingNu`
+*negated* a refund on the assumption that the table holds magnitudes, which made a refund
+**increase** what the customer appeared to have paid. Nothing caught it: `payments` had zero rows
+on every platform, so no test and no screen ever saw a real refund, and the tests encoded the same
+assumption as the code. The doc comment on `fetchBookingPayments` asserted the exact opposite of
+the truth. It surfaced within minutes of there being a writer — a Nu 1,200 booking with a Nu 400
+deposit and a Nu 150 refund read **Outstanding Nu 650** where the signed sum says 950.
+
+Three rules follow:
+
+- **Sum the column; do not re-sign it.** `outstandingNu` adds `amountNu` raw.
+- **`depositNu` is the exception and says so.** It subtracts refunds *explicitly* rather than
+  summing, so it takes `Math.abs` — the sign is being supplied by the arithmetic there. The
+  asymmetry between the two functions is deliberate and looks like an inconsistency, which is why
+  both carry the note.
+- **Display takes the magnitude and adds its own sign.** `formatNu(p.amountNu)` on a negative
+  renders "Nu -150"; both the owner ledger and the customer receipt render
+  `−${formatNu(Math.abs(...))}`.
+
+The sheet collects a **positive** number and the kind carries the direction. Asking an owner to
+type a minus sign to give money back is a trap: the sign gets forgotten, the write succeeds, and
+the customer's balance moves the wrong way.
+
+
 ## Verify
 
 ```bash
@@ -1486,7 +1656,7 @@ npm run lint
 npm run test      # ported pure logic
 ```
 
-A clean build, lint and test run is the bar — currently **559 tests across 28 files** and **70
+A clean build, lint and test run is the bar — currently **639 tests across 30 files** and **71
 route entries** in the build tree. Count routes with the tree itself
 (`npm run build | sed -n '/^Route (app)/,/(Dynamic)/p'`) rather than by eye: a loose grep over
 that output has produced 66, 69 and 70 for the same build.

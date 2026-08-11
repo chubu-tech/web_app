@@ -10,6 +10,7 @@ import type {
   Product,
   QueueJoinMode,
   Review,
+  SalonAvailability,
   ServiceItem,
   StaffMember,
 } from "../types/salon";
@@ -406,6 +407,33 @@ export function toQueueEntry(m: Row, fallbackBusinessId?: string): QueueEntry {
 }
 
 /**
+ * One row of `salons_available_today`.
+ *
+ * `queue_line` is a **jsonb array**, not a PostgREST embed, so it arrives already parsed
+ * and each element is mapped by the same `toQueueEntry` the customer's live view uses. The
+ * projection is `queue_active_line`'s exactly — PII-free and **without `business_id`** —
+ * which is what the fallback argument on that mapper exists for. Without it every entry
+ * would map with an empty `businessId` and the ETA would still be right, but any future
+ * reader grouping by salon would silently get one bucket.
+ *
+ * A malformed or absent array yields an empty line rather than throwing: one salon's line
+ * failing to parse must not blank the whole row for every other salon.
+ */
+export function toSalonAvailability(m: Row): SalonAvailability {
+  const businessId = str(m.business_id) ?? "";
+  const line = Array.isArray(m.queue_line) ? m.queue_line : [];
+  return {
+    businessId,
+    nextSlot: dateOrNull(m.next_slot),
+    openCount: numOrNull(m.open_count) ?? 0,
+    queueLine: line
+      .filter((e): e is Row => e != null && typeof e === "object")
+      .map((e) => toQueueEntry(e, businessId)),
+    barberCount: numOrNull(m.barber_count) ?? 0,
+  };
+}
+
+/**
  * A notification row.
  *
  * `payload` is the event's own data, not a rendered message — `notificationText` in
@@ -422,6 +450,10 @@ export function toNotification(m: Row): AppNotification {
       payload != null && typeof payload === "object" && !Array.isArray(payload)
         ? (payload as Record<string, unknown>)
         : {},
+    // The server's own copy, since `20260807000020`/`…21`. `notificationText` prefers these
+    // over the local composer — see the fields' note.
+    title: str(m.title),
+    body: str(m.body),
     createdAt: new Date(m.created_at as string),
     readAt: dateOrNull(m.read_at),
     bookingId: str(m.booking_id),

@@ -23,6 +23,7 @@ import {
   isActive,
   outstandingNu,
   paymentLine,
+  relativeDayLabel,
   type Payment,
 } from "@/lib/types/booking";
 import { hasLocation, runsQueue, travels } from "@/lib/types/salon";
@@ -155,6 +156,8 @@ export default async function BookingDetailPage({
   }
 
   const outstanding = outstandingNu(booking.totalPrice, payments);
+  /* Same helper the card uses, same clock discipline — `lib/types/booking.ts`. */
+  const relative = active ? relativeDayLabel(booking.startTs, new Date()) : null;
 
   return (
     <div>
@@ -178,6 +181,18 @@ export default async function BookingDetailPage({
           <h1 className="text-display-sm text-ink flex-1 font-semibold">
             {booking.businessName ?? "Salon"}
           </h1>
+          {/*
+            The relative chip the card has and this page did not
+            (`booking_detail_screen.dart:308`). It is the fastest thing to read on a receipt
+            somebody opened to check *when* — "In 3 days" answers that before the date line
+            below has been parsed. Null past a week and for anything already gone, so a
+            completed booking gets a status pill and nothing else.
+          */}
+          {relative ? (
+            <span className="bg-surface-soft text-badge text-ink px-sm py-xxs shrink-0 rounded-full font-semibold">
+              {relative}
+            </span>
+          ) : null}
           <StatusPill status={booking.status} />
         </div>
 
@@ -280,7 +295,13 @@ export default async function BookingDetailPage({
                             : "text-body-sm text-success-text tabular-nums"
                         }
                       >
-                        {formatNu(p.amountNu)}
+                        {/* `Math.abs` with an explicit sign: `amount_nu` is stored negative
+                            for a refund, so the raw value renders "Nu -150" — a minus buried
+                            inside the currency string. The colour already says which
+                            direction; the sign makes the column add up. */}
+                        {p.kind === "refund"
+                          ? `−${formatNu(Math.abs(p.amountNu))}`
+                          : formatNu(p.amountNu)}
                       </dd>
                     </div>
                   ))}

@@ -1,4 +1,7 @@
+import { GENDER_SERVICE_KINDS } from "./salon-filters";
+import { THIMPHU_TZ, thimphuMinutesOfDay } from "./time";
 import type { ServiceItem, StaffMember } from "./types/salon";
+import { formatDuration } from "./utils";
 
 /**
  * The arithmetic and the narrowing behind the multi-service booking flow.
@@ -77,6 +80,115 @@ export function staffStillEligible(
   staffByService: Record<string, string[]>,
 ): boolean {
   return serviceIds.every((id) => staffByService[id]?.includes(staffId));
+}
+
+/**
+ * The services matching a gender choice — the booking step's own filter.
+ *
+ * A port of `filterByGender` (`../tho/app/lib/customer/booking/service_filters.dart:33`),
+ * reading `GENDER_SERVICE_KINDS` so this and Discover's server-side query cannot drift about
+ * what "Women" admits.
+ *
+ * **A service with a null `gender` is treated as unisex**, which is the load-bearing part.
+ * Every hand-written service predating THO-18 has none — **24 of the 34 live rows** — so
+ * reading null as "unknown, hide it" would empty most real menus. It is the same divergence
+ * `api/discovery.ts` documents for the cross-salon query, arrived at from the same data.
+ *
+ * An unrecognised choice (including `any`) returns everything.
+ */
+export function filterByGender(all: ServiceItem[], gender: string): ServiceItem[] {
+  const kinds = GENDER_SERVICE_KINDS[gender];
+  if (!kinds) return [...all];
+  return all.filter((s) => kinds.includes(s.gender ?? "unisex"));
+}
+
+/** Morning · Afternoon · Evening, the three blocks the slot grid is grouped into. */
+export type DayPart = "morning" | "afternoon" | "evening";
+
+export const DAY_PART_LABELS: Record<DayPart, string> = {
+  morning: "Morning",
+  afternoon: "Afternoon",
+  evening: "Evening",
+};
+
+/** In order, so a caller can render the groups without inventing a sequence. */
+export const DAY_PARTS: readonly DayPart[] = ["morning", "afternoon", "evening"];
+
+/**
+ * Which block of the day an instant falls in — **in Thimphu time, always.**
+ *
+ * A port of `_groupByDayPart`'s cut points (`time_step.dart:504`): before 12:00 is morning,
+ * before 17:00 afternoon, the rest evening.
+ *
+ * The timezone is the whole risk, and it is A1-11 upstream: "afternoon" has to mean *the
+ * salon's* afternoon. Read in the browser's zone, a chip labelled 14:30 would be filed under
+ * Morning for a customer six hours behind — the label and the heading above it disagreeing on
+ * the same screen. `thimphuMinutesOfDay` is the same helper every other time comparison here
+ * uses.
+ */
+export function dayPartOf(instant: Date): DayPart {
+  const minutes = thimphuMinutesOfDay(instant);
+  if (minutes < 12 * 60) return "morning";
+  if (minutes < 17 * 60) return "afternoon";
+  return "evening";
+}
+
+/**
+ * Slots split into the three blocks, in order, **omitting any block with nothing in it.**
+ *
+ * Returned as a list of pairs rather than a record so the caller renders what exists in the
+ * right sequence without filtering — a heading over an empty grid is the thing to avoid, and a
+ * salon that opens at 13:00 has no morning at all.
+ */
+export function groupByDayPart<T>(
+  slots: T[],
+  startOf: (slot: T) => Date,
+): { part: DayPart; label: string; slots: T[] }[] {
+  const buckets = new Map<DayPart, T[]>();
+  for (const slot of slots) {
+    const part = dayPartOf(startOf(slot));
+    const existing = buckets.get(part);
+    if (existing) existing.push(slot);
+    else buckets.set(part, [slot]);
+  }
+  return DAY_PARTS.filter((part) => buckets.has(part)).map((part) => ({
+    part,
+    label: DAY_PART_LABELS[part],
+    slots: buckets.get(part)!,
+  }));
+}
+
+/**
+ * Why a day has no times — *"No slot fits 1 hr 30 min with Sonam on Fri — try another day, or
+ * fewer services."*
+ *
+ * A port of `noSlotsForSelection` (`service_selection.dart:113`), and it exists because **"the
+ * day is full" and "your basket needs one unbroken block" are different problems with different
+ * ways out.** `is_bookable_window` requires the whole basket to fit inside a single working-hours
+ * interval, so a three-service basket can find nothing on a day with plenty of single-service
+ * gaps. A generic *"Nothing free that day"* sends that customer to try every other day in turn,
+ * when dropping one service would have worked immediately.
+ *
+ * Which is why the advice branches on the basket size: suggesting "fewer services" to somebody
+ * who chose one would be advice they cannot take.
+ */
+export function noSlotsForSelection({
+  services,
+  staffName,
+  day,
+}: {
+  services: ServiceItem[];
+  /** The chosen stylist, or a stand-in when "any professional" is selected. */
+  staffName: string;
+  day: Date;
+}): string {
+  const block = formatDuration(basketDuration(services));
+  const dayName = day.toLocaleDateString("en-GB", {
+    weekday: "short",
+    timeZone: THIMPHU_TZ,
+  });
+  const advice = services.length > 1 ? "try another day, or fewer services." : "try another day.";
+  return `No slot fits ${block} with ${staffName} on ${dayName} — ${advice}`;
 }
 
 /**

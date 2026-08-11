@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Booking, BookingSource, Payment, Slot } from "../types/booking";
+import type {
+  Booking,
+  BookingSource,
+  Payment,
+  PaymentKind,
+  PaymentMethod,
+  Slot,
+} from "../types/booking";
 import type { Hairstyle } from "../types/salon";
 import { toBooking, toHairstyle, toPayment, toSlot } from "./mappers";
 
@@ -62,7 +69,11 @@ export async function fetchAvailability(
  * **The idempotency key is the caller's to own.** `create_booking` catches its own
  * unique violation and returns the booking that key already made, so a retry with the
  * *same* key is safe and a retry with a *fresh* key is a second booking. Generate one
- * per confirm attempt and hold it across retries — see `useIdempotencyKey`.
+ * per confirm attempt and hold it across retries.
+ *
+ * The call sites hold it in a ref cleared only on success — `booking-wizard.tsx` and
+ * `walk-in-form.tsx`. (This used to point at a `useIdempotencyKey` hook, which has never
+ * existed in this repo.)
  */
 export async function createBooking(
   supabase: SupabaseClient,
@@ -237,9 +248,16 @@ export async function fetchBookingById(
  * they paid. The RPC authorises **the salon that took the money or the person who paid it, and
  * nobody else** — so one call serves both sides and the ledger stops being owner-only.
  *
- * `total_paid` travels in the row and is deliberately ignored: it is `sum(amount_nu) over ()`,
- * which counts a **refund as positive**, so it disagrees with `outstandingNu`'s signed
- * arithmetic. The signed version is the one that can be read against a total.
+ * `total_paid` travels in the row and is ignored — but **not for the reason this comment used to
+ * give.** It claimed the column "counts a refund as positive, so it disagrees with
+ * `outstandingNu`". The opposite was true: `sum(amount_nu) over ()` is correct, because
+ * `record_payment` stores a refund negative, and it was `outstandingNu` that disagreed by
+ * negating an already-negative figure. That bug shipped for three slices behind this sentence
+ * and surfaced the moment a writer existed to produce a refund row.
+ *
+ * It stays ignored because it is a window function repeated on every row, so a caller that used
+ * it would have to trust all rows arrived — a `.slice()` or a filter anywhere upstream would
+ * silently keep the full total. Summing the rows in hand cannot drift from the rows in hand.
  *
  * `28000` for no session and `42501` for somebody else's booking are the RPC's own refusals; both
  * reach the caller, which is why every call site wraps this in a `catch` that costs the block
@@ -254,6 +272,67 @@ export async function fetchBookingPayments(
   });
   if (error) throw error;
   return ((data ?? []) as Record<string, unknown>[]).map(toPayment);
+}
+
+/**
+ * Record a payment against a booking — `record_payment`, and the **only owner write in the
+ * app that had no web equivalent**.
+ *
+ * Skipped through three earlier slices on a reason that has since expired: it is Pro-gated,
+ * and no live salon was on Pro, so the editable branch was unreachable and anything built
+ * here would have been untestable code. Norzin Salon & Spa is `pro` now, which makes this the
+ * one place the RPC succeeds — and the sixteen other salons are what keeps the refusal path
+ * the majority case.
+ *
+ * ## A refund is a negative amount, and that is the caller's job
+ *
+ * The table stores one signed `amount_nu` rather than a kind-plus-sign pair, so
+ * `summarizePayments` and `outstandingNu` net a refund out by plain addition. `p_amount` is
+ * therefore **negated here when the kind is `refund`** — the sheet collects a positive number,
+ * because asking somebody to type a minus sign to give money back is a trap. Sending a
+ * positive refund would compile, run, and increase what the customer appears to have paid.
+ *
+ * ## Everything it refuses, and why none of it is mapped specially
+ *
+ * Read off the live function body rather than the migration: owner-only (`42501`), `pro`-only
+ * (`P0001 'payments require Pro'`), non-zero amount, `method` in
+ * `cash|mbob|bank_transfer|other`, `kind` in `deposit|balance|full|refund`, and the booking
+ * must belong to the business. Every one of those is a `P0001` whose message names the thing
+ * to fix, so `ownerErrorMessage` passes them through rather than flattening them.
+ *
+ * `p_booking` is nullable in the RPC — a payment can be recorded against the salon alone — but
+ * nothing calls it that way in either client, so this signature requires a booking. Widen it
+ * when there is a surface that needs it, not before.
+ */
+export async function recordPayment(
+  supabase: SupabaseClient,
+  {
+    businessId,
+    bookingId,
+    amountNu,
+    kind,
+    method,
+    note,
+  }: {
+    businessId: string;
+    bookingId: string;
+    /** Always **positive**; the sign is applied here from `kind`. */
+    amountNu: number;
+    kind: PaymentKind;
+    method: PaymentMethod;
+    note?: string | null;
+  },
+): Promise<Payment> {
+  const { data, error } = await supabase.rpc("record_payment", {
+    p_business: businessId,
+    p_booking: bookingId,
+    p_amount: kind === "refund" ? -Math.abs(amountNu) : Math.abs(amountNu),
+    p_method: method,
+    p_kind: kind,
+    p_note: note?.trim() ? note.trim() : null,
+  });
+  if (error) throw error;
+  return toPayment(data as Record<string, unknown>);
 }
 
 /* --------------------------------------------------------------------------

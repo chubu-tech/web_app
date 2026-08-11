@@ -71,8 +71,16 @@ export function ProductCard({
           <QtyStepper qty={qty} label={product.name} onChange={onSetQty} />
         )}
         {showSalon && product.businessName ? (
+          /*
+            `#shop`, not the salon root. This linked to the top of the page, which on a salon
+            with a cover, an offers section and five services meant the customer arrived
+            nowhere near the shelf they had just been looking at and had to hunt for it. The
+            app pushes the detail screen with its Shop tab already selected
+            (`customer_home.dart:573`); the fragment is this layout's equivalent, and the
+            section id it targets is set on `/salon/[id]`.
+          */
           <Link
-            href={`/salon/${product.businessId}`}
+            href={`/salon/${product.businessId}#shop`}
             className="text-caption-sm text-muted hover:text-ink max-w-[10rem] truncate underline"
           >
             {product.businessName}

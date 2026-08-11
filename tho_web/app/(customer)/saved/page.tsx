@@ -20,7 +20,23 @@ export const metadata: Metadata = { title: "Saved salons" };
  */
 export default async function SavedPage() {
   const supabase = await createClient();
-  const salons = await fetchMyFavourites(supabase).catch(() => []);
+  /*
+    **No catch, and this one needed the reader fixed as well as the page.**
+
+    `.catch(() => [])` here was dead code twice over: `fetchMyFavourites` destructured only
+    `data` and dropped `error`, so it could not reject, and a failed read already rendered as
+    *"Nothing saved yet — tap the heart on a salon and it will show up here"*. That is the
+    third time this repo has found a silent RLS or grant failure hiding behind a dropped
+    `error` (the `payments` receipt and the `businesses` anon grant were the others), and the
+    only reason it was invisible is that the same shape is also the correct answer for somebody
+    who has genuinely saved nothing.
+
+    The reader now surfaces its error and this lets it through to the boundary. **The sign-in
+    wall six sibling routes have is deliberately still absent**: a *guest* can hold favourites —
+    `favorites_insert` requires no `is_real_user()` and an upgrade keeps the same user id — so
+    gating on `registered` would hide a list somebody actually has.
+  */
+  const salons = await fetchMyFavourites(supabase);
 
   return (
     // Uncapped, and the grid auto-fills above 1440 — the same treatment Discover gets,

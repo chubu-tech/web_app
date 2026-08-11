@@ -141,6 +141,30 @@ export function canRemind(
 }
 
 /**
+ * "Today" / "Tomorrow" / "In n days", or null beyond a week and for anything past.
+ *
+ * Compared as **Thimphu** calendar days, not the browser's: at 23:00 UTC it is already tomorrow
+ * in Bhutan, and a card reading "Today" for an appointment that has moved to tomorrow is worse
+ * than one that says nothing at all.
+ *
+ * **Moved here from `components/customer/booking-card.tsx`, where it read `new Date()` inside
+ * the render.** Two reasons, both this repo's own rules: a pure helper belongs in `lib/` and not
+ * beside a component that might become a client one (the `customerName` incident), and `now`
+ * has to be an argument for the card and the detail page to be guaranteed to agree — two
+ * renders reading their own clock eventually straddle midnight.
+ */
+export function relativeDayLabel(start: Date, now: Date): string | null {
+  // Thimphu day index: shift by the offset, then floor to whole days.
+  const dayIndex = (d: Date) => Math.floor((d.getTime() + 6 * 3_600_000) / 86_400_000);
+  const days = dayIndex(start) - dayIndex(now);
+  if (days < 0) return null;
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  if (days <= 7) return `In ${days} days`;
+  return null;
+}
+
+/**
  * Which tab a booking belongs in: 0 Upcoming · 1 Completed · 2 Cancelled.
  *
  * A direct port of `_tabOf` (`customer_home.dart:843`), including that it buckets by
@@ -214,13 +238,36 @@ export const PAYMENT_KIND_LABELS: Record<PaymentKind, string> = {
   refund: "Refund",
 };
 
-/** `mbob` and `bank_transfer` are identifiers, not words anyone says. */
+/**
+ * `mbob` and `bank_transfer` are identifiers, not words anyone says.
+ *
+ * **Lower case, because these read mid-sentence** — `paymentLine` builds
+ * *"Deposit · cash · 4 Aug"*. See {@link PAYMENT_METHOD_CHOICES} for the standalone form.
+ */
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: "cash",
   mbob: "mBoB",
   bank_transfer: "bank transfer",
   other: "other",
 };
+
+/**
+ * The same four methods labelled for a **standalone control** — a chip, a radio, a heading.
+ *
+ * A second table rather than capitalising the first letter of the prose labels, and that is not
+ * pedantry: `"mbob".charAt(0).toUpperCase()` yields **"MBoB"**, which is not the name of
+ * anything. mBoB is the Bank of Bhutan's app and it is written that way everywhere including
+ * `lib/plans.ts`. Caught by a verification run that looked for a chip reading "mBoB" and did
+ * not find one.
+ *
+ * Ordered as the sheet offers them, cash first, because that is what a counter takes.
+ */
+export const PAYMENT_METHOD_CHOICES: { value: PaymentMethod; label: string }[] = [
+  { value: "cash", label: "Cash" },
+  { value: "mbob", label: "mBoB" },
+  { value: "bank_transfer", label: "Bank transfer" },
+  { value: "other", label: "Other" },
+];
 
 /**
  * "Deposit · cash · 4 Aug" — one payment as a line of prose.
@@ -248,12 +295,54 @@ export function paymentLine(p: Payment, timeZone: string): string {
  * on a customer's receipt (`booking_detail_screen.dart:448`).
  */
 export function outstandingNu(totalPrice: number, payments: Payment[]): number {
-  const paid = payments.reduce(
-    (sum, p) => sum + (p.kind === "refund" ? -p.amountNu : p.amountNu),
-    0,
-  );
+  /*
+    **The sign is already in the data.** This used to negate a `refund`'s amount, on the
+    assumption that the table stores magnitudes and the kind carries the direction. It does
+    not: `record_payment` writes a refund as a **negative** `amount_nu` — the RPC's own comment
+    says so, and `booking_payments` sums the column raw to produce `total_paid`. So negating it
+    here was a double negative, and a refund *increased* what the customer appeared to have
+    paid.
+
+    Measured, once a writer existed to produce the row: a Nu 1,200 booking with a Nu 400 deposit
+    and a Nu 150 refund read **Outstanding Nu 650** where the signed sum is 250, so the true
+    figure is 950. Nothing caught it for three slices because `payments` had no rows on any
+    platform and the tests encoded the same wrong assumption as the code.
+
+    `Math.abs` is deliberately *not* used: a refund arriving positive would be a row this
+    product cannot create, and defending against it here would re-introduce the ambiguity
+    rather than resolve it. One writer, one convention.
+  */
+  const paid = payments.reduce((sum, p) => sum + p.amountNu, 0);
   const total = Math.round(totalPrice);
   return Math.min(Math.max(total - paid, 0), total);
+}
+
+/**
+ * What was taken **up front** — the deposits, net of refunds.
+ *
+ * Only `deposit` rows count, not everything paid: the figure exists to answer *"is there
+ * money here the salon keeps if nobody turns up"*, and a balance handed over after the cut
+ * is not no-show cover. That is the distinction the app's *"deposit retained as no-show
+ * cover"* pill makes, and reading it off the total paid would name a number the entitlement
+ * has nothing to do with.
+ *
+ * **Refunds net against it**, so a deposit taken and then given back reads as zero rather
+ * than as cover the salon no longer holds. A refund is not itself tagged as refunding a
+ * deposit — `payments` has no such link — so this is the honest approximation: everything
+ * refunded on the booking comes off the deposits, and the result is clamped at zero.
+ *
+ * `Math.abs` on the refund, unlike {@link outstandingNu}, because this subtracts explicitly
+ * rather than summing: the sign is being supplied by the arithmetic here, so taking the
+ * magnitude is what keeps the two from cancelling out.
+ */
+export function depositNu(payments: Payment[]): number {
+  const deposits = payments
+    .filter((p) => p.kind === "deposit")
+    .reduce((sum, p) => sum + p.amountNu, 0);
+  const refunded = payments
+    .filter((p) => p.kind === "refund")
+    .reduce((sum, p) => sum + Math.abs(p.amountNu), 0);
+  return Math.max(0, deposits - refunded);
 }
 
 /**

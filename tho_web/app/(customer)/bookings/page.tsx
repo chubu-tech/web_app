@@ -38,11 +38,22 @@ export default async function BookingsPage() {
   const supabase = await createClient();
   // The id is passed rather than left to RLS: `bookings_select` OR-matches business
   // membership, so an owner would otherwise see their salon's whole book here.
-  const bookings = await fetchMyBookings(supabase, account.user.id).catch(() => []);
+  /*
+    **No catch.** This used to be `.catch(() => [])`, which turned an outage into the empty
+    state below — somebody with a full list was told they had nothing, in the app's own
+    encouraging words. There was no `error.tsx` anywhere when that was written, so swallowing
+    was the only alternative to Next's default error page; now the segment has a boundary and a
+    failed read can say it failed.
+
+    The session is already established above, so nothing here fails for a signed-out visitor:
+    a throw means the read itself broke.
+  */
+  const bookings = await fetchMyBookings(supabase, account.user.id);
 
   return (
     <Shell>
-      <BookingsList bookings={bookings} />
+      {/* One clock for the whole list, resolved on the server — see `BookingCard`. */}
+      <BookingsList bookings={bookings} now={new Date()} />
     </Shell>
   );
 }

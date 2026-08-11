@@ -40,7 +40,17 @@ export default async function MessagesPage() {
   }
 
   const supabase = await createClient();
-  const conversations = await fetchMyConversations(supabase, account.user.id).catch(() => []);
+  /*
+    **No catch.** This used to be `.catch(() => [])`, which turned an outage into the empty
+    state below — somebody with a full list was told they had nothing, in the app's own
+    encouraging words. There was no `error.tsx` anywhere when that was written, so swallowing
+    was the only alternative to Next's default error page; now the segment has a boundary and a
+    failed read can say it failed.
+
+    The session is already established above, so nothing here fails for a signed-out visitor:
+    a throw means the read itself broke.
+  */
+  const conversations = await fetchMyConversations(supabase, account.user.id);
 
   if (conversations.length === 0) {
     return (

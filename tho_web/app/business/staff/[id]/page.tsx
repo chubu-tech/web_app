@@ -52,6 +52,18 @@ export default async function OwnerStaffDetailPage({
   const member = roster.find((s) => s.id === id);
   if (!member) notFound();
 
+  /**
+   * Active stylists **other than this one** — what the Basic cap is measured against.
+   *
+   * Excluding the row being edited is the whole subtlety: counting it would make an already-
+   * active stylist look like they had used up the salon's own allowance, so the Active
+   * checkbox would lock the moment somebody opened the only stylist they have. The cap stops
+   * a *new* active stylist, never an existing one.
+   *
+   * Free here — the roster is already loaded to find the member.
+   */
+  const otherActiveCount = roster.filter((s) => s.isActive && s.id !== member.id).length;
+
   const now = new Date();
   const in60Days = new Date(now.getTime() + 60 * 86_400_000);
 
@@ -116,6 +128,7 @@ export default async function OwnerStaffDetailPage({
     <StaffEditor
       business={active}
       member={member}
+      otherActiveCount={otherActiveCount}
       services={services}
       initialServiceIds={serviceIds}
       initialHours={hours}

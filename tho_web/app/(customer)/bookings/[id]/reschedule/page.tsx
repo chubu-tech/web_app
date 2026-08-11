@@ -7,6 +7,7 @@ import { Icons } from "@/components/ui/icons";
 import { fetchBookingById } from "@/lib/api/booking";
 import { fetchBusinessById } from "@/lib/api/discovery";
 import { cancellationWindow } from "@/lib/booking-guards";
+import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { isActive, serviceIds, servicesSummary } from "@/lib/types/booking";
 
@@ -20,8 +21,30 @@ export default async function ReschedulePage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const booking = await fetchBookingById(supabase, id);
+  const [booking, account] = await Promise.all([
+    fetchBookingById(supabase, id),
+    getAccount(),
+  ]);
   if (!booking) notFound();
+
+  /**
+   * **This booking has to belong to the person asking**, and RLS does not establish that.
+   *
+   * `bookings_select` is `customer_profile_id = auth.uid() OR is_business_member(...)`, so a
+   * salon member reading a customer's booking by id gets a row back — and this page would
+   * then hand them a working slot picker for somebody else's appointment. The sibling
+   * `/bookings/[id]` has refused exactly this since it was written and documents why at
+   * length; **this route was missing the check**, which made the detail page's disabled
+   * Reschedule button bypassable by typing the URL.
+   *
+   * The seventh instance of the OR-policy rule in this repo. `reschedule_booking` does allow
+   * a member to move a booking, so this is not a privilege escalation — but the console has
+   * `/business/bookings/[id]` for that, and a customer route must act for the customer.
+   *
+   * `notFound()`, not a redirect: the honest answer to "is there such a booking *of yours*"
+   * is no.
+   */
+  if (booking.customerProfileId !== account.user?.id) notFound();
 
   const business = booking.businessId
     ? await fetchBusinessById(supabase, booking.businessId).catch(() => null)

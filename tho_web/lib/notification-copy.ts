@@ -159,10 +159,21 @@ function humanise(eventType: string): string {
 /**
  * The words, ported case for case from the delivery worker's `compose()`.
  *
- * **This is the copy the product already sends**, so an in-app row and the push or SMS
- * for the same event cannot say different things. Unknown events fall back to
- * `notificationStyle`'s humanised slug rather than the worker's flat "Update" — a
- * title is more use than a shrug, and the inbox has room for one.
+ * **A fallback now, not the primary source.** When this was written the server stored no copy
+ * at all — the app rendered `payload['message']`, a key nothing has ever written, so its rows
+ * showed a bare title — and porting `compose()` was the way to put a real sentence in front of
+ * somebody. `20260807000020` added `notifications.title`/`.body` and `…21` fills them on every
+ * insert path by trigger, branching on audience, so the row now arrives with the right words
+ * for whoever is reading it. `NotificationRow` prefers those and falls back to here.
+ *
+ * Kept, rather than deleted, for two reasons that are not sentiment: a row written before
+ * those migrations or by a path that nulls the columns still needs words, and this module also
+ * owns `notificationStyle` — icon, accent and filter bucket — which has **no** server
+ * equivalent. Keeping the two together is what stops a new event type getting a body from the
+ * server and no glyph here.
+ *
+ * Unknown events fall back to `notificationStyle`'s humanised slug rather than the worker's
+ * flat "Update" — a title is more use than a shrug, and the inbox has room for one.
  */
 export function notificationText(
   eventType: string,

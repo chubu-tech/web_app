@@ -315,10 +315,23 @@ function Row({
   audience: "customer" | "owner";
 }) {
   const style = notificationStyle(n.eventType);
-  const { title, body } =
+  /*
+    **The server's own words first.** `notifications.title`/`.body` are filled on every insert
+    path by the trigger in `20260807000021`, and the SQL branches on audience — so the row
+    already carries the right voice for whoever is reading it, and re-composing it here would
+    be a second implementation that drifts the moment the SQL copy changes.
+
+    The local composers stay as the fallback rather than being deleted, for two reasons: a row
+    written before those migrations (or by a path that nulls the columns) still needs words,
+    and `notificationStyle` — the icon, the accent and the filter bucket — has no server
+    equivalent at all, so this module is not going away.
+  */
+  const composed =
     audience === "owner"
       ? ownerNotificationText(n.eventType, n.payload)
       : notificationText(n.eventType, n.payload);
+  const title = n.title ?? composed.title;
+  const body = n.body ?? composed.body;
   const Glyph = GLYPHS[style.icon];
   const unread = isUnread(n);
 
@@ -373,10 +386,15 @@ function Row({
   /**
    * Where a row goes, if anywhere.
    *
-   * **A customer's order rows stay unlinked until 2f** — the customer order pages don't exist
-   * yet, and a row that navigates to a route which isn't there is exactly the dead end
-   * `destinations.ts` exists to prevent. The owner's do link, because `/business/orders/[id]`
-   * arrived with this slice.
+   * **The customer's order rows link now.** This used to read *"a customer's order rows stay
+   * unlinked until 2f"*, which was right when written — `/orders/[id]` did not exist and a row
+   * navigating to a missing route is the dead end `destinations.ts` exists to prevent. 2f
+   * shipped that route and the comment outlived its reason, so `order_ready`,
+   * `order_declined` and `order_cancelled` have been dead ends for the customer ever since:
+   * the one notification that says *"your order is ready for pickup"* had nothing to press.
+   *
+   * A row with neither id — `loyalty_points_earned`, a review request — still has nowhere
+   * useful to go and stays unlinked, which is why this is a chain and not a lookup.
    */
   const href =
     audience === "owner"
@@ -387,7 +405,9 @@ function Row({
           : null
       : n.bookingId
         ? `/bookings/${n.bookingId}`
-        : null;
+        : n.orderId
+          ? `/orders/${n.orderId}`
+          : null;
 
   if (href) {
     return (

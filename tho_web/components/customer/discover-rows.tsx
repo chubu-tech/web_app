@@ -6,8 +6,11 @@ import { Carousel } from "@/components/ui/carousel";
 import { CoverImage } from "@/components/ui/cover-image";
 import { categoryIcon, Icons, IconSize } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
+import { availableLabel, type AvailableSalon } from "@/lib/available-today";
 import { formatKm } from "@/lib/discover-logic";
+import { rebookSubtitle } from "@/lib/rebook";
 import type { RankedSalon } from "@/lib/recommendations";
+import type { Booking } from "@/lib/types/booking";
 import {
   cardMetaLine,
   offerEndsLabel,
@@ -345,5 +348,147 @@ export function TopRatedRow({
         ),
       }))}
     />
+  );
+}
+
+/**
+ * "Available today" — who can actually see you before the day is out.
+ *
+ * Upstream added this on 2026-08-08 (`home_sections.dart:747`) with a server RPC behind it,
+ * and it answers a question no other row on Discover does: every other row ranks salons by
+ * what they *are*, this one by **when they can take you**. That is what somebody standing on
+ * the street at four o'clock is asking.
+ *
+ * The badge is the whole content — `availableLabel` renders either `Today 14:30` or
+ * `Walk in · ~15 min`, so the card states its own answer. That is also what makes the mixed
+ * ordering legible: a walk-in shop sorting ahead of a booked slot is accountable when both
+ * cards say why.
+ *
+ * **Absent, not empty, for a signed-out visitor.** `salons_available_today` is revoked from
+ * `anon`, so the caller passes an empty list and `SalonScroller` renders nothing. An
+ * *empty* row under a heading promising availability would be a worse answer than no row.
+ */
+export function AvailableTodayRow({
+  entries,
+  total,
+}: {
+  entries: AvailableSalon[];
+  /** Salons with an answer in the whole set, so "See all" is only offered when it leads somewhere. */
+  total?: number;
+}) {
+  return (
+    <SalonScroller
+      title="Available today"
+      seeAllHref={(total ?? entries.length) > entries.length ? "/salons" : undefined}
+      seeAllLabel="See all salons"
+      items={entries.map((entry) => ({
+        business: entry.business,
+        badge: (
+          <>
+            <Icons.clock
+              className="shrink-0"
+              style={{ width: IconSize.xxs, height: IconSize.xxs }}
+              aria-hidden
+            />
+            {availableLabel(entry)}
+          </>
+        ),
+      }))}
+    />
+  );
+}
+
+/**
+ * "Book again" — the same thing, at the same shop, without walking the whole flow.
+ *
+ * In a category people return to every few weeks, most sessions are a rebooking rather than
+ * a shopping trip, which is why upstream put this above the browse rows. It is also what
+ * buys back the tap the stepped flow costs, for exactly the customers who used to have the
+ * short path.
+ *
+ * **A card is a button, not a link, and that is forced by what has to happen on press.**
+ * The destination is not knowable in advance: `resolveRebook` has to read the salon's
+ * *current* menu and roster first, because a service may have been retired or the stylist
+ * may have left. So the press starts a fetch and the answer decides the step. A link would
+ * have to guess.
+ *
+ * `busyBookingId` freezes **every** card while one is resolving, not just the pressed one.
+ * That is the re-entrancy guard upstream added in `a25af1a`: an impatient second press would
+ * otherwise start an overlapping fetch and push a second booking flow.
+ */
+export function BookAgainRow({
+  bookings,
+  onRebook,
+  busyBookingId,
+}: {
+  /** Already narrowed by `rebookable` — completed, newest first, one per salon. */
+  bookings: Booking[];
+  onRebook: (booking: Booking) => void;
+  busyBookingId?: string | null;
+}) {
+  if (bookings.length === 0) return null;
+  const frozen = busyBookingId != null;
+
+  return (
+    <section>
+      <SectionHeader title="Book again" className="mb-base" />
+      <Carousel label="Book again">
+        {bookings.map((b, i) => (
+          <li
+            key={b.id}
+            className="w-[240px] shrink-0 snap-start motion-safe:animate-card-in tablet:w-[264px]"
+            style={{ "--i": i, animationDelay: "calc(var(--i) * 45ms)" } as React.CSSProperties}
+          >
+            <button
+              type="button"
+              disabled={frozen}
+              onClick={() => onRebook(b)}
+              aria-label={`Book ${rebookSubtitle(b) || "again"} at ${b.businessName ?? "this salon"}`}
+              className={cn(
+                "block w-full cursor-pointer text-left",
+                "focus-visible:outline-ink rounded-md focus-visible:outline-2 focus-visible:outline-offset-2",
+                frozen && "cursor-wait opacity-60",
+              )}
+            >
+              <BusinessCard
+                id={b.businessId ?? ""}
+                name={b.businessName ?? "Salon"}
+                subtitle={rebookSubtitle(b)}
+                meta={null}
+                imageUrl={b.businessCoverUrl ?? null}
+                avgRating={null}
+                reviewCount={0}
+                /* No `href`: the press has to resolve before it knows where to go. */
+                href={null}
+                chip={
+                  <MediaChip>
+                    {busyBookingId === b.id ? (
+                      <>
+                        <Icons.spinner
+                          className="shrink-0 animate-spin"
+                          style={{ width: IconSize.xxs, height: IconSize.xxs }}
+                          aria-hidden
+                        />
+                        Checking
+                      </>
+                    ) : (
+                      <>
+                        <Icons.bookingRescheduled
+                          className="shrink-0"
+                          style={{ width: IconSize.xxs, height: IconSize.xxs }}
+                          aria-hidden
+                        />
+                        Book again
+                      </>
+                    )}
+                  </MediaChip>
+                }
+                sizes="264px"
+              />
+            </button>
+          </li>
+        ))}
+      </Carousel>
+    </section>
   );
 }

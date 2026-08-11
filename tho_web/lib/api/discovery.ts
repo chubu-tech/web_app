@@ -1,7 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Business, Category } from "../types/salon";
+import type { Business, Category, SalonAvailability } from "../types/salon";
 import type { WorkingHour } from "../types/booking";
-import { toBusiness, toBusinessHour, toCategory, withRating } from "./mappers";
+import {
+  toBusiness,
+  toBusinessHour,
+  toCategory,
+  toSalonAvailability,
+  withRating,
+} from "./mappers";
 
 /**
  * Discovery reads, ported from `Api.businesses` and friends in
@@ -265,4 +271,28 @@ export async function fetchBusinessCategoryIds(
     .select("category_id")
     .eq("business_id", businessId);
   return new Set((data ?? []).map((r) => r.category_id as string));
+}
+
+/**
+ * What every discoverable salon can offer for the rest of today — one round trip.
+ *
+ * `salons_available_today` (`20260808000001`, secured by `20260808000002`) takes **no
+ * arguments**: the server already knows the date, the timezone and which salons are
+ * discoverable. It calls `compute_availability` internally rather than reimplementing
+ * availability, so the slot it reports is the slot the booking flow will actually offer.
+ *
+ * **`authenticated` only** — `revoke execute … from public, anon`. So this returns nothing
+ * for a signed-out visitor and the row that renders it is correctly absent for them, which
+ * is a different thing from the row being broken. Callers should treat a rejection as "no
+ * answer" rather than surfacing it.
+ *
+ * The N+1 it replaces is why `Api.earliestSlotsFor` was never ported: the app used to do a
+ * services read, a staff read, and one `compute_availability` **per stylist per salon**.
+ */
+export async function fetchSalonsAvailableToday(
+  supabase: SupabaseClient,
+): Promise<SalonAvailability[]> {
+  const { data, error } = await supabase.rpc("salons_available_today");
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map(toSalonAvailability);
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ConfettiBurst } from "@/components/ui/confetti-burst";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/sheet";
 import { thimphuMinutesOfDay, formatMinutesOfDay } from "@/lib/time";
@@ -58,6 +59,17 @@ export function BookingConfirmedSheet({
 
   return (
     <Sheet open={open} onClose={onDone} title="You're booked">
+      {/*
+        The app's own first use of the confetti kit, and its reasoning holds here: *"This is the
+        peak of the journey; it belongs here."*
+
+        Keyed on `open` so it replays if the sheet is shown again, and mounted only while it is
+        open so a closed sheet is not holding 24 spans. Unlike the redemption screen this needs
+        no transition guard — the sheet exists **because** a booking was just made, and it
+        replaced a snackbar that vanished while the screen was being popped, so there is time for
+        a 1.4s burst to be seen.
+      */}
+      {open ? <ConfettiBurst key="booked" /> : null}
       <div className="p-base">
         <div className="flex flex-col items-center text-center">
           <span className="bg-rausch/10 flex size-16 items-center justify-center rounded-full">

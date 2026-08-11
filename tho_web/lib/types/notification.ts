@@ -31,6 +31,27 @@ export type AppNotification = {
    * every live row. `notificationText` composes from these fields instead.
    */
   payload: Record<string, unknown>;
+  /**
+   * The copy the **server** composed for this row — `notifications.title` and `.body`.
+   *
+   * Added by `20260807000020` and filled on every insert path by the BEFORE INSERT trigger in
+   * `20260807000021`. Measured on the live database: **all 92 rows carry both**, and the SQL
+   * branches on audience, so a `booking_created` reads *"Booking confirmed / Your appointment
+   * is set for Fri 7 Aug, 09:00"* for the customer and *"New booking / A customer booked Fri 7
+   * Aug, 09:00"* for the salon.
+   *
+   * That invalidated this file's original premise. The old note here said the payload is *"not
+   * a rendered message"* and that the app looks for a `payload.message` key the server never
+   * writes — both true when written, and the conclusion drawn from them was to compose the
+   * words client-side in `notification-copy.ts`. The server does it now, in one place, for
+   * every client and every channel, so **the row's own words win** and the local composer is
+   * the fallback. See `notificationText`.
+   *
+   * Nullable because the columns are, and because a row written by a path that sets them
+   * explicitly to null would otherwise render an empty heading.
+   */
+  title: string | null;
+  body: string | null;
   createdAt: Date;
   readAt: Date | null;
   /** Set for booking-related events — the customer inbox's only deep link. */
@@ -38,9 +59,9 @@ export type AppNotification = {
   /**
    * Set for `order_placed` / `order_ready` / `order_declined` / `order_cancelled`.
    *
-   * Read only by the **owner** inbox, which has somewhere to send it: `/business/orders/[id]`
-   * arrived in 3c. The customer's order pages are 2f, so their rows stay unlinked until then —
-   * a row that navigates nowhere is the dead end `destinations.ts` exists to prevent.
+   * **Both inboxes link it now.** The owner's has since 3c (`/business/orders/[id]`); the
+   * customer's route arrived in 2f, and this comment claimed otherwise for long enough that
+   * *"your order is ready for pickup"* had nothing to press.
    */
   orderId: string | null;
 };

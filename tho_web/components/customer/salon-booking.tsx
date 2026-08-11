@@ -35,6 +35,7 @@ export function SalonBooking({
   services,
   staffByService,
   initialServiceId = null,
+  gender = "any",
 }: {
   salonId: string;
   services: ServiceItem[];
@@ -53,6 +54,15 @@ export function SalonBooking({
    */
   initialServiceId?: string | null;
   /**
+   * Discover's gender filter, carried in on `?gender=` and passed straight out again on the
+   * Book link so the flow's first step opens on the same choice.
+   *
+   * The hand-off `book_flow_screen.dart:54` makes: somebody who narrowed Discover to "Women"
+   * has already said what they want, and asking again in the flow is the friction this
+   * removes. Nothing here filters on it — the salon page shows the salon's whole menu.
+   */
+  gender?: string;
+  /**
    * Who performs what, from `service_staff` — the authority on what is bookable.
    *
    * Used here only to drop services nobody performs, which on live data is 2 of Norzin's
@@ -68,7 +78,10 @@ export function SalonBooking({
 
   // No stylist in the href: the flow asks for one, and it can offer "any professional",
   // which is not a value this rail could produce.
-  const href = serviceId ? `/salon/${salonId}/book?service=${serviceId}` : null;
+  const href = serviceId
+    ? `/salon/${salonId}/book?service=${serviceId}` +
+      (gender !== "any" ? `&gender=${encodeURIComponent(gender)}` : "")
+    : null;
   const missing = serviceId ? null : "Choose a service to continue";
 
   return (

@@ -593,11 +593,37 @@ export function BookingWizard({
 
       <div className="gap-xl desktop:grid-cols-[minmax(0,1fr)_400px] grid">
         <div>
+          {/*
+            What changed since last time, for a rebook — `?changed=1`, set by `startRebook`
+            when `resolveRebook` found a service the salon no longer offers.
+
+            **Shown once, above step 1, and only there.** The basket arriving smaller than the
+            customer expects is the thing that needs saying; a departed stylist gets no
+            sentence, because step 2 opens with the roster in front of them, which says it
+            better than a banner. Deliberately not tied to the parameter surviving a step
+            change — it is about how the flow was *entered*.
+          */}
+          {step === "services" && params.get("changed") === "1" ? (
+            <p className="text-body-sm text-ink bg-surface-soft p-md gap-sm mb-lg flex items-start rounded-sm">
+              <Icons.info
+                className="text-muted mt-0.5 shrink-0"
+                style={{ width: IconSize.xs, height: IconSize.xs }}
+                aria-hidden
+              />
+              A service from last time is no longer offered — check what&apos;s selected before
+              you continue.
+            </p>
+          ) : null}
+
           {step === "services" ? (
             <BookingServiceStep
               services={bookable}
               unbookableCount={allServices.length - bookable.length}
               selectedIds={basketIds}
+              /* Carried from Discover's gender filter through `/salon/[id]` — see the
+                 prop's own note. Read once and not tracked, so widening it here does not
+                 rewrite the URL. */
+              initialGender={params.get("gender") ?? "any"}
               onToggle={toggleService}
             />
           ) : step === "professional" ? (
@@ -620,6 +646,9 @@ export function BookingWizard({
               onRetry={() => setReloadKey((k) => k + 1)}
               staffLabel={chosenStaff ? chosenStaff.displayName : "Any professional"}
               onChangeStaff={() => goTo("professional")}
+              /* For the empty state's sentence: a long basket finding nothing needs different
+                 advice from a full day. See `noSlotsForSelection`. */
+              services={basket}
             />
           ) : (
             <BookingConfirmStep

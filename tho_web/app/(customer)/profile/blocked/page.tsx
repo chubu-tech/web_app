@@ -43,7 +43,17 @@ export default async function BlockedAccountsPage() {
   if (account.state !== "registered") notFound();
 
   const supabase = await createClient();
-  const blocked = await fetchMyBlockedUsers(supabase).catch(() => []);
+  /*
+    **No catch.** This used to be `.catch(() => [])`, which turned an outage into the empty
+    state below — somebody with a full list was told they had nothing, in the app's own
+    encouraging words. There was no `error.tsx` anywhere when that was written, so swallowing
+    was the only alternative to Next's default error page; now the segment has a boundary and a
+    failed read can say it failed.
+
+    The session is already established above, so nothing here fails for a signed-out visitor:
+    a throw means the read itself broke.
+  */
+  const blocked = await fetchMyBlockedUsers(supabase);
 
   return (
     <div className="px-base py-lg mx-auto w-full max-w-[720px] tablet:px-lg">

@@ -6,6 +6,7 @@ import {
   kmBetween,
   rank,
   reviewScore,
+  sortedBy,
   visitCount,
 } from "./recommendations";
 import { thimphuDayOf, thimphuWeekday } from "./time";
@@ -284,5 +285,76 @@ describe("rank", () => {
       now: NOW,
     });
     expect(ranked.map((r) => r.business.name)).toEqual(["Alpha", "Zeta"]);
+  });
+});
+
+/*
+  `/salons` — every salon, ordered. Ported from `AllSalonsScreen.sortedBy`.
+
+  The distinction from `topRated` is the point of the tests below: this is a browse, so
+  nothing is dropped. A sort that quietly removed the unrated would be a filter wearing a
+  sort's label, and most live salons are unrated.
+*/
+describe("sortedBy", () => {
+  it("orders by rating, best first", () => {
+    const out = sortedBy(
+      [biz("mid", { rating: 4.0 }), biz("best", { rating: 4.9 }), biz("low", { rating: 3.1 })],
+      "topRated",
+    );
+    expect(out.map((b) => b.id)).toEqual(["best", "mid", "low"]);
+  });
+
+  it("keeps unrated salons, LAST — a browse drops nobody", () => {
+    const out = sortedBy([biz("none"), biz("rated", { rating: 4.2 })], "topRated");
+    expect(out.map((b) => b.id)).toEqual(["rated", "none"]);
+    expect(out).toHaveLength(2);
+  });
+
+  it("orders by distance when there is a fix", () => {
+    const out = sortedBy(
+      [biz("far", { lat: 27.4305, lng: 89.4164 }), biz("near", { lat: 27.4741, lng: 89.6377 })],
+      "nearest",
+      CENTER,
+    );
+    expect(out.map((b) => b.id)).toEqual(["near", "far"]);
+  });
+
+  it("keeps unlocated salons, LAST", () => {
+    const out = sortedBy([biz("nowhere"), biz("near", { lat: 27.4741, lng: 89.6377 })], "nearest", CENTER);
+    expect(out.map((b) => b.id)).toEqual(["near", "nowhere"]);
+  });
+
+  it("returns the input order for `nearest` with no fix, rather than a different sort", () => {
+    /*
+      Showing top-rated under a chip reading "Nearest" would be worse than showing the order
+      the page already had. `/salons` is responsible for not offering the chip when it has
+      no fix; this is the safe answer if it does.
+    */
+    const input = [biz("b", { lat: 27.43, lng: 89.41, rating: 5 }), biz("a", { lat: 27.47, lng: 89.63, rating: 1 })];
+    expect(sortedBy(input, "nearest").map((b) => b.id)).toEqual(["b", "a"]);
+  });
+
+  it("breaks ties on name in both orderings, so the page is deterministic", () => {
+    expect(
+      sortedBy([biz("z", { name: "Zeta", rating: 4 }), biz("a", { name: "Alpha", rating: 4 })], "topRated")
+        .map((b) => b.name),
+    ).toEqual(["Alpha", "Zeta"]);
+    expect(
+      sortedBy(
+        [
+          biz("z", { name: "Zeta", lat: 27.4741, lng: 89.6377 }),
+          biz("a", { name: "Alpha", lat: 27.4741, lng: 89.6377 }),
+        ],
+        "nearest",
+        CENTER,
+      ).map((b) => b.name),
+    ).toEqual(["Alpha", "Zeta"]);
+  });
+
+  it("never mutates its input", () => {
+    const input = [biz("a", { rating: 1 }), biz("b", { rating: 5 })];
+    const before = input.map((b) => b.id);
+    sortedBy(input, "topRated");
+    expect(input.map((b) => b.id)).toEqual(before);
   });
 });

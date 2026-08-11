@@ -10,6 +10,7 @@ import { fetchDashboard, fetchPeakHeatmap } from "@/lib/api/owner-analytics";
 import { countNewOrders } from "@/lib/api/owner-back-office";
 import { fetchBusinessBookings } from "@/lib/api/owner";
 import { openMinutesForWeekday } from "@/lib/calendar-logic";
+import { fetchStaff } from "@/lib/api/salon";
 import { hasFeature } from "@/lib/entitlements";
 import { getOwnerContext } from "@/lib/owner/context";
 import { createClient } from "@/lib/supabase/server";
@@ -65,11 +66,16 @@ export default async function OwnerInsightsPage({
   const trends = hasFeature(active.plan, "fullAnalytics");
   const storefront = hasFeature(active.plan, "productStore");
 
-  const [bookings, hours, newOrders] = await Promise.all([
+  const [bookings, hours, newOrders, roster] = await Promise.all([
     fetchBusinessBookings(supabase, active.id, bounds).catch(() => []),
     fetchBusinessHours(supabase, active.id).catch(() => []),
     storefront ? countNewOrders(supabase, active.id).catch(() => 0) : Promise.resolve(0),
+    // For the header's stylist count only. Decorative, so a failed read costs the count and
+    // not the page — the subtitle then falls back to the salon name alone.
+    fetchStaff(supabase, active.id, { activeOnly: true }).catch(() => []),
   ]);
+
+  const activeStylists = roster.length;
 
   const dash = trends
     ? await fetchDashboard(supabase, active.id, granularity).catch(() => null)
@@ -87,7 +93,18 @@ export default async function OwnerInsightsPage({
     <div className="px-base py-lg gap-lg mx-auto flex w-full max-w-[1128px] flex-col tablet:px-lg">
       <div>
         <h1 className="text-display-lg text-ink font-medium">Insights</h1>
-        <p className="text-caption-sm text-muted">{active.name}</p>
+        {/*
+          `Salon · N active stylists`, the app's own subtitle (`insights_tab.dart:110`). It
+          was the salon name alone here, which reads as a label; the count makes it a line
+          about the business, and it is the denominator behind the staff leaderboard further
+          down the page.
+        */}
+        <p className="text-caption-sm text-muted">
+          {active.name}
+          {activeStylists > 0
+            ? ` · ${activeStylists} active ${activeStylists === 1 ? "stylist" : "stylists"}`
+            : ""}
+        </p>
       </div>
 
       {storefront ? <OrdersInboxCard newCount={newOrders} /> : null}
