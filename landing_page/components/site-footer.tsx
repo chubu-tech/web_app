@@ -80,7 +80,7 @@ export function SiteFooter() {
                     take the rounded corners. */}
                 <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-xl">
                   <Image
-                    src="/tho-logo.jpg"
+                    src="/tho-logo.webp"
                     alt=""
                     width={36}
                     height={36}

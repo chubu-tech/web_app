@@ -4,6 +4,7 @@ import {
   ACTIVE_BUSINESS_COOKIE,
   ACTIVE_BUSINESS_COOKIE_OPTIONS,
 } from "@/lib/owner/active-business";
+import { SESSION_ENDED_REASON } from "@/lib/session-timeout";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -38,6 +39,27 @@ import { createClient } from "@/lib/supabase/server";
 export async function POST(request: NextRequest) {
   const origin = new URL(request.url).origin;
 
+  /*
+    `reason` is read from the form body, and it is the one field this route accepts.
+
+    It exists so an *involuntary* sign-out can explain itself: `IdleTimeout` submits
+    `reason=idle` after thirty minutes without interaction, and landing on a bare sign-in
+    form having pressed nothing is exactly the confusion that is worth avoiding. It is
+    matched against a closed set rather than forwarded — the same rule `safeNext` applies to
+    `?next=` — so a hand-crafted value cannot put arbitrary text on the sign-in page, and
+    anything unrecognised falls back to the ordinary front-door redirect.
+
+    A deliberate sign-out sends no reason at all and still lands on `/`.
+  */
+  let reason: string | null = null;
+  try {
+    const form = await request.formData();
+    const raw = form.get("reason");
+    if (raw === "idle") reason = "idle";
+  } catch {
+    // No body, or not a form. A sign-out with no reason is the normal case.
+  }
+
   // The server client writes the auth cookies through this same store, so signing out and clearing
   // the salon happen in one response rather than two round trips.
   const supabase = await createClient();
@@ -52,5 +74,10 @@ export async function POST(request: NextRequest) {
   });
 
   // 303 so the browser follows with GET — this was a form POST.
-  return NextResponse.redirect(new URL("/", origin), { status: 303 });
+  //
+  // An idle sign-out goes to the sign-in form carrying its reason, because the person did
+  // not ask for this and Discover would not explain it. A deliberate sign-out goes to `/`,
+  // where a visitor belongs.
+  const target = reason === "idle" ? `/sign-in?${SESSION_ENDED_REASON}=idle` : "/";
+  return NextResponse.redirect(new URL(target, origin), { status: 303 });
 }

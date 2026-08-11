@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { fetchMyBusinesses } from "../api/owner";
 import { homeForRole } from "../auth";
 import { requireLiveAccount } from "../session";
+import { SESSION_ENDED_COOKIE, sessionEndedRedirect } from "../session-timeout";
 import { createClient } from "../supabase/server";
 import type { Business } from "../types/salon";
 import { ACTIVE_BUSINESS_COOKIE, resolveActiveBusinessId } from "./active-business";
@@ -45,7 +46,9 @@ export const getOwnerContext = cache(async (): Promise<OwnerContext> => {
 
   // A visitor or a guest has no role to check yet. `?next=` brings them back here.
   if (account.state !== "registered") {
-    redirect(`/sign-in?next=${encodeURIComponent("/business")}`);
+    redirect(
+      sessionEndedRedirect("/business", (await cookies()).has(SESSION_ENDED_COOKIE)),
+    );
   }
 
   // Symmetric with Discover sending an owner to `/business`: a customer, staff member or

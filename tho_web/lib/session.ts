@@ -1,6 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { createClient } from "./supabase/server";
 import {
   isBlocked,
@@ -33,8 +34,25 @@ import {
  * customer" — so tightening `profiles` RLS would have quietly demoted every owner and
  * stylist into the customer shell. Upstream calls this A2-08 and refuses to route on it;
  * so does this.
+ *
+ * ## `cache()` — it was running three times a page
+ *
+ * Measured on `/salon/[id]`: **three** `getAccount` calls per request, the first two timed
+ * at **1239 ms and 1231 ms**. Each is a `supabase.auth.getUser()` — a network round trip to
+ * the Auth server, which is what that second-plus is — followed by a `profiles` select.
+ * Nothing was wrong with any single call site: the shell layout needs the account, the page
+ * needs it, and a reader like `fetchMyFavouriteIds` needs the id. They had no way to share.
+ *
+ * `cache()` makes them share, per request. Both reads are unchanged, so this is a latency
+ * fix with no behavioural surface: same result, same authority, same `profiles` columns,
+ * once instead of three times.
+ *
+ * **Not a security relaxation.** The memo lives for one request and dies with it, so no
+ * account state can survive into another visitor's render. Validation still happens — the
+ * shared client performs a real `getUser()` against the Auth server exactly as before — and
+ * the role still comes from the `profiles` table, never a JWT claim.
  */
-export async function getAccount(): Promise<Account> {
+export const getAccount = cache(async (): Promise<Account> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -65,7 +83,7 @@ export async function getAccount(): Promise<Account> {
   };
 
   return { state: "registered", user, role: account.role, account };
-}
+});
 
 /** The signed-in user's id, or null. Guests count: they have a real id. */
 export async function getUserId(): Promise<string | null> {

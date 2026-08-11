@@ -1,10 +1,12 @@
 import "server-only";
 
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { fetchMyStaffMember } from "../api/staff";
 import { homeForRole } from "../auth";
 import { requireLiveAccount } from "../session";
+import { SESSION_ENDED_COOKIE, sessionEndedRedirect } from "../session-timeout";
 import { createClient } from "../supabase/server";
 import type { StaffMember } from "../types/salon";
 
@@ -40,7 +42,9 @@ export const getStaffContext = cache(async (): Promise<StaffContext> => {
 
   // A visitor or a guest has no role to check yet. `?next=` brings them back here.
   if (account.state !== "registered") {
-    redirect(`/sign-in?next=${encodeURIComponent("/staff")}`);
+    redirect(
+      sessionEndedRedirect("/staff", (await cookies()).has(SESSION_ENDED_COOKIE)),
+    );
   }
 
   // Symmetric with `/business` turning away a non-owner: a customer, owner or admin who

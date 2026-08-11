@@ -1647,6 +1647,155 @@ type a minus sign to give money back is a trap: the sign gets forgotten, the wri
 the customer's balance moves the wrong way.
 
 
+## Per-request reads must be memoised, and it is worth about a second
+
+`getAccount` and `createClient` are wrapped in React's `cache`. Not tidiness — measured, by
+instrumenting both with counters and loading three routes signed in:
+
+| Per request to `/salon/[id]` | before | after |
+| --- | --- | --- |
+| `createClient` calls | 5 | 1 |
+| `getAccount` calls | 3 | 1 |
+| `auth.getUser()` round trips | 4 (1 proxy + 3) | 2 (1 proxy + 1) |
+
+The first two `getAccount` calls were timed at **1239 ms and 1231 ms**. That second-plus is
+not the `profiles` select — it is `supabase.auth.getUser()`, which is a **network round trip
+to the Auth server**, and each fresh client had to make its own because a Supabase client
+carries its own auth state. Nothing was wrong with any single call site: the shell layout
+needs the account, the page needs it, and a reader like `fetchMyFavouriteIds` needs the id.
+They simply had no way to share one answer.
+
+The rule that follows: **anything read more than once per request goes through `cache`.**
+`getOwnerContext` and `getStaffContext` already did, and their doc comments say why; the two
+things every route touches did not.
+
+**It is not a security relaxation, and that question is worth answering rather than
+assuming.** The memo's lifetime is one request, so nothing survives into another visitor's
+render; validation still happens, because the shared client performs a real `getUser()`
+against the Auth server exactly as before; and role still comes from `profiles`, never a JWT
+claim.
+
+### And collapse the waves, don't just parallelise inside them
+
+`/salon/[id]` awaited in **four** steps — the business, then eleven reads, then
+`{account, queueLine, loyaltyProgram}`, then `{rewards, balance}`. Each step is a full round
+trip to a database that is not local, and each `Promise.all` was already correct *within*
+itself, which is what made the waterfall easy to miss.
+
+Only one of those boundaries was a real dependency. Everything in the first wave keys off
+`id`, which comes from the **URL**, not off the business row — so the `notFound()` gate did
+not have to run before them, and it now runs after the first `await`. The reads it used to
+guard are harmless on a salon that does not exist (they come back empty and are discarded),
+and paying for them on a rare 404 beats making every real visitor wait a serial round trip to
+prove the salon exists.
+
+Measured cold, production build, same harness either side:
+
+| | DCL before | DCL after |
+| --- | --- | --- |
+| `/salon/[id]` | 3832 ms | **1525 ms** |
+| `/` (Discover) | 2261 ms | **1354 ms** |
+| `/bookings` | 1350 ms | **1069 ms** |
+
+**Read DCL, not LCP, when judging a server change.** LCP on these pages also moves with the
+image optimizer's disk cache, which is cold on a freshly built server and warm afterwards —
+on the marketing site that alone is the difference between 2492 ms and 416 ms for identical
+bytes. DCL is when the document finished, so it is the number a server-side change actually
+owns.
+
+## `images.qualities` — a `quality` prop that silently does nothing
+
+Next 16 changed `images.qualities` from "allow anything" to **`[75]`**, and an unlisted
+`quality` is **coerced to the nearest allowed value rather than rejected**
+(`node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md`).
+
+So `quality={68}` on the marketing hero compiled, linted, built and served `q=75`. There was
+no warning at any stage. It was caught by reading the emitted `srcset` — nothing else would
+have. `landing_page/next.config.ts` now lists `qualities: [68, 75]`.
+
+**Anything that sets `quality` must be listed there or it is dead code that looks live.**
+Verify by grepping the served HTML for the `q=` it actually emitted, not by trusting the prop.
+
+## The logo was 547 KB for a 36px mark
+
+`public/tho-logo.jpg` was a **1254×1254 JPEG, 547 KB**, rendered at `width={36} height={36}`
+in four places across both apps. `next/image` was resizing it correctly, so the *delivered*
+bytes were small — which is exactly why it survived: the cost was in the repo, in every
+deploy bundle, and in the optimizer's first pass over it.
+
+Replaced with a **192×192 WebP at 6.6 KB** (192 covers 36px at up to 4× DPR). Checked for
+fidelity before shipping rather than after: mean absolute difference against the original,
+resampled to the sizes actually painted, is **2.42/255 at 36px and 2.76/255 at 72px** — under
+1%.
+
+Five Next starter SVGs (`next.svg`, `vercel.svg`, `globe.svg`, `file.svg`, `window.svg`) were
+in `public/` with **zero references** anywhere and are gone.
+
+## Session timeout is the eighth deliberate divergence from `../tho`
+
+`../tho` has **no idle timeout at all** — `AuthGate` watches `onAuthStateChange` and shows the
+sign-in screen when the session goes null. So this is web-only, and the reason is a threat
+model a phone does not have: the console runs on a machine behind the counter that staff share
+and customers stand beside. `app/auth/sign-out/route.ts` already documents the same concern
+from the other end, where `tho_active_business` was surviving a year on such a machine.
+
+- **30 minutes, console and staff shell only.** `IdleTimeout` is mounted by
+  `app/business/layout.tsx` and `app/staff/layout.tsx`. **Customer routes deliberately have
+  no idle clock**: a customer is on their own phone, and signing somebody out because they
+  spent half an hour choosing between two salons costs them a half-built booking to protect
+  nothing.
+- **One timer, not a tick.** `idleState` returns `msUntilNext`, so an idle console arms one
+  `setTimeout` for 28 minutes and then one per second only while the warning is up — two
+  firings in half an hour rather than eighteen hundred, on a machine already running a
+  4-second queue poll.
+- **Activity is shared across tabs** through `localStorage`. The console is routinely open
+  twice; a per-tab timer would sign the owner out of whichever tab they were not looking at.
+- **It submits the real sign-out route**, not `supabase.auth.signOut()` in the browser — only
+  that route can clear `httpOnly` `tho_active_business`, which is the residue the feature
+  exists to remove. A client-side sign-out would look identical and leave it behind.
+- **No record means "just arrived", never "idle for ever".** `readLastActivity` falls back to
+  `now` for a missing, junk or zero value, and every storage access is wrapped. The opposite
+  default would lock somebody out on their first paint in a fresh browser or in private mode —
+  a lockout wearing a security feature's clothes.
+- **Two lint rules shaped the implementation, not preference.** The first version put
+  `schedule` in a `useCallback` that passed itself to `setTimeout`:
+  `react-hooks/immutability` rejects a self-referencing `useCallback`, and
+  `react-hooks/set-state-in-effect` — the rule `usePrefersReducedMotion` already hit — rejects
+  a setter called synchronously from an effect body, which is what arming on mount did. So
+  `arm` is a plain closure inside the one effect and takes `applyState`, false only on mount.
+
+### An expired session says so now
+
+A dead session used to make a customer silently become a visitor, and sent an owner to a bare
+sign-in form. The distinction that was missing: **`/business` refuses a signed-out caller
+either way**, but *"sign in to continue"* is right for a first visit and wrong for somebody
+who was working a minute ago.
+
+Only `proxy.ts` can tell those apart, and only *before* it calls `getUser()` — that call is
+what destroys the evidence, because `@supabase/ssr` clears the auth cookies onto the response
+when a refresh token is rejected. So the proxy reads whether the request **arrived** holding a
+session, and if it did and the user is now gone it sets `tho_session_ended` for 60 seconds.
+`sessionEndedRedirect` reads it, and `/sign-in` renders a sentence for `?reason=idle` or
+`?reason=expired`.
+
+`sessionEndedMessage` validates against a closed set rather than interpolating — this is a
+query parameter, so an unrecognised value renders **no** message rather than putting
+attacker-chosen text above a password field. Same rule `safeNext` applies to `next`.
+
+Verified in the browser rather than reasoned about, by backdating `tho_last_activity` and
+dispatching `visibilitychange` — the same path a real idle session takes, with no test-only
+branch: the warning appears with a live countdown, "Stay signed in" clears it and moves the
+stored timestamp forward, and the cut lands on `/sign-in?reason=idle` with the explanation
+rendered. Revisiting `/business` afterwards redirects, so the session is genuinely gone rather
+than the page merely having changed.
+
+**One caveat on the harness:** the sign-out is a real form POST, so polling for the result
+from inside a single `Runtime.evaluate` fails with *"Inspected target navigated or closed"* —
+which is the feature working, reported as a broken test. Wait for the navigation from outside
+the page, then wait for `document.body` before reading it; the URL commits before the new
+document has parsed.
+
+
 ## Verify
 
 ```bash

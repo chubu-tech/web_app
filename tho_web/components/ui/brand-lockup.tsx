@@ -41,7 +41,7 @@ export function BrandLockup({
       className={cn("gap-sm flex shrink-0 items-center", className)}
     >
       <Image
-        src="/tho-logo.jpg"
+        src="/tho-logo.webp"
         alt=""
         width={36}
         height={36}

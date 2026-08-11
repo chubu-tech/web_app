@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { StaffHeader } from "@/components/staff/staff-nav";
+import { IdleTimeout } from "@/components/ui/idle-timeout";
 import { getStaffContext } from "@/lib/staff/context";
 
 export const metadata: Metadata = { title: "My day" };
@@ -29,6 +30,10 @@ export default async function StaffLayout({
     <div data-shell="owner" className="bg-canvas flex min-h-full flex-col">
       <StaffHeader displayName={me?.displayName ?? null} />
       <main className="flex-1">{children}</main>
+
+      {/* Same idle cut as the owner console — a stylist's shell runs on the same shared
+          machine. See `lib/session-timeout.ts`. */}
+      <IdleTimeout />
     </div>
   );
 }

@@ -67,6 +67,20 @@ export function Hero() {
                 priority
                 fetchPriority="high"
                 sizes="100vw"
+                /*
+                  The LCP element, and it was the heaviest thing on the page: measured at
+                  **230 KB** cold, against 613 KB of subresources in total, with an LCP of
+                  2268 ms.
+
+                  68 rather than the default 75, and this is the one image on the site where
+                  that is clearly safe: two full-bleed black gradient scrims are composited
+                  over it immediately below, at 85%/45%/10% and 70%/0%/40%, precisely so the
+                  headline stays legible. Fine detail in the photograph is already being
+                  crushed by those layers before anyone sees it, so paying full quality for
+                  detail the design deliberately hides is the wrong trade on the element that
+                  decides this page's LCP.
+                */
+                quality={68}
                 className="object-cover object-center"
               />
             </motion.div>

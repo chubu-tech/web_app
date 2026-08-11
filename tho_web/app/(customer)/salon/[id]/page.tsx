@@ -44,6 +44,7 @@ import { coverageLine, dayName, hhmm, todayHoursLine } from "@/lib/salon-copy";
 import { jsonLdScript, salonSchema } from "@/lib/seo";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
+import type { LoyaltyBalance, LoyaltyReward } from "@/lib/types/back-office";
 import type { QueueEntry } from "@/lib/types/queue";
 import { hasLocation, offerEndsLabel, runsQueue, travels } from "@/lib/types/salon";
 import type { Review } from "@/lib/types/salon";
@@ -139,10 +140,28 @@ export default async function SalonPage({
   const gender = (Array.isArray(genderParam) ? genderParam[0] : genderParam) ?? "any";
   const supabase = await createClient();
 
-  const business = await fetchBusinessById(supabase, id);
-  if (!business) notFound();
+  /*
+    ## Two waves, not four
 
+    This page used to await in four steps — the business, then eleven reads, then
+    `{account, queueLine, loyaltyProgram}`, then `{rewards, balance}` — and each step is a
+    full round trip to a database that is not local. Measured cold: **DCL 3832 ms, LCP
+    4560 ms**, the slowest page in the app and the most-travelled one in the product.
+
+    Only two of those steps are real dependencies. Everything in the first wave keys off
+    `id`, which comes from the URL, **not** off the business row — so the `notFound()` gate
+    does not have to run before them. And `queueLine` needs `business` (for `runsQueue`)
+    while `rewards`/`balance` need `loyaltyProgram` and `account`, which is one genuine
+    dependency, not two.
+
+    So: everything that needs only `id` goes in wave one, everything that needs wave one's
+    answers goes in wave two. The `notFound()` moves below the first `await` — the reads it
+    used to guard are harmless on a salon that does not exist (they return empty and are
+    discarded), and paying for them on the rare 404 is a far better trade than making every
+    real visitor wait a serial round trip to prove the salon exists.
+  */
   const [
+    business,
     services,
     staff,
     hours,
@@ -153,7 +172,10 @@ export default async function SalonPage({
     offers,
     favouriteIds,
     staffByService,
+    account,
+    loyaltyProgram,
   ] = await Promise.all([
+    fetchBusinessById(supabase, id),
     fetchServices(supabase, id),
     fetchStaff(supabase, id),
     fetchBusinessHours(supabase, id),
@@ -177,41 +199,50 @@ export default async function SalonPage({
     // Which stylist can do which service. Not decorative: an incompatible pair is
     // refused by `create_booking`, so the picker must not offer one.
     fetchServiceStaff(supabase, id).catch(() => ({}) as Record<string, string[]>),
-  ]);
-
-  /**
-   * The walk-in line, read once for the card's badge — and **only** for a salon that
-   * actually runs a queue, so 10 of the 13 live salons don't pay for an RPC whose card
-   * never renders. `queue_active_line` is revoked from `anon`, so this legitimately
-   * fails for a signed-out visitor; `null` reaches the badge as "Wait unknown" rather
-   * than a fabricated zero.
-   */
-  const [account, queueLine, loyaltyProgram] = await Promise.all([
+    // Free to hoist into wave one: `cache()` on `getAccount` means the shell layout has
+    // very likely already resolved this, so it costs nothing here either way.
     getAccount(),
-    runsQueue(business)
-      ? fetchActiveLine(supabase, id).catch(() => null as QueueEntry[] | null)
-      : Promise.resolve(null),
     // Null for a salon with no programme *or* a switched-off one, since
     // `loyalty_programs_select_public` admits only `is_active` — so the card can be included
     // unconditionally and simply renders nothing. Decorative: loyalty must not take the page down.
     fetchPublicLoyaltyProgram(supabase, id).catch(() => null),
   ]);
 
+  if (!business) notFound();
+
   /**
-   * The rewards menu and the caller's balance, read only when there is a programme to read them for.
+   * Wave two — the reads that genuinely could not go above.
    *
-   * The menu is public (`loyalty_rewards_select_public`) and the balance is not — `loyalty_balance`
-   * raises `28000` without a session — so a visitor sees what is on offer and no number. That split
-   * is the point: the rewards are the advertisement.
+   * The walk-in line is read once for the card's badge, and **only** for a salon that
+   * actually runs a queue, so 10 of the 13 live salons don't pay for an RPC whose card
+   * never renders. That test needs `business`, which is why this is a second wave at all.
+   * `queue_active_line` is revoked from `anon`, so this legitimately fails for a signed-out
+   * visitor; `null` reaches the badge as "Wait unknown" rather than a fabricated zero.
    */
-  const [loyaltyRewards, loyaltyBalance] = loyaltyProgram
-    ? await Promise.all([
-        fetchPublicRewards(supabase, id).catch(() => []),
-        account.state === "registered"
-          ? fetchLoyaltyBalance(supabase, id, account.user.id).catch(() => null)
-          : Promise.resolve(null),
-      ])
-    : [[], null];
+  const [queueLine, [loyaltyRewards, loyaltyBalance]] = await Promise.all([
+    runsQueue(business)
+      ? fetchActiveLine(supabase, id).catch(() => null as QueueEntry[] | null)
+      : Promise.resolve(null),
+    /**
+     * The rewards menu and the caller's balance, read only when there is a programme to
+     * read them for — the one real dependency on wave one, since `loyaltyProgram` decides
+     * whether either read happens at all.
+     *
+     * The menu is public (`loyalty_rewards_select_public`) and the balance is not —
+     * `loyalty_balance` raises `28000` without a session — so a visitor sees what is on
+     * offer and no number. That split is the point: the rewards are the advertisement.
+     */
+    loyaltyProgram
+      ? Promise.all([
+          fetchPublicRewards(supabase, id).catch(() => []),
+          account.state === "registered"
+            ? fetchLoyaltyBalance(supabase, id, account.user.id).catch(() => null)
+            : Promise.resolve(null),
+        ])
+      : // Typed rather than `as const`: the tuple's first element flows into a prop typed
+        // `LoyaltyReward[]`, and a `readonly []` is not assignable to a mutable array.
+        Promise.resolve<[LoyaltyReward[], LoyaltyBalance | null]>([[], null]),
+  ]);
 
   const isTravelling = travels(business);
   const wa = whatsappUrl(

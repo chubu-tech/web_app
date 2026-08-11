@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { OwnerHeader } from "@/components/owner/owner-nav";
 import { SalonSwitcher } from "@/components/owner/salon-switcher";
+import { IdleTimeout } from "@/components/ui/idle-timeout";
 import { unreadNotificationCount } from "@/lib/api/notifications";
 import { fetchOwnerConversations } from "@/lib/api/owner-back-office";
 import { unreadThreadCount } from "@/lib/chat-logic";
@@ -95,6 +96,14 @@ export default async function OwnerLayout({
       <SalonSwitcher active={active} businesses={businesses} />
 
       <main className="flex-1">{children}</main>
+
+      {/*
+        Thirty minutes without interaction signs this console out. Here rather than on the
+        customer surface because the threat model is the shared machine behind the counter —
+        the same one `app/auth/sign-out/route.ts` was written for. `lib/session-timeout.ts`
+        carries the full reasoning, including why `../tho` has no equivalent.
+      */}
+      <IdleTimeout />
     </div>
   );
 }

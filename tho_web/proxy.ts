@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { SESSION_ENDED_COOKIE } from "@/lib/session-timeout";
 
 /**
  * Session refresh only.
@@ -44,9 +45,51 @@ export async function proxy(request: NextRequest) {
     },
   );
 
+  /*
+    Did this request arrive holding a session?
+
+    Read **before** `getUser()`, because that call is what destroys the evidence: on a
+    refresh token the Auth server rejects, `@supabase/ssr` clears the auth cookies onto the
+    response, so by the time a page renders there is nothing left to distinguish *"their
+    session just died"* from *"they never had one"*. Those two need opposite treatment — one
+    deserves an explanation, the other is an ordinary first visit — and this is the only
+    place in the request where both facts are available at once.
+
+    Matched on the cookie *name* pattern rather than a constant: `@supabase/ssr` derives it
+    from the project ref and chunks large tokens with a `.0`/`.1` suffix.
+  */
+  const arrivedWithSession = request.cookies
+    .getAll()
+    .some((c) => /^sb-.+-auth-token(\.\d+)?$/.test(c.name) && c.value.length > 0);
+
   // Refreshes the token when there is one, and writes it back onto the
   // response. A missing session is normal here, not an error.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (arrivedWithSession && !user) {
+    /*
+      The session was real and is now gone — expired, revoked, or signed out elsewhere.
+
+      A short-lived breadcrumb rather than a redirect, because this proxy must not redirect:
+      the app is public, and a customer whose session lapsed while reading a salon page
+      should keep reading it. What this does is let the surfaces that *do* require an
+      account say why they are asking again — see `sessionEndedRedirect`.
+
+      60 seconds is deliberately brief. It only has to survive the redirect it triggers, and
+      a stale breadcrumb would explain a session that ended an hour ago. It is not
+      `httpOnly`, carries no identity, and says nothing an attacker could not already
+      observe by watching their own session end.
+    */
+    response.cookies.set(SESSION_ENDED_COOKIE, "1", {
+      path: "/",
+      maxAge: 60,
+      httpOnly: false,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
+  }
 
   return response;
 }
