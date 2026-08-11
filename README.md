@@ -1,93 +1,97 @@
-# web — the Bhutan Salons web monorepo
+# web_app — Tho
 
-Two independent Next.js applications in one repository. They share a database and
-a brand; they share no code, no build and no `node_modules`.
+One Next.js 16 application serving both halves of Tho: the public marketing site
+at `/`, and the product — customers, salon owners and stylists — on its own
+routes. They were two applications until 2026-08-11; this is the merge.
 
-| Directory | What it is | Deployed as |
-| --- | --- | --- |
-| [`landing_page/`](landing_page) | The public marketing site — one route, statically prerendered, no auth. Serves **bhutansalons.com**. | Root directory `landing_page` |
-| [`tho_web/`](tho_web) | The Tho product in a browser — customers book and queue, owners run the salon, staff see their day. | Not yet deployed |
+Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS 4 ·
+Supabase.
 
-The platform is **Bhutan Salons**. The app you download is **Tho**.
-
-## Run either app
-
-Each app is self-contained: its own `package.json`, its own `package-lock.json`,
-its own `node_modules`, its own `.env.local`. Nothing at the root is required to
-build or run either one.
+## Run
 
 ```bash
-cd landing_page && npm install && npm run dev   # http://localhost:3000
-cd tho_web      && npm install && npm run dev   # http://localhost:3000
+npm install
+cp .env.example .env.local
+npm run dev        # http://localhost:3000
+npm run build      # also typechecks
+npm run lint
+npm run test       # 653 tests, ported pure logic
 ```
 
-Both default to port 3000, so to run them at the same time give one a different
-port: `npm run dev -- -p 3001`.
+## The routes
 
-The root `package.json` is a convenience only — it has no dependencies and
-declares no workspaces. Each script is a `cd` into an app:
+| Route | What it is |
+| --- | --- |
+| `/` | The marketing homepage. Static, revalidated hourly, salon index prerendered at build. |
+| `/waitlist` · `/privacy` | The other two marketing pages. `/privacy` is the canonical policy — the app-store listings point at it, and `/legal/privacy` 308s here. |
+| `/discover` | The customer home: find a salon. **This was `/` before the merge.** |
+| `/salons` `/salon/[id]` `/stylist/[id]` `/map` | Browse, one salon, one stylist, the map. |
+| `/bookings` `/cart` `/orders` `/rewards` `/saved` `/messages` `/notifications` `/profile` | The signed-in customer. |
+| `/q/[id]` | Join a walk-in queue. **The printed QR codes point here** — `QueueDeepLink.businessIdFrom` in `../tho` parses this exact shape, so the path is fixed. |
+| `/business/*` | The owner console — calendar, queue, insights, the back office. |
+| `/staff/*` | A stylist's day. |
+| `/sign-in` `/sign-up` `/auth/*` | Auth. |
 
-```bash
-npm run install:all     # install both
-npm run dev:landing     # or dev:app
-npm run build:landing   # or build:app
-npm run test:app        # tho_web's vitest suite
+## How the two halves are kept apart
+
+The marketing code is namespaced; the product's is not. That is deliberate and
+it is about churn: the product is 358 files against marketing's 64, so
+`@/components/ui/*` and `@/lib/*` keep meaning what they have always meant, and
+the marketing side moved.
+
+```
+app/
+  (marketing)/     /  ·  /waitlist  ·  /privacy      + WaitlistProvider
+  (customer)/      /discover and the 24 customer routes
+  business/  staff/  auth/  account/
+  layout.tsx       the ONE root layout: html, body, Inter, skip link, Toaster
+  globals.css      product tokens, and it imports:
+  marketing-tokens.css
+components/
+  marketing/       the 32 marketing components (its own ui/button.tsx lives here)
+  customer/ owner/ staff/ ui/ auth/
+lib/
+  marketing/       content.ts salons.ts search.ts waitlist.ts heading.ts utils.ts
+  …                everything else
 ```
 
-## Why there is no npm workspace
+Two files exist twice on purpose, because they are genuinely different things:
+`components/marketing/ui/button.tsx` is the editorial button and
+`components/ui/button.tsx` is the product one; `lib/marketing/utils.ts` has a
+dependency-free `cn` while `lib/utils.ts` wraps `twMerge`. Neither pair should be
+reconciled — see the note in `lib/utils.ts` for why the product one cannot simply
+be used everywhere.
 
-Deliberate, and the reason is deployment. The marketing site builds with its
-**root directory set to `landing_page`**, which means the platform runs
-`npm install` and `npm run build` inside that directory and never sees the
-repository root. A hoisted root `node_modules` and a single root lockfile would
-make the build depend on files outside the directory it is told to build from —
-the one thing a per-app root directory setting is meant to rule out.
+### The stylesheets
 
-So each app keeps the lockfile it already had, and the two cannot conflict
-because they never meet. The cost is that a shared dependency is installed twice
-and the two can drift apart in version; both are on Next 16.2.12 and React
-19.2.4 today. Workspaces can be adopted later if that cost starts to bite — it is
-a change to make on purpose, with the deployment settings changed in the same
-breath, not a default to inherit.
+`app/globals.css` is the product system, ported from `../tho/app/lib/ui/tokens.dart`.
+It imports `app/marketing-tokens.css`, which is the editorial layer.
 
-`landing_page/netlify.toml` lives inside the app rather than at the root for the
-same reason: its `publish = ".next"` is resolved relative to the configured base
-directory.
+The two agreed on **33 of the 43 tokens they both declared**, so those were
+dropped from the marketing file during the merge rather than duplicated. What
+genuinely conflicted was the display scale — a marketing headline clamp and a
+19px product section title are different *sizes*, not one value in two flavours —
+so the marketing three are `--text-editorial-{xl,lg,md}` now. `--color-star` was
+the one same-role collision and the product value won.
 
-## History
+The rule for adding a token is in `AGENTS.md`: override a shared name only when
+both systems mean the same *role* and differ only in *value*.
 
-This repository **is** the former `chubu-tech/landing_dashboard`, renamed. Its
-twelve commits are untouched and their SHAs are unchanged — `0597abd`, the
-initial landing page commit, still resolves. The landing page's files moved into
-`landing_page/` in one commit that changed no content: 64 files, 0 insertions, 0
-deletions, every blob hash identical.
+## Deployment
 
-`tho_web` was imported from `chubu-tech/tho_web` with its nineteen commits
-rewritten to sit under `tho_web/`, so both of these work:
+Vercel, with the repository root as the root directory — there is no monorepo and
+no workspace. `netlify.toml` is also present and pins Node 22 plus the Associated
+Domains content type; `next.config.ts` carries the same header rule for platforms
+that serve `public/` through Next.
 
-```bash
-git log -- tho_web/lib/hours.ts        # its real history, not just the import
-git blame tho_web/lib/hours.ts         # real authors, real dates
-```
+Environment variables are in `.env.example`. One Supabase pair serves both halves.
 
-The two halves are asymmetric on purpose. `tho_web`'s commits were rewritten and
-so have new SHAs; the landing page's were **not**, because rewriting them would
-change every SHA in a repository that is already pushed and already deployed, and
-would need a force-push. The landing page's own history is reached with
-`--follow`, which traverses the move:
+## Where the product's rules are written down
 
-```bash
-git log --follow -- landing_page/app/page.tsx
-```
+`AGENTS.md` is the long-form record — the account model, the queue's two routes,
+plan gating, the OR-policy trap that has bitten seven times, the `payments` sign
+convention, session timeout, and what live data actually looks like. Read it
+before changing behaviour. `PARITY.md` is the audit against the Flutter app.
 
-`chubu-tech/tho_web` is deliberately left in place and unmodified. Nothing here
-depends on deleting it.
-
-### One quirk worth knowing
-
-`tho_web/`'s files were re-checked-out during the import, so on Windows with
-`core.autocrlf=true` they now have CRLF line endings while `landing_page/`'s have
-LF. Committed content is identical either way — git stores LF — and `git status`
-is clean. It is the state a fresh clone produces on such a machine. There is
-deliberately no root `.gitattributes` pinning this: adding one would renormalise
-one half of the tree and produce a large diff that says nothing.
+`../tho` is upstream for product behaviour, tokens and copy. Mirror it; never the
+reverse.
