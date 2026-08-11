@@ -1,0 +1,37 @@
+# Root-level ignores only.
+#
+# Every pattern here is deliberately anchored with a leading `/` so it matches at
+# the repository root and nowhere else. That is the whole design of this file:
+# `landing_page/.gitignore` and `tho_web/.gitignore` are unchanged from when each
+# project was its own repository, and their patterns are already rooted
+# (`/node_modules`, `/.next/`, `/out/`) — which git resolves against the directory
+# containing the `.gitignore`, not the repository root. So they already cover
+# `landing_page/node_modules` and `tho_web/.next` correctly.
+#
+# An unanchored pattern here would apply recursively and could shadow a negation
+# in one of those files — `!.env.example`, which both rely on so a fresh clone has
+# a template to copy. Anchoring keeps the three files from interacting at all.
+
+# A root install, if anyone ever runs one. There is no npm workspace here (see
+# README) so this should stay empty in normal use.
+/node_modules
+/package-lock.json
+
+# Deploy CLI scratch, if either is ever linked from the repo root rather than
+# from an app directory.
+/.vercel
+/.netlify
+
+# Env files never belong at the root — each app owns its own, and each app's
+# .gitignore already permits its own .env.example.
+/.env*
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+/.idea/
+*.swp
+
+# The migration safety copies, if they are ever moved inside the repo. They hold
+# a full mirror of both projects and must never be committed.
+/_migration_backup/

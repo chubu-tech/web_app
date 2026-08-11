@@ -1,0 +1,21 @@
+{
+  "name": "web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Bhutan Salons web monorepo — the marketing site and the Tho web app, side by side.",
+  "scripts": {
+    "dev:landing": "cd landing_page && npm run dev",
+    "dev:app": "cd tho_web && npm run dev",
+    "build:landing": "cd landing_page && npm run build",
+    "build:app": "cd tho_web && npm run build",
+    "lint:landing": "cd landing_page && npm run lint",
+    "lint:app": "cd tho_web && npm run lint",
+    "test:app": "cd tho_web && npm run test",
+    "install:landing": "cd landing_page && npm install",
+    "install:app": "cd tho_web && npm install",
+    "install:all": "npm run install:landing && npm run install:app"
+  },
+  "engines": {
+    "node": ">=20.9"
+  }
+}
