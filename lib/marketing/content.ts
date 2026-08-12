@@ -34,8 +34,9 @@ export const brand = {
    * page title, the OG image, the JSON-LD and the privacy policy all moved
    * together. Only `waitlist.back` had it hardcoded, and that is fixed too.
    *
-   * `domain` and `supportEmail` deliberately did NOT change: bhutansalons.com is
-   * the domain that is actually registered and serving.
+   * `domain` deliberately did NOT change: bhutansalons.com is the domain that is
+   * actually registered and serving. (`supportEmail` was in that sentence too, and has
+   * since changed for its own reason — see the note on it below.)
    */
   name: "THO",
   /**
@@ -75,8 +76,28 @@ export const brand = {
    * locally rather than relying on the start order.
    */
   adminUrl: (process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3002").replace(/\/+$/, ""),
-  supportEmail: "hello@bhutansalons.com",
-  whatsapp: "+975 17 00 00 00",
+  /**
+   * The mailbox on the footer, in the Organization JSON-LD, and now the same address
+   * `legal.contactEmail` uses.
+   *
+   * It was `hello@bhutansalons.com`, which **did not exist** — nobody read it, and the
+   * note on `legal.contactEmail` said so and kept a second address for the one thing that
+   * legally has to arrive (account deletion). One real mailbox is better than a branded
+   * one nobody opens: a support address that bounces is worse than a personal one that is
+   * read. Point both at a role address when there is a role address to point at, and they
+   * are already one constant apart.
+   */
+  supportEmail: "chemsbhai@gmail.com",
+  /**
+   * **A real number now**, replacing the `+975 17 00 00 00` placeholder. Two things read
+   * it, so it had to be a form both accept: the footer's phone row (`tel:`) and the
+   * WhatsApp icon in the same footer, which strips to digits for `wa.me/97517716523`.
+   *
+   * Kept in the international form the placeholder used, so those two derivations stay
+   * correct — WhatsApp will not resolve a bare local number. The digits are 17716523; the
+   * spacing is display only.
+   */
+  whatsapp: "+975 17 71 65 23",
   /** Dzongkha greeting, romanised so it renders on every device. */
   greeting: "Kuzuzangpo la",
   cities: ["Thimphu", "Paro", "Phuentsholing"],
@@ -88,8 +109,10 @@ export const brand = {
   /**
    * Social profiles, for the footer's Follow us row.
    *
-   * **WhatsApp is the only real one.** It is derived from `whatsapp` above, which
-   * is itself a placeholder number (+975 17 00 00 00) — check it before launch.
+   * **WhatsApp is the only real one, and it is now genuinely real** — derived from
+   * `whatsapp` above, which used to be the placeholder +975 17 00 00 00 this note told
+   * you to check before launch. It has been checked; it is a live number.
+   *
    * The other three have no account yet: paste the profile URLs here and the icons
    * point at them with no other edit. Until then they fall back to the site root,
    * which is a harmless destination rather than a 404.
@@ -330,6 +353,51 @@ export const forSalons = {
  * different copy: `hero.freeNote`, the `customer` panel below (Nu 0, forever), the first
  * FAQ answer and the download band. None of those changed and none of them should — see
  * the "Say who pays" rule in `AGENTS.md`.
+ *
+ * ## The feature lists mirror the entitlements gate, not a wish list
+ *
+ * Every bullet below is a capability that exists and is gated at the tier it is listed
+ * under. The tier split is `../tho/app/lib/data/entitlements.dart` (ported verbatim as
+ * `lib/entitlements.ts`), which is the only thing that decides what a plan unlocks;
+ * `plans_config.dart` is the app's own rendering of the same three cards. Anything a
+ * salon cannot actually do at the tier it is sold under does not belong here — a price
+ * list is the one place on this page where a wrong claim is a refund conversation, and
+ * the plan is flipped by an operator out-of-band, so there is no refund path.
+ *
+ * **Two bullets were removed as unimplemented**, both from Pro, and both were flagged by
+ * the app's own pre-launch audit (`../tho/docs/launch/2026-08-06-prelaunch-audit-findings.md`):
+ *
+ * - *"Shown higher in search"* — finding **A3-04**, filed as a truthfulness problem
+ *   rather than a feature gap. `Feature.priorityPlacement` is read by **no code in either
+ *   client**: `recommendations.dart`'s `_score` has no plan term and there is no ranking
+ *   code in `supabase/` at all, so a Pro salon ranks identically to a Basic one. Put the
+ *   bullet back only when the recommender actually scores the plan.
+ * - *"Deposits & no-show cover"* — the deposit half is real (`record_payment`, Pro-gated,
+ *   with kinds `deposit | balance | full | refund`) and is now stated as what it is. The
+ *   **no-show cover half is not built**: `businesses.late_fee_amount` exists with a
+ *   default of 0, is not in the owner-updatable column grant, and is referenced by no
+ *   function in the schema. Nothing charges anybody for a no-show.
+ *
+ * **Three implemented capabilities were added**, each verified against its gate rather
+ * than inferred from a plan card: offers (`offers/offers_screen.dart` carries no plan
+ * check at all, so it is a Basic feature), rebooking nudges
+ * (`enqueue_rebooking_nudges` filters `plan in ('growth','pro')`) and style selection at
+ * booking (`set_booking_hairstyle` is Pro-gated in SQL and `time_step.dart` passes
+ * `offerStyles: entitlements.has(Feature.stylePicker)`). The last one is a Pro perk the
+ * app's own card omits.
+ *
+ * Two things are deliberately NOT claimed, and both are traps:
+ *
+ * - **The salon's opening hours.** The Flutter app only ever *reads* `business_hours`
+ *   (`Api.businessHours` is a select; there is no writer), so an owner cannot edit them
+ *   in the app. `tho_web` has an editor. What both clients can edit is a **stylist's**
+ *   working hours, which is also the table that actually gates bookings — hence "who
+ *   works when" rather than "your opening hours".
+ * - **The five hidden analytics cards.** New vs returning, Top services, Staff
+ *   leaderboard, Completion & no-shows and Peak hours are commented out of
+ *   `insights_tab.dart` at the owner's request (THO-55) — working features, not dead
+ *   code, and `tho_web` draws all nine. Growth's bullet therefore names only what the app
+ *   renders today: the KPI figures, the revenue trend and the monthly goal.
  */
 export const pricing = {
   eyebrow: "Who pays what",
@@ -341,7 +409,19 @@ export const pricing = {
     label: "If you're booking a haircut",
     price: "Nu 0",
     period: "forever",
-    body: "Everything a customer needs is free — searching salons, booking a time, joining the walk-in queue and getting reminders.",
+    /*
+      "and getting reminders" was removed from the end of this sentence. Reminders are a
+      **Growth** feature — `enqueue_booking_reminders` returns early below that tier — and
+      13 of the 16 live salons are Basic, so for most customers no reminder is ever sent.
+      The app's own audit files that as A4-01: the per-booking "Remind me" toggle is shown
+      at every salon and only enqueues at some. Listing it among the things that are free
+      for customers made a salon's plan read as a customer entitlement.
+
+      What is left is unconditional at every tier: search, booking and the queue. The same
+      claim is still made in `faq[0]` and in `twoWays.options[0].points` — fix those
+      together with this one, or not at all, so the page does not contradict itself.
+    */
+    body: "Everything a customer needs is free — searching salons, booking a time and joining the walk-in queue.",
     points: ["No booking fee", "No card needed", "No charge at the door"],
     cta: { label: "Get the app", href: "#download" },
   },
@@ -352,11 +432,24 @@ export const pricing = {
       price: "Nu 399",
       period: "/mo",
       tagline: "Get found and take bookings.",
+      /*
+        Nothing here is gated: `Entitlements` unlocks the empty set at Basic, so every
+        line is a capability an ungated salon has today. Four were missing from this card
+        and are real — the service list and prices, a stylist's working hours, the message
+        thread with a customer, and offers, which carry no plan check anywhere.
+
+        "1 stylist" is enforced by the `staff_members_basic_cap` trigger
+        (`20260807000004`), not just by the Dart cap — it raises P0001 on an insert that
+        lands active or an update that flips inactive → active.
+      */
       features: [
-        "Listed in the app",
-        "Online bookings",
-        "Today's bookings by the hour",
-        "Your profile, photos & reviews",
+        "Listed in the app, found by customers nearby",
+        "Online bookings, confirmed on the spot",
+        "Today's bookings, hour by hour",
+        "Today's numbers at a glance",
+        "Your services, prices and who works when",
+        "Your profile, photos and reviews",
+        "Message customers and post offers",
         "1 stylist",
       ],
       cta: "Start with Basic",
@@ -367,16 +460,30 @@ export const pricing = {
       price: "Nu 699",
       period: "/mo",
       tagline: "For a full team and a full book.",
+      /*
+        The eight `_growthAdds` entitlements, plus rebooking nudges — which is a ninth
+        Growth capability with no `Feature` of its own, gated directly in SQL
+        (`enqueue_rebooking_nudges` filters `plan in ('growth','pro')`).
+
+        Seven of the eight are enforced server-side. `weekView` is the exception and
+        structurally so: it reads the owner's own bookings through RLS, so there is no RPC
+        to gate — a trivially bypassable perk, not a disclosure.
+
+        "your busiest hours" is gone from the last line: the peak-hours heatmap is one of
+        the five cards commented out of the app's Insights tab (THO-55). The three figures
+        named instead are what the app actually draws at Growth.
+      */
       features: [
         "Everything in Basic",
         "As many stylists as you like",
+        "The walk-in queue, joined by QR at your door",
         "Week view",
         "Reminders sent for you",
-        "The walk-in queue",
-        "Your customer list",
+        "Your customer list and visit history",
+        "Nudges that bring back customers who drift",
         "Sell products in the app",
         "Rewards for regulars",
-        "How your week and your busiest hours went",
+        "How the week went — bookings, takings, monthly goal",
       ],
       cta: "Choose Growth",
       featured: true,
@@ -386,11 +493,30 @@ export const pricing = {
       price: "Nu 1,499",
       period: "/mo",
       tagline: "For busy shops with a big team.",
+      /*
+        The three `_proAdds` entitlements that are real, split by what an owner actually
+        does with them. Every one raises P0001 below Pro in SQL, quoted from the
+        migrations: 'payroll requires Pro' (`set_staff_pay`, `payroll_report`), 'tax report
+        requires Pro' (`tax_estimate`), 'payments require Pro' (`record_payment`).
+
+        The customer's phone and WhatsApp sit under `Feature.deposits` rather than a
+        contact feature of their own — an odd bundling, but it is the live gate
+        (`client_detail_screen.dart:98`, `business_booking_detail_screen.dart:158`).
+
+        Style selection is `Feature.stylePicker`, added here because it is a real Pro perk
+        that the app's own card forgets to sell: `set_booking_hairstyle` is Pro-gated and
+        the customer's booking flow only offers the picker when the salon has it.
+
+        "Shown higher in search" was here and is not a feature — see the note on A3-04
+        above. Do not restore it without a plan term in the recommender.
+      */
       features: [
         "Everything in Growth",
-        "Shown higher in search",
-        "Staff pay & commissions",
-        "Deposits & no-show cover",
+        "Staff pay, commissions and payroll",
+        "A Bhutan income-tax estimate",
+        "Deposits and payments recorded on a booking",
+        "Call or WhatsApp a customer from their booking",
+        "Customers pick the exact style they want",
       ],
       cta: "Choose Pro",
       featured: false,
@@ -401,7 +527,18 @@ export const pricing = {
 export const faq = [
   {
     q: "Does it cost anything to book a haircut?",
-    a: "No — never. Searching, booking, joining the walk-in queue and getting reminders are all free for customers. There is no booking fee and nothing extra to pay at the salon. Salons are the ones who pay, from Nu 399 a month.",
+    /*
+      Reminders dropped from the list, for the reason spelled out on `pricing.customer`:
+      they are a Growth feature, so at a Basic salon — 13 of the 16 live ones — none is
+      ever sent, and naming them here made a salon's plan read as a customer entitlement.
+      This answer and that panel carried the same sentence, so they had to change together
+      or the page would answer its own pricing section.
+
+      The "who pays" answer itself is untouched, and still lands in all four places
+      `AGENTS.md` requires: the hero chip, this answer, the pricing lead panel and the
+      download band.
+    */
+    a: "No — never. Searching salons, booking a time and joining the walk-in queue are all free for customers. There is no booking fee and nothing extra to pay at the salon. Salons are the ones who pay, from Nu 399 a month.",
   },
   {
     q: "Do I need the app to join a queue?",
@@ -539,18 +676,40 @@ export const footer = {
   cities: ["Thimphu", "Paro", "Phuentsholing"],
 
   /**
-   * Sits in the bottom bar, not a column: these are legal links, not navigation.
+   * The Legal section — a titled column in the footer's link grid, where it used to be
+   * one row of the bottom bar.
    *
-   * **A blank `href` is not rendered.** Only `/privacy` exists as a route today, so
-   * Terms and Cookie would be a pair of 404s in the one place a visitor goes looking
-   * for a commitment. Same self-switching mechanism as `brand.stores`: build the
-   * page, paste the path, and the link appears with no other edit.
+   * **It could only become a section because all four routes now exist and all four are
+   * public.** Terms and Cookie sat here with empty hrefs when `/privacy` was the only one
+   * built; `/help`, `/legal/terms` and `/legal/content-policy` have since shipped.
+   *
+   * Each was checked **anonymously** before being linked — 200, with its own `<h1>`, not a
+   * redirect to `/sign-in` and not the 404 boundary. That check is the whole reason this
+   * is safe rather than a guess: three of the four live under `app/(customer)/`, whose
+   * layout calls `requireLiveAccount()`, and a name like that reads as "members only". It
+   * is not — it turns away a *deleted or suspended* account and nothing else, so a visitor
+   * with no session passes straight through. Re-run the check if that helper ever grows a
+   * third redirect, because a footer is exactly where somebody goes looking for a policy
+   * and a sign-in wall there is worse than an absence.
+   *
+   * **A blank `href` is still dropped by the filter in `site-footer.tsx`.** That stays: it
+   * is what makes adding a fifth policy a one-line paste. Cookie Policy is gone rather
+   * than kept blank — there is no route for it, and an entry that renders nowhere is a
+   * worse record of that than no entry.
+   *
+   * Help is not a legal document, and is grouped here on purpose: it is the other thing a
+   * reader scrolls to the bottom for, and it is a page of links into the product rather
+   * than a support address (see the note on `app/(customer)/help/page.tsx`).
    */
-  legalLinks: [
-    { label: "Privacy Policy", href: "/privacy" },
-    { label: "Terms of Service", href: "" },
-    { label: "Cookie Policy", href: "" },
-  ],
+  legal: {
+    title: "Legal",
+    links: [
+      { label: "Help", href: "/help" },
+      { label: "Terms of Service", href: "/legal/terms" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Content policy", href: "/legal/content-policy" },
+    ],
+  },
   rights: "All rights reserved.",
 } as const;
 
@@ -560,10 +719,12 @@ export const footer = {
  * Both app stores read `/privacy`, and every value here is a commitment made to
  * a regulator and to users — not marketing copy. Change them only deliberately.
  *
- * `contactEmail` is deliberately NOT `brand.supportEmail`: account-deletion
- * requests legally land at this address, so it has to be a mailbox that is
- * actually read. `hello@bhutansalons.com` does not exist yet; when it does and
- * someone monitors it, point this there and delete this paragraph.
+ * `contactEmail` used to be deliberately different from `brand.supportEmail`, because
+ * account-deletion requests legally land here and so this has to be a mailbox somebody
+ * actually reads — and `hello@bhutansalons.com` was not one. **The two now agree**, since
+ * `brand.supportEmail` is this same address. Keep them as two constants anyway: the day a
+ * monitored role address exists, the support inbox and the address on a legal obligation
+ * are the kind of thing that should be able to move separately.
  */
 export const legal = {
   operator: "Chojay Wangchuk",

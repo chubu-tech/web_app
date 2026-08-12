@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { FollowButton } from "@/components/customer/follow-button";
@@ -40,7 +41,21 @@ import type { Review } from "@/lib/types/salon";
  * null. That one live row is the test case.
  */
 
-async function load(id: string) {
+/**
+ * **`cache`d because `generateMetadata` and the page both call it, in the same request.**
+ *
+ * Next runs the two in one pass, so an unmemoised loader here is not a tidiness problem —
+ * it is this route's six reads run **twice**: the staff row, the business row, and the
+ * four in the `Promise.all`. Wrapping it is the same correction `getAccount` and
+ * `createClient` already carry, for the same reason and with the same measured cost
+ * behind it — see *Per-request reads must be memoised* in `AGENTS.md`.
+ *
+ * The `.catch(() => null)` stays at the **metadata** call site rather than moving in here.
+ * A failed read must still take the page to its error boundary; what it must not do is
+ * take it down from inside `generateMetadata`, where the only honest fallback is a
+ * generic title.
+ */
+const load = cache(async (id: string) => {
   const supabase = await createClient();
 
   const staff = await fetchStaffById(supabase, id);
@@ -58,7 +73,7 @@ async function load(id: string) {
   ]);
 
   return { staff, business, reviews, photos, followers, following };
-}
+});
 
 export async function generateMetadata({
   params,

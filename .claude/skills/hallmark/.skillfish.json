@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "hallmark",
+  "owner": "nexu-io",
+  "repo": "open-design",
+  "path": "plugins/community/hallmark",
+  "branch": "main",
+  "sha": "aaf96ea0d406fec8fa715e4c09edc092c1ccfb74",
+  "source": "manual"
+}

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { FavouriteButton } from "@/components/customer/favourite-button";
@@ -83,14 +84,32 @@ import { whatsappUrl } from "@/lib/whatsapp";
  * which is what a shared link or a QR scan gets.
  */
 
+/**
+ * The salon row, read **once** per request however many callers ask for it.
+ *
+ * `generateMetadata` and the page body both need it and Next runs them in the same
+ * request, so without `cache` this route — the most-travelled one in the product — pays
+ * for `fetchBusinessById` twice on every visit. The two-waves comment below is about not
+ * paying for round trips serially; this is the same argument about not paying for one
+ * twice. Same correction `getAccount` and `createClient` already carry.
+ *
+ * It deliberately does **not** swallow errors. The page's own call is bare, so a failed
+ * read reaches the error boundary rather than rendering as "no such salon" — the rule in
+ * *A failed read must never render as empty*. `generateMetadata` keeps its own `.catch`,
+ * because a title is the one thing that should degrade rather than throw.
+ */
+const loadBusiness = cache(async (id: string) => {
+  const supabase = await createClient();
+  return fetchBusinessById(supabase, id);
+});
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const supabase = await createClient();
-  const business = await fetchBusinessById(supabase, id).catch(() => null);
+  const business = await loadBusiness(id).catch(() => null);
   if (!business) return { title: "Salon" };
 
   const description =
@@ -175,7 +194,9 @@ export default async function SalonPage({
     account,
     loyaltyProgram,
   ] = await Promise.all([
-    fetchBusinessById(supabase, id),
+    // `loadBusiness`, not a bare fetch: `generateMetadata` has already asked for this row
+    // in this same request, and `cache` is what stops the two being two queries.
+    loadBusiness(id),
     fetchServices(supabase, id),
     fetchStaff(supabase, id),
     fetchBusinessHours(supabase, id),

@@ -179,7 +179,11 @@ function WaitlistDialog({
         exit={reduced ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.98 }}
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         className={[
-          "bg-canvas relative w-full max-w-lg p-6 shadow-2xl sm:p-9",
+          // 32rem written out. `max-w-lg` resolves to `--spacing-lg` — 24px — which
+          // is the same bug that made every `Sheet` in the product a sliver; see
+          // `components/ui/sheet.tsx`. Here it left the waitlist modal 24px wide
+          // with its heading, field and button spilling out beside it.
+          "bg-canvas relative w-full max-w-[32rem] p-6 shadow-2xl sm:p-9",
           // A sheet on a phone, a card on everything else — the modal is the
           // full width of a 390px screen either way, so squaring off the
           // bottom corners is the honest shape there.

@@ -70,7 +70,9 @@ export function DownloadBand() {
             />
 
             <Reveal delay={0.12}>
-              <p className="mt-5 max-w-lg text-body-lg leading-relaxed text-white/80">
+              {/* 32rem, not `max-w-lg` — that resolves to `--spacing-lg`, 24px.
+                  See `components/ui/sheet.tsx`. */}
+              <p className="mt-5 max-w-[32rem] text-body-lg leading-relaxed text-white/80">
                 {download.body}
               </p>
             </Reveal>
@@ -83,7 +85,22 @@ export function DownloadBand() {
                     instead of it — a laptop reader taps, a phone reader scans,
                     and neither should have to switch device. */}
                 <div className="flex items-center gap-4 rounded-2xl bg-white/10 p-3 ring-1 ring-white/20 ring-inset backdrop-blur-md">
-                  <div className="rounded-xl bg-white p-2">
+                  {/*
+                    Square corners, and `rounded-none` rather than dropping the class —
+                    stating the zero is what stops the next reader "restoring" a radius.
+
+                    It was `rounded-xl`, which in this repo is `--radius-xl` — **32px**,
+                    not Tailwind's 12px. On an 80px tile that is a deep bite out of three
+                    corners, and those are exactly where a QR's finder patterns sit. The
+                    white square here *is* the quiet zone (`qr-code.tsx` bakes `margin: 0`
+                    into the SVG precisely so this element owns it), so rounding it was
+                    eating the margin a camera needs to lock on. Zero is the correct value
+                    for a scannable code, not only the requested one.
+
+                    The logo lockups elsewhere keep `rounded-xl` deliberately — this is a
+                    per-element change, not a token change.
+                  */}
+                  <div className="rounded-none bg-white p-2">
                     <QrCode
                       value={QR_TARGET}
                       label={`QR code — scan to ${waitlist.cta.toLowerCase()} for ${brand.appName}`}

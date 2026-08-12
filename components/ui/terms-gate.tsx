@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { acceptTerms } from "@/lib/api/moderation";
+import { acceptTermsErrorMessage } from "@/lib/api/moderation-errors";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -59,18 +60,7 @@ export function TermsGate({
       onAccepted();
       onClose();
     } catch (caught) {
-      const code =
-        typeof caught === "object" && caught !== null && "code" in caught
-          ? String((caught as { code: unknown }).code)
-          : "";
-      // `42501` is the guest refusal — `private.is_real_user()`. The guest wall is the
-      // right surface for that, and it is already in front of both callers, so reaching
-      // it here means something upstream let a guest through.
-      setError(
-        code === "42501"
-          ? "Create an account first, then you can post."
-          : "Couldn't save that. Please try again.",
-      );
+      setError(acceptTermsErrorMessage(caught));
       setBusy(false);
     }
   }

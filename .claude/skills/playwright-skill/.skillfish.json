@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "playwright-skill",
+  "owner": "microck",
+  "repo": "ordinary-claude-skills",
+  "path": "skills_all/playwright-skill",
+  "branch": "main",
+  "sha": "372c48cce77f90a407f975935776e5d02cb5aefc",
+  "source": "manual"
+}

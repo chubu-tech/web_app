@@ -32,7 +32,9 @@ export function Pricing() {
               aria-hidden
             />
             <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-              <div className="max-w-xl">
+              {/* 36rem, not `max-w-xl` — that resolves to `--spacing-xl`, 32px.
+                  See `components/ui/sheet.tsx`. */}
+              <div className="max-w-[36rem]">
                 <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-caption-sm font-semibold tracking-[0.14em] uppercase ring-1 ring-white/20 ring-inset">
                   <Smartphone className="size-3.5" strokeWidth={2.2} aria-hidden />
                   {pricing.customer.label}

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -31,14 +32,26 @@ import type { QueueEntry } from "@/lib/types/queue";
  * referrer heuristic that would break real scans.
  */
 
+/**
+ * One read of the salon row per request, shared with `generateMetadata` below.
+ *
+ * A poster in a shop is scanned by somebody standing at the counter, so this route's
+ * latency is the one a customer feels most directly — and reading the same row twice in
+ * one request is the cheapest thing here to stop doing. See *Per-request reads must be
+ * memoised* in `AGENTS.md`; `getAccount` and `createClient` already carry this.
+ */
+const loadBusiness = cache(async (id: string) => {
+  const supabase = await createClient();
+  return fetchBusinessById(supabase, id);
+});
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const supabase = await createClient();
-  const business = await fetchBusinessById(supabase, id).catch(() => null);
+  const business = await loadBusiness(id).catch(() => null);
   return {
     title: business ? `Join the queue at ${business.name}` : "Join the queue",
     // A QR poster is scanned in a shop, not indexed. Nothing here should rank.
@@ -54,7 +67,7 @@ export default async function JoinQueuePage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const business = await fetchBusinessById(supabase, id);
+  const business = await loadBusiness(id);
   if (!business) notFound();
 
   const account = await getAccount();

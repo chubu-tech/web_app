@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "webapp-testing",
+  "owner": "spuneiartur",
+  "repo": "claude-agent-specs",
+  "path": "next-js/skills/skills/webapp-testing",
+  "branch": "main",
+  "sha": "f77d7161a0f25915c92f80238862dd2d59d7a9fe",
+  "source": "manual"
+}

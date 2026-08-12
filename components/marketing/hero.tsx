@@ -151,7 +151,12 @@ export function Hero() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.9, delay: 0.85, ease: EASE }}
-                    className="mt-6 max-w-xl text-body-lg leading-relaxed text-white/85"
+                    /* 36rem written out, not `max-w-xl`. `globals.css` declares
+                       `--spacing-xl: 32px` and a named width resolves against the
+                       spacing namespace before `--container-*`, so `max-w-xl`
+                       compiled to `max-width: 32px` and broke this sentence to one
+                       word per line over the photograph. See `components/ui/sheet.tsx`. */
+                    className="mt-6 max-w-[36rem] text-body-lg leading-relaxed text-white/85"
                   >
                     {hero.purpose}
                   </motion.p>
@@ -209,7 +214,10 @@ function QueueCard() {
       initial={{ opacity: 0, y: 30, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 1, delay: 1.15, ease: EASE }}
-      className="w-full max-w-sm"
+      /* 24rem, not `max-w-sm` — that resolves to `--spacing-sm`, 8px, which
+         collapsed this card to a sliver at the right edge of the hero with its
+         own text spilling out beside it. See `components/ui/sheet.tsx`. */
+      className="w-full max-w-[24rem]"
     >
       <motion.div
         className="rounded-slab bg-black/35 p-5 ring-1 ring-white/20 ring-inset backdrop-blur-xl"

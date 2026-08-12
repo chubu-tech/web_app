@@ -37,7 +37,10 @@ export function TwoWays() {
             return (
               <Reveal asChild key={option.tag}>
                 <article className="group flex flex-col items-center text-center">
-                  <Tilt className="w-full max-w-sm">
+                  {/* 24rem written out, not `max-w-sm`: a named width resolves
+                      against `--spacing-*` first, so `sm` meant 8px and the arch
+                      photo was a sliver. See `components/ui/sheet.tsx`. */}
+                  <Tilt className="w-full max-w-[24rem]">
                     <Curtain className="arch aspect-4/5 w-full overflow-hidden" delay={i * 0.1}>
                       <div className="absolute inset-0">
                         <HoverZoomImage
@@ -61,10 +64,10 @@ export function TwoWays() {
                     </Curtain>
                   </Tilt>
 
-                  <h3 className="text-ink mt-7 max-w-sm text-heading font-semibold">
+                  <h3 className="text-ink mt-7 max-w-[24rem] text-heading font-semibold">
                     {option.title}
                   </h3>
-                  <p className="text-body mt-3 max-w-md leading-relaxed">
+                  <p className="text-body mt-3 max-w-[28rem] leading-relaxed">
                     {option.body}
                   </p>
 

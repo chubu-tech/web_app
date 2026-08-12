@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "code-quality",
+  "owner": "technanimals",
+  "repo": "geekmidas-skills",
+  "path": ".cursor/skills/code-quality",
+  "branch": "main",
+  "sha": "85787205e60f85cd1f81f98824f594576e0015b3",
+  "source": "manual"
+}

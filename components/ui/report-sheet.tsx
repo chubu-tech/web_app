@@ -14,6 +14,7 @@ import {
   type ReportReason,
   type ReportTarget,
 } from "@/lib/api/moderation";
+import { reportErrorMessage } from "@/lib/api/moderation-errors";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -180,21 +181,3 @@ export function ReportSheet({
   );
 }
 
-/**
- * By `errcode`, never message text — the rule the rest of this repo follows.
- *
- * `42501` is a guest: reporting needs a real account. `P0002` means the thing has already
- * gone, which is not a failure worth alarming anyone about. `22023` covers an unknown
- * value or reporting yourself, both of which this UI prevents — so it reads as a bug
- * rather than as something the person can fix.
- */
-function reportErrorMessage(error: unknown): string {
-  const code =
-    typeof error === "object" && error !== null && "code" in error
-      ? String((error as { code: unknown }).code)
-      : "";
-
-  if (code === "42501") return "Create an account to report content.";
-  if (code === "P0002") return "That's already been removed.";
-  return "Couldn't send that report. Please try again.";
-}

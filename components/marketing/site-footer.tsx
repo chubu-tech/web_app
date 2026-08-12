@@ -18,11 +18,18 @@ import { WaitlistCta } from "./waitlist-cta";
  *
  * ## Four things here are decisions
  *
- * 1. **A blank `href` is not rendered.** `footer.legalLinks` carries Terms and
- *    Cookie with empty hrefs because those routes do not exist — only `/privacy`
- *    does. A footer is exactly where somebody goes looking for a policy, so a 404
- *    there is worse than an absence. Build the page, paste the path, and the link
- *    appears. Same mechanism as `brand.stores`.
+ * 1. **A blank `href` is not rendered**, and `footer.legal` no longer has one. Terms and
+ *    Cookie sat there with empty hrefs while `/privacy` was the only policy route built;
+ *    Help, Terms and Content policy have since shipped, so Legal is now a titled column
+ *    of four rather than a row in the bottom bar. The filter stays because it is what
+ *    makes the next policy a one-line paste — same mechanism as `brand.stores`.
+ *
+ *    **Three of the four live under `app/(customer)/`, whose layout calls
+ *    `requireLiveAccount()`, and all four were verified anonymously before being linked**
+ *    — 200 with their own `<h1>`. That helper only turns away a deleted or suspended
+ *    account, so a visitor with no session reads them fine. A footer is exactly where
+ *    somebody goes looking for a policy, so a sign-in wall there is as bad as the 404
+ *    this rule was written to prevent. Re-check if that helper grows another redirect.
  *
  * 2. **The signup is a button, not an inline form.** It was `WaitlistForm` with
  *    `tone="light"` and `stacked`; now it is `WaitlistCta`, so the column offers one
@@ -34,9 +41,10 @@ import { WaitlistCta } from "./waitlist-cta";
  *
  * 3. **The social row renders all four even though three have no URL yet.** They
  *    fall back to the site root rather than 404ing, and `brand.social` is the one
- *    place to paste real profiles. WhatsApp is live today and is derived from
- *    `brand.whatsapp` — which is itself still a placeholder number. The glyphs are
- *    sized here rather than defaulted in `social-icons.tsx`; that file says why.
+ *    place to paste real profiles. WhatsApp is derived from `brand.whatsapp`, which is
+ *    **a real number now** rather than the `+975 17 00 00 00` placeholder this note used
+ *    to warn about — so that icon and the phone row below both resolve to somewhere. The
+ *    glyphs are sized here rather than defaulted in `social-icons.tsx`; that file says why.
  *
  * 4. **`RevealGroup` wraps the columns**, so the four stagger as one gesture on
  *    entry instead of each firing its own observer. `Reveal` already collapses to
@@ -54,7 +62,7 @@ export function SiteFooter() {
     instagram: brand.social.instagram || "/",
   };
 
-  const legal = footer.legalLinks.filter((link) => link.href.length > 0);
+  const legalLinks = footer.legal.links.filter((link) => link.href.length > 0);
 
   return (
     <footer className="bg-obsidian text-white">
@@ -71,7 +79,7 @@ export function SiteFooter() {
           {/* 4 · 2 · 3 · 3. Contact needs the three because
               `hello@bhutansalons.com` is 22 characters and broke across two lines
               at a narrower span; the company column gives up the width because its
-              blurb is capped at `max-w-sm` anyway and was not using it. */}
+              blurb is capped at 24rem anyway and was not using it. */}
           <Reveal asChild className="sm:col-span-2 lg:col-span-4">
             <div>
               <span className="flex items-center gap-2.5">
@@ -92,7 +100,9 @@ export function SiteFooter() {
 
               <TextileRule className="mt-5 w-28" />
 
-              <p className="mt-5 max-w-sm text-ui leading-relaxed text-white/70">
+              {/* 24rem, not `max-w-sm` — that resolves to `--spacing-sm`, 8px.
+                  See `components/ui/sheet.tsx`. */}
+              <p className="mt-5 max-w-[24rem] text-ui leading-relaxed text-white/70">
                 {footer.blurb}
               </p>
 
@@ -133,29 +143,58 @@ export function SiteFooter() {
             </div>
           </Reveal>
 
-          {/* ── Quick links ───────────────────────────────────────────── */}
-          <Reveal asChild className="lg:col-span-2">
-            <nav aria-label={footer.quickLinks.title}>
-              <h2 className="text-caption-sm font-semibold tracking-[0.16em] text-white/60 uppercase">
-                {footer.quickLinks.title}
-              </h2>
-              <ul className="mt-5 flex flex-col gap-3">
-                {footer.quickLinks.links.map((link) => (
-                  <li key={link.href}>
-                    <FooterLink href={link.href}>{link.label}</FooterLink>
-                  </li>
-                ))}
-                {/* Sign in was the one off-site destination left here, and is removed
-                    until `../tho_web` is deployed — see `signIn` in `lib/content.ts`,
-                    which is also the restore. With it gone, every link in this footer is
-                    same-origin, so nothing here can strand a visitor on a host that is
-                    not serving.
+          {/* ── Quick links + Legal ────────────────────────────────────────
+              **Two stacked navs in one column, not a fifth column** — the same call the
+              Follow us row above already makes, and for the same arithmetic: at `lg` the
+              grid is twelve ~92px columns, all twelve are spoken for (4·2·3·3), and a
+              fifth would have to come out of Contact, which holds an email address, or
+              out of the signup, which holds a full-width button. Legal is four short
+              labels and costs nothing sitting under the five above it.
 
-                    "Admin portal" sat below it and is gone for a different reason: the
-                    operators' console is internal, and a public marketing footer is the
-                    wrong place to advertise the door to it. Operators reach it by URL. */}
-              </ul>
-            </nav>
+              Two `<nav>` elements rather than one list under a shared heading: these are
+              different kinds of destination — anchors down this page versus documents you
+              leave it for — so each needs its own accessible name. Putting Legal inside
+              the Quick links `<nav>` would have made one landmark labelled "Quick links"
+              that also contains the Terms. */}
+          <Reveal asChild className="lg:col-span-2">
+            <div>
+              <nav aria-label={footer.quickLinks.title}>
+                <h2 className="text-caption-sm font-semibold tracking-[0.16em] text-white/60 uppercase">
+                  {footer.quickLinks.title}
+                </h2>
+                <ul className="mt-5 flex flex-col gap-3">
+                  {footer.quickLinks.links.map((link) => (
+                    <li key={link.href}>
+                      <FooterLink href={link.href}>{link.label}</FooterLink>
+                    </li>
+                  ))}
+                  {/* Sign in was the one off-site destination left here, and is removed
+                      until `../tho_web` is deployed — see `signIn` in `lib/content.ts`,
+                      which is also the restore. With it gone, every link in this footer is
+                      same-origin, so nothing here can strand a visitor on a host that is
+                      not serving.
+
+                      "Admin portal" sat below it and is gone for a different reason: the
+                      operators' console is internal, and a public marketing footer is the
+                      wrong place to advertise the door to it. Operators reach it by URL. */}
+                </ul>
+              </nav>
+
+              {legalLinks.length > 0 ? (
+                <nav aria-label={footer.legal.title} className="mt-8">
+                  <h2 className="text-caption-sm font-semibold tracking-[0.16em] text-white/60 uppercase">
+                    {footer.legal.title}
+                  </h2>
+                  <ul className="mt-5 flex flex-col gap-3">
+                    {legalLinks.map((link) => (
+                      <li key={link.href}>
+                        <FooterLink href={link.href}>{link.label}</FooterLink>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              ) : null}
+            </div>
           </Reveal>
 
           {/* ── Contact ───────────────────────────────────────────────── */}
@@ -221,27 +260,19 @@ export function SiteFooter() {
           </Reveal>
         </RevealGroup>
 
-        {/* ── Bottom bar ──────────────────────────────────────────────── */}
+        {/* ── Bottom bar ──────────────────────────────────────────────────
+            Copyright only. The legal links were here as a right-aligned row and moved
+            up into their own titled column, because that is where a reader looks for a
+            policy and because a bottom bar is not a place four items read as a list.
+
+            They are **not in both places**: with Terms and Content policy now built,
+            keeping the row would have printed Privacy Policy twice in one footer, a few
+            inches apart. `justify-between` is kept for the single child — it pins the
+            line left at `sm` and up, which is where it was. */}
         <div className="mt-16 flex flex-col gap-4 border-t border-white/10 py-7 text-caption text-white/55 sm:flex-row sm:items-center sm:justify-between">
           <span>
             © {year} {brand.name}. {footer.rights}
           </span>
-          {legal.length > 0 ? (
-            <nav aria-label="Legal">
-              <ul className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
-                {legal.map((link) => (
-                  <li key={link.href}>
-                    <a
-                      href={link.href}
-                      className="transition-colors duration-200 hover:text-white"
-                    >
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ) : null}
         </div>
       </Container>
     </footer>
@@ -269,7 +300,7 @@ function FooterLink({
 /**
  * A labelled contact row. The label is visible rather than `sr-only` because
  * "Email" above an address is useful to everybody, not only a screen reader —
- * and a bare `+975 17 00 00 00` under a bare address reads as one block of text.
+ * and a bare `+975 17 71 65 23` under a bare address reads as one block of text.
  */
 function ContactRow({
   icon,

@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "design-reviewer",
+  "owner": "mderk",
+  "repo": "memento",
+  "path": "memento/static/skills/design-reviewer",
+  "branch": "main",
+  "sha": "986f6e1c811232f08bdd79ddbc321a5dcbe032ef",
+  "source": "manual"
+}

@@ -8,6 +8,7 @@ import { Icons, IconSize } from "@/components/ui/icons";
 import { ReportSheet } from "@/components/ui/report-sheet";
 import { Sheet } from "@/components/ui/sheet";
 import { blockUser } from "@/lib/api/moderation";
+import { blockErrorMessage } from "@/lib/api/moderation-errors";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -205,20 +206,3 @@ function MenuRow({
   );
 }
 
-/**
- * By `errcode`, as everywhere else.
- *
- * `42501` is a guest, which cannot happen from a thread — messaging already requires a real
- * account — but is the RPC's own refusal and so is stated rather than guessed at. `P0002`
- * means the account has gone, in which case there is nothing left to block.
- */
-function blockErrorMessage(error: unknown, name: string): string {
-  const code =
-    typeof error === "object" && error !== null && "code" in error
-      ? String((error as { code: unknown }).code)
-      : "";
-
-  if (code === "42501") return "Create an account to block someone.";
-  if (code === "P0002") return "That account no longer exists.";
-  return `Couldn't block ${name}. Check your connection and try again.`;
-}
