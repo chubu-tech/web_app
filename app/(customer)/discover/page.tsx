@@ -14,7 +14,7 @@ import { fetchMyBookings } from "@/lib/api/booking";
 import { fetchMyFavouriteIds } from "@/lib/api/favourites";
 import { fetchLiveOffers } from "@/lib/api/salon";
 import { fetchProducts } from "@/lib/api/shop";
-import { homeForRole } from "@/lib/auth";
+import { CUSTOMER_HOME, homeForRole } from "@/lib/auth";
 import { priceBounds, productFilterFromParams } from "@/lib/product-filter";
 import { fromParams, hasPrice, serviceGenders } from "@/lib/salon-filters";
 import { getAccount } from "@/lib/session";
@@ -41,8 +41,8 @@ import { createClient } from "@/lib/supabase/server";
  * needs no loading state.
  *
  * **This is the one customer route that turns an owner away**, and only because it is
- * the one an owner is *sent* to: `/` is where a bare sign-in, a bookmark and the root
- * of the site all land. Every other customer route stays open to them on purpose — an
+ * the one an owner arrives at by accident: a bookmark from before they were an owner, or
+ * the marketing site's way into the product. Every other customer route stays open to them on purpose — an
  * owner's own `/salon/<id>` page and their own printed `/q/<id>` QR are pages any
  * anonymous visitor can already read, and bouncing them off those would be a
  * regression with no security value. The nav simply never offers the way in.
@@ -56,12 +56,18 @@ import { createClient } from "@/lib/supabase/server";
  * without a canonical those variants compete with each other and dilute the one page
  * that should rank for "book a salon in Bhutan".
  *
- * Pointing it at bare `/` is deliberate and is the right call *because* the filters are
- * server-side: every variant is a subset of this page's own list, not a different
+ * Pointing it at the bare route is deliberate and is the right call *because* the filters
+ * are server-side: every variant is a subset of this page's own list, not a different
  * document. `metadataBase` in the root layout is what makes it absolute.
+ *
+ * **It is `/discover`, not `/`.** This said `/` while Discover lived there; after the
+ * marketing merge that claim stopped being true in the worst possible direction — it told
+ * crawlers this page was a duplicate of the marketing landing page, which is a wholly
+ * different document, and invited them to drop the one page meant to rank for
+ * "book a salon in Bhutan" in favour of it.
  */
 export const metadata: Metadata = {
-  alternates: { canonical: "/" },
+  alternates: { canonical: CUSTOMER_HOME },
 };
 export default async function DiscoverPage({
   searchParams,
@@ -73,7 +79,10 @@ export default async function DiscoverPage({
   const account = await getAccount();
   if (account.state === "registered") {
     const home = homeForRole(account.role);
-    if (home !== "/") redirect(home);
+    // Against `CUSTOMER_HOME`, never a literal. This read `home !== "/"` until the
+    // marketing merge moved Discover off `/` — after which it was true for a *customer*,
+    // so the one role this page is for was redirected to the page it was already on.
+    if (home !== CUSTOMER_HOME) redirect(home);
   }
 
   const raw = await searchParams;

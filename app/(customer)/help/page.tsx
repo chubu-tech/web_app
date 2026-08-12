@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Icons, IconSize } from "@/components/ui/icons";
+import { CUSTOMER_HOME } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Help",
@@ -65,7 +66,7 @@ const TOPICS: { q: string; a: string; href?: string; cta?: string }[] = [
   {
     q: "What is a walk-in queue?",
     a: "Some salons take walk-ins as a live line you can join from your phone. You get a place and a rough wait, and the page updates itself while you wait — there is nothing to refresh and nothing to keep checking.",
-    href: "/",
+    href: CUSTOMER_HOME,
     cta: "Find a salon",
   },
   {

@@ -11,6 +11,7 @@ import { Icons, IconSize } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Sheet } from "@/components/ui/sheet";
 import { fetchServices, fetchServiceStaff, fetchStaff } from "@/lib/api/salon";
+import { CUSTOMER_HOME } from "@/lib/auth";
 import { availableToday } from "@/lib/available-today";
 import { formatKm, kmTo, nearestSalons, withinDistance } from "@/lib/discover-logic";
 import { resolveLocation, type Fix } from "@/lib/geo";
@@ -146,11 +147,17 @@ export function Discover({
 
   const favourites = useMemo(() => new Set(favouriteIds), [favouriteIds]);
 
-  /** Write the filters into the URL; the server re-runs the query from there. */
+  /**
+   * Write the filters into the URL; the server re-runs the query from there.
+   *
+   * `CUSTOMER_HOME`, not `/` — this page's own route. All four pushes below named `/`
+   * until the marketing merge took that path, at which point narrowing a filter navigated
+   * off the product and onto the landing page.
+   */
   function apply(next: SalonFilters) {
     const params = new URLSearchParams(toParams(next));
     const qs = params.toString();
-    router.push(qs ? `/?${qs}` : "/", { scroll: false });
+    router.push(qs ? `${CUSTOMER_HOME}?${qs}` : CUSTOMER_HOME, { scroll: false });
   }
 
   /**
@@ -163,16 +170,16 @@ export function Discover({
    */
   function goToTab(next: "salons" | "products") {
     if (next === "salons") {
-      router.push("/", { scroll: false });
+      router.push(CUSTOMER_HOME, { scroll: false });
       return;
     }
     const params = new URLSearchParams({ tab: "products", ...productFilterToParams(productFilter) });
-    router.push(`/?${params.toString()}`, { scroll: false });
+    router.push(`${CUSTOMER_HOME}?${params.toString()}`, { scroll: false });
   }
 
   function applyProducts(next: ProductFilter) {
     const params = new URLSearchParams({ tab: "products", ...productFilterToParams(next) });
-    router.push(`/?${params.toString()}`, { scroll: false });
+    router.push(`${CUSTOMER_HOME}?${params.toString()}`, { scroll: false });
   }
 
   const onProducts = tab === "products";

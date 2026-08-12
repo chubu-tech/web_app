@@ -213,6 +213,22 @@ export function homeForRole(role: Role): string {
       // `/discover`, not `/`. The merge gave `/` to the marketing site, so signing a
       // customer in and sending them to the homepage would land them on a page inviting
       // them to download an app they are already using. Discover is the product home.
-      return "/discover";
+      return CUSTOMER_HOME;
   }
 }
+
+/**
+ * Where the customer side begins — **a constant because more than one place has to agree
+ * on it**, and the last time they disagreed the page broke for everybody signed in.
+ *
+ * Discover turns away anyone whose home is elsewhere, so its guard is
+ * `home !== CUSTOMER_HOME`. When the marketing merge moved Discover from `/` to
+ * `/discover`, that guard still read `home !== "/"` — which is *true* for a customer, so
+ * the page redirected to itself. Every signed-in customer got the shell with an empty
+ * middle, because the loop meant the page body never rendered at all.
+ *
+ * Anything navigating to the customer home builds its URL from this: the four `router.push`
+ * calls in `components/customer/discover.tsx` were left pointing at `/` by the same merge,
+ * which sent a filter change to the marketing homepage.
+ */
+export const CUSTOMER_HOME = "/discover";
