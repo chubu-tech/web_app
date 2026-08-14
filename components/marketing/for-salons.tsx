@@ -280,76 +280,76 @@ export function ForSalons() {
               className="flex flex-col gap-2"
             >
               {features.map((feature, i) => {
-              const Icon = ICONS[i];
-              const isActive = active === i;
+                const Icon = ICONS[i];
+                const isActive = active === i;
 
-              return (
-                <button
-                  key={feature.title}
-                  type="button"
-                  role="tab"
-                  id={`salon-tab-${i}`}
-                  aria-selected={isActive}
-                  aria-controls="salon-panel"
-                  tabIndex={isActive ? 0 : -1}
-                  onClick={() => go(i, true)}
-                  className={cn(
-                    "group relative overflow-hidden rounded-md p-4 text-left",
-                    "transition-colors duration-300",
-                    isActive
-                      ? "bg-surface-soft ring-hairline ring-1 ring-inset"
-                      : "hover:bg-surface-soft/70",
-                  )}
-                >
-                  <span className="flex items-start gap-4">
-                    <span
-                      className={cn(
-                        "grid size-11 shrink-0 place-items-center rounded-full",
-                        "transition-colors duration-300",
-                        isActive
-                          ? "bg-rausch-cta text-white"
-                          : "bg-surface-strong text-muted group-hover:text-ink",
-                      )}
-                    >
-                      <Icon className="size-5" strokeWidth={2} aria-hidden />
-                    </span>
-                    <span className="min-w-0 flex-1">
+                return (
+                  <button
+                    key={feature.title}
+                    type="button"
+                    role="tab"
+                    id={`salon-tab-${i}`}
+                    aria-selected={isActive}
+                    aria-controls="salon-panel"
+                    tabIndex={isActive ? 0 : -1}
+                    onClick={() => go(i, true)}
+                    className={cn(
+                      "group relative overflow-hidden rounded-md p-4 text-left",
+                      "transition-colors duration-300",
+                      isActive
+                        ? "bg-surface-soft ring-hairline ring-1 ring-inset"
+                        : "hover:bg-surface-soft/70",
+                    )}
+                  >
+                    <span className="flex items-start gap-4">
                       <span
                         className={cn(
-                          "text-subheading block font-semibold transition-colors duration-300",
+                          "grid size-11 shrink-0 place-items-center rounded-full",
+                          "transition-colors duration-300",
                           isActive
-                            ? "text-ink"
-                            : "text-muted group-hover:text-ink",
+                            ? "bg-rausch-cta text-white"
+                            : "bg-surface-strong text-muted group-hover:text-ink",
                         )}
                       >
-                        {feature.title}
+                        <Icon className="size-5" strokeWidth={2} aria-hidden />
                       </span>
-                      <span className="text-body mt-1.5 block text-body-sm">
-                        {feature.body}
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={cn(
+                            "text-subheading block font-semibold transition-colors duration-300",
+                            isActive
+                              ? "text-ink"
+                              : "text-muted group-hover:text-ink",
+                          )}
+                        >
+                          {feature.title}
+                        </span>
+                        <span className="text-body mt-1.5 block text-body-sm">
+                          {feature.body}
+                        </span>
                       </span>
                     </span>
-                  </span>
 
-                  {/* The dwell, as a hairline along the foot of the selected card
+                    {/* The dwell, as a hairline along the foot of the selected card
                       only. It used to be an empty grey track under all four rows at
                       once, which is three rules the design never wanted and most of
                       what made the column read as an article. */}
-                  <span className="absolute inset-x-0 bottom-0 block h-0.5">
-                    <motion.span
-                      key={`${i}-${isActive}-${running}`}
-                      className="bg-rausch block h-full origin-left rounded-full"
-                      initial={{ scaleX: 0 }}
-                      animate={{ scaleX: isActive && running ? 1 : 0 }}
-                      transition={
-                        isActive && running
-                          ? { duration: DWELL_MS / 1000, ease: "linear" }
-                          : { duration: 0.3, ease: EASE }
-                      }
-                    />
-                  </span>
-                </button>
-              );
-            })}
+                    <span className="absolute inset-x-0 bottom-0 block h-0.5">
+                      <motion.span
+                        key={`${i}-${isActive}-${running}`}
+                        className="bg-rausch block h-full origin-left rounded-full"
+                        initial={{ scaleX: 0 }}
+                        animate={{ scaleX: isActive && running ? 1 : 0 }}
+                        transition={
+                          isActive && running
+                            ? { duration: DWELL_MS / 1000, ease: "linear" }
+                            : { duration: 0.3, ease: EASE }
+                        }
+                      />
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Held back until the rows have been measured, so it appears beside

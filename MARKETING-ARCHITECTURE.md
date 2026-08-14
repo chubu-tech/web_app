@@ -124,7 +124,7 @@ app/
     page.tsx            composition + JSON-LD graph
     privacy/ waitlist/
 components/marketing/
-  site-header.tsx       80px top nav, centred links, mobile sheet
+  site-header.tsx       floating bar that condenses to a pill, mobile sheet
   hero.tsx / service-marquee.tsx / find-salon.tsx / search-bar.tsx
   search-panel.tsx / salon-card.tsx / two-ways.tsx / queue-live.tsx
   for-salons.tsx / proof.tsx / pricing.tsx / faq.tsx
@@ -270,30 +270,85 @@ product working or marks a change of state; ambient decoration is gone.**
 |---|---|
 | Hero load | image un-zooms 1.08 → 1; headline rises word-by-word from behind a clip mask; kira rule wipes in; lede, free-for-customers chip, store badges and queue card stagger in |
 | Hero live card | the queue position and wait time **tick down** (`#7 → #3`, `40 → 18 min`) — the clearest demo of what the app does |
-| Nav | a bottom hairline fades in past 8px of scroll. Nothing reflows |
-| Nav links | a 2px ink rule grows from the left on hover |
-| Mobile sheet | fade + 12px slide, 240ms; Escape closes it, focus goes to the close button and returns to the hamburger |
+| Nav — entrance | the bar drops in from `y: -80` over 900ms after a 150ms beat |
+| Nav — scroll | past 28px the bar condenses into a floating pill: white at 80% with a backdrop blur, the one shadow tier, `rounded-full`, 12px clear of the top, paddings 20 → 10 vertical. 500ms on the shared curve, and it reverses on the way back up |
+| Nav — read progress | a 2px rausch line pinned above the bar, spring-damped against `scrollYProgress` |
+| Nav links | a 1px rausch rule grows from the left, while the label slides out of the top and an ink copy of it rises from below (400ms) |
+| Nav CTA | magnetic: the pill leans up to 14×10px toward the pointer and springs back on leave. Mouse only, and off under reduced motion |
+| Mobile sheet | a circle `clip-path` opens from the hamburger's corner (92% 5%) over 600ms and the five links stagger up 28px behind it; Escape closes it, focus goes to the close button and returns to the hamburger |
 | Category strip | velocity-linked: it drifts on its own, speeds up as you scroll down, reverses as you scroll up, and skews slightly with the shove |
 | Sections | `Reveal` / `RevealGroup` — opacity + short travel, staggered, fires once |
 | Closing photo | `ParallaxImage` — spring-damped drift as the slab crosses the viewport |
 | Card photos | scale to 1.04 under a fixed rounded mask on hover |
 | Queue board | a 5-deep window slides along a ring every 2.6s; "You" climbs to the chair; the "two away" notification fires at position #2. Pauses when off-screen |
 | Salon screen | panels slide in with a direction, the card's height animates to whatever the panel measures, and a dwell bar fills along its foot; tap a chip or the rail, **swipe the panel** (finger, mouse drag or two-finger trackpad), or use the arrow keys — any of which stops the auto-advance for good |
-| Salon screen — the hand | **below `lg` only.** A pink pointing hand under the chips presses, drags left and lifts, ~2s on to ~1s off. It is spent on first use: the same flag that stops the auto-advance collapses it away |
+| Salon screen — the hand, below `lg` | A pink pointing hand under the chips presses, drags left and lifts, ~2s on to ~1s off. It is spent on first use: the same flag that stops the auto-advance collapses it away |
+| Salon screen — the hand, at `lg` | The same glyph, parked on the right edge of the rail row the demo is **about to** move to, tapping it every ~2.6s and sliding down the column as the selection advances. Spent on first use as well |
 | Numbers | `CountUp` on the hero card and the week figures |
 | Pricing | plan cards take the one shadow tier on hover |
 | Motif divider | drifts on CSS alone |
 | FAQ | height-animated accordion, one open at a time |
 
-**Seven effects were removed and their CSS deleted with them**, so nothing is left
-declared for a call site that no longer exists: the header's shape-changing pill and
-its read-progress line, `Button`'s magnetic spring, `Curtain`, `Tilt`, `Spotlight`,
-the `rim-card` conic gradient and its `@property` angle, the pricing panel's breathing
-`glow`, and the salon screen's `sheen`. `curtain.tsx`, `tilt.tsx` and `spotlight.tsx`
-are deleted files.
+**Effects were removed and their CSS deleted with them**, so nothing is left declared
+for a call site that no longer exists: `Curtain`, `Tilt`, `Spotlight`, the `rim-card`
+conic gradient and its `@property` angle, the pricing panel's breathing `glow`, and
+the salon screen's `sheen`. `curtain.tsx`, `tilt.tsx` and `spotlight.tsx` are deleted
+files.
+
+**Three of that list came back**, and this paragraph used to say seven: the header's
+shape-changing pill, its read-progress line and the magnetic CTA were restored on
+request from `4e11786^`. None of them needed the deleted CSS — the pill and the line
+are utility classes, and the magnet is two springs in `site-header.tsx` rather than
+in `Button`, which stays the plain element the other ten call to actions use. See the
+file's own header comment for what is verbatim and what is not.
 
 `prefers-reduced-motion` is honoured: `useReducedMotion` drops travel and loops, and
 `marketing-tokens.css` collapses all durations and iteration counts.
+
+### The top bar floats, so nothing beneath it knows its height
+
+The bar is `fixed` and reserves nothing. `--site-header-height` (72px below `sm`,
+80px above) is still what the hero, `/privacy` and every `scroll-mt` gutter is built
+from, and it is deliberately **not** the bar's own height any more: the bar is 88px
+open and 80px condensed at `sm` and up, 80/72 below it. Measured, the condensed pill
+occupies exactly the reserved 72/80 including its 12px top margin, and the open bar
+is 8px taller than the reservation against a hero gutter that is 24–48px larger
+again — so the two never meet and no page moved when this changed.
+
+Four things about it are load-bearing:
+
+- **`w-full` is gone from the bar, and it was a real overflow.** The original had
+  `w-full` alongside `sm:mx-4`, which is 100% of the viewport *plus* 32px of margin
+  between 640 and 1024. It never showed because the root layout's
+  `overflow-x-hidden` masked it. A block-level flex container with auto width fills
+  the same space minus its margins, so every state renders identically and the leak
+  is gone rather than hidden.
+- **The condensed flag is synced once on mount**, not only on `change`.
+  `useMotionValueEvent` fires on change alone, so a reload at a scrolled position
+  painted the open bar over content until the first wheel tick.
+- **The CTA keeps `--color-rausch-cta` (#e00b41).** The original pill was
+  `--color-rausch` (#ff385c), which is 3.53:1 under white — the AA failure `AGENTS.md`
+  names as a bug already fixed once. Size, radius, weight and the magnet are the
+  original's; the hue is not.
+- **The magnet is on the wrapper, not in `Button`.** Translating the span that
+  already carried the `sm:` breakpoint renders identically to translating the pill,
+  and it leaves the other ten call to actions on the page plain elements.
+
+Verified at 360 / 390 / 744 / 834 / 1024 / 1280 / 1440, both states, and with
+`prefers-reduced-motion` at 390 and 1280: the open bar is transparent with no shadow
+and 20px vertical padding (20/32/40 horizontal by breakpoint); the condensed one is
+`rounded-full`, 80% white, blurred, shadowed, 12px down and 20px shorter; the CTA
+appears at 640 and the inline links at 1024, where the wordmark measures 17px and the
+links 15px; `#top` sits at the same document offset in both states, and the page's
+own height is unchanged at all seven widths; the progress line fills 0 → 1 and is 2px
+of `rgb(255, 56, 92)`; hovering a link grows the rule from 0 to 85px and moves the
+label; the pill leans 6.7×4.4px toward a pointer in its corner and springs back, and
+does neither under reduced motion; the sheet is `aria-modal` with focus on its close
+button, five 20px/600 links, a circle reveal that becomes a plain fade under reduced
+motion, and Escape closes it and hands focus back to the hamburger. All five nav
+anchors land with their heading 121–288px clear of the condensed bar, on desktop and
+through the sheet. `/privacy` renders the same bar; `/waitlist` deliberately renders
+none.
 
 ### The salon screen: nothing is sticky, and the card carries its own controls
 
@@ -318,12 +373,14 @@ its own `role="tab"` chips wrap inside it so all four are visible, the panel is
 swipeable, and the active feature's sentence sits in a caption row under the panel —
 so there is nothing stacked outside the card to scroll past. From `lg` the rail
 returns beside it as a column of selectable cards and the chips give way to a static
-label, because the rail is already the control. The rail is `hidden lg:flex`, which
-is `display: none` — out of the tab order and the accessibility tree below `lg`, so
-exactly one tablist is ever exposed, while its four sentences stay in the HTML for a
-crawler at every width.
+label, because the rail is already the control. The rail sits in a `hidden lg:block`
+wrapper — `display: none`, so it is out of the tab order and the accessibility tree
+below `lg` and exactly one tablist is ever exposed, while its four sentences stay in
+the HTML for a crawler at every width. The wrapper exists so the desktop hand has
+something to be positioned against **without** being a child of the tablist, whose
+children should be tabs and nothing else.
 
-Six things about the mechanism are load-bearing:
+Seven things about the mechanism are load-bearing:
 
 - **The panel's height is measured, not guessed.** A `ResizeObserver` reports the
   active panel's `offsetHeight` and the wrapper animates to it. The four panels run
@@ -357,6 +414,26 @@ Six things about the mechanism are load-bearing:
   reader. Under `prefers-reduced-motion` the hand parks in the middle at full opacity
   and the sentence stays: the guidance was the point, the movement only the delivery.
   Everything moves inside a fixed 44×24 track, so the chips above never shift.
+- **The desktop gets a hand too, and it answers a different question.** Not a
+  breakpoint prop on the same component: below `lg` the hand says *this can be
+  swiped*, at `lg` it says *these are buttons*. The rail rows carry no button
+  chrome — a title, a sentence, an icon, and a soft fill on the selected one — so a
+  still screenshot reads as a legend beside the card rather than as four controls,
+  and hover only says otherwise once you have already guessed. `RailHint` straddles
+  the **right edge of the row it is tapping**, half over the row's own 16px padding
+  and half in the 56px column gap: both halves are empty by construction, which
+  makes it the one place near a row that cannot cover text at any width — the rows'
+  sentences run the full width between the icon and that padding, and the 8px
+  between rows is smaller than the hand. It is `pointer-events-none`, which matters
+  more than it looks on something overlapping a real control: a hint that swallowed
+  the click it is asking for would be worse than none. It points at
+  `(active + 1) % count`, so always at a row that is **not** selected, and follows
+  the demo down the column — which makes the auto-advance look intended, since the
+  hand taps a row and a moment later that row is the one on screen. Only the *tap*
+  is periodic; the hand itself stays put, because a pointer that blinks out every
+  two seconds reads as a glitch rather than as a rest. Under
+  `prefers-reduced-motion` it parks beside the next row at full opacity and does not
+  tap.
 - **A two-finger trackpad swipe is a third input, not a variant of the drag.** It
   never presses a pointer down, so `motion`'s `drag` and every `onDragEnd`
   threshold behind it are blind to it — the panel carried a `cursor-grab` and a
@@ -403,6 +480,29 @@ cycle was measured rather than eyeballed, because the first version was wrong: a
 with a 0.7s gap the hand was absent for nearly half the loop, and six screenshots
 300ms apart caught it four times as an empty row.
 
+The desktop hand is measured the same way, and geometrically rather than by class
+name — the whole claim is *"half in the padding, half in the gap"*, and a class
+cannot tell you whether a sentence wrapped onto a second line and ran under it. At
+1024 / 1280 / 1440 it reaches **10.9px into a 16px padding** and 8.7px into the gap,
+its centre is within 3px of the next row's, it intersects **zero** of the rail's text
+boxes, its halo stops 40px short of the card, `elementFromPoint` over it returns the
+row rather than the hand, it taps (10–11 distinct transforms in 1.7s), it follows the
+auto-advance to the new next row, and a click fades it to 0. At 390 / 744 / **1023**
+it is not in the DOM at all, and the mobile hand is. Crossing the breakpoint live —
+390 → 1280 → 1440 → 900 → 1100 — appears and disappears correctly and lands within
+3px each time, which is the only way to exercise the `ResizeObserver` firing on
+`display: none` giving way to a box; a page loaded straight into either width proves
+nothing about it.
+
+Two harnesses had to be corrected rather than the page, and for the same reason:
+`#for-salons svg.lucide-pointer` now matches **two** hands, and the desktop one comes
+first in the DOM. `hint.py` walked the mobile structure off it and threw on a null
+ancestor at every width from 1024 up. Both now take the **last** match, since below
+`lg` the desktop hand is not rendered at all. A selector written when there was one
+of something has to be told which one the moment there are two, and the failure is
+loud here only by luck — it threw. A probe that had silently measured the wrong hand
+would have reported the mobile hint working at 1280, where it is `display: none`.
+
 ### Responsive behaviour
 
 The reference's rule for every grid: **reduce columns, never reflow rows.**
@@ -415,7 +515,7 @@ The reference's rule for every grid: **reduce columns, never reflow rows.**
 | Proof figures | 2 | 4 | 4 | 4 |
 | Footer | 1 | 2 | 3 | 5 (3·2·2·3·2 of twelve) |
 | Hero | stacked | stacked | 6 + 6 | 6 + 6 |
-| Nav | hamburger sheet | hamburger sheet | inline, centred | inline, centred |
+| Nav | hamburger sheet | hamburger sheet + CTA from 640 | inline links, `justify-between` | inline links, `justify-between` |
 
 Three things that only show up under measurement, and each cost a fix:
 
