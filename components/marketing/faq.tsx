@@ -17,8 +17,8 @@ export function Faq() {
   return (
     <Section id="faq" aria-labelledby="faq-title">
       <Container>
-        <div className="grid gap-12 lg:grid-cols-12 lg:gap-16">
-          <div className="lg:col-span-5 lg:sticky lg:top-28 lg:self-start">
+        <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
+          <div className="lg:sticky lg:top-[calc(var(--site-header-height)+2rem)] lg:col-span-5 lg:self-start">
             <SectionHeading
               eyebrow="Questions"
               title="The things _everyone asks_"
@@ -38,22 +38,25 @@ export function Faq() {
                       type="button"
                       onClick={() => setOpen(isOpen ? null : i)}
                       aria-expanded={isOpen}
-                      className="group flex w-full items-center gap-5 py-6 text-left"
+                      className="group flex w-full items-center gap-5 py-5 text-left"
                     >
                       <span
                         className={cn(
-                          "flex-1 text-body-lg font-medium transition-colors duration-300 sm:text-subheading",
-                          isOpen ? "text-ink" : "text-ink/80 group-hover:text-ink",
+                          "text-subheading flex-1 font-medium transition-colors duration-200",
+                          isOpen ? "text-ink" : "text-body group-hover:text-ink",
                         )}
                       >
                         {item.q}
                       </span>
+                      {/* `icon-button-circle` from the reference — a
+                          `surface-strong` disc, taking the accent only while the
+                          panel it controls is open. */}
                       <span
                         className={cn(
-                          "grid size-9 shrink-0 place-items-center rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                          "grid size-9 shrink-0 place-items-center rounded-full transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
                           isOpen
-                            ? "bg-rausch rotate-135 text-white"
-                            : "bg-ink/5 text-ink group-hover:bg-ink/10",
+                            ? "bg-rausch-cta rotate-135 text-white"
+                            : "bg-surface-strong text-ink",
                         )}
                       >
                         <Plus className="size-4" strokeWidth={2.4} />
@@ -70,7 +73,7 @@ export function Faq() {
                           transition={{ duration: 0.5, ease: EASE }}
                           className="overflow-hidden"
                         >
-                          <p className="text-body max-w-2xl pb-6 leading-relaxed">
+                          <p className="text-body text-body-md max-w-[38rem] pb-6">
                             {item.a}
                           </p>
                         </motion.div>

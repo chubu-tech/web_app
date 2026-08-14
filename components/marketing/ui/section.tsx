@@ -3,7 +3,16 @@ import { cn } from "@/lib/marketing/utils";
 import { Reveal } from "./reveal";
 import { TextReveal } from "./text-reveal";
 
-/** Page gutter + max width. Every band shares it so edges line up. */
+/**
+ * Page gutter + max width. Every band shares it so edges line up.
+ *
+ * **1280px, down from 1312px** — the reference caps editorial content at ~1280 and
+ * lets the gutters absorb the rest above that. The number is written out rather
+ * than given a `max-w-*` name on purpose: this repo declares `--spacing-lg`,
+ * `--spacing-xl` and friends, and a named width resolves against the spacing
+ * namespace *before* `--container-*`, so `max-w-xl` compiles to `max-width: 32px`.
+ * See the note in `app/globals.css`.
+ */
 export function Container({
   children,
   className,
@@ -14,7 +23,7 @@ export function Container({
   return (
     <div
       className={cn(
-        "mx-auto w-full max-w-[82rem] px-5 sm:px-8 lg:px-10",
+        "mx-auto w-full max-w-[80rem] px-5 sm:px-8 lg:px-10",
         className,
       )}
     >
@@ -23,7 +32,13 @@ export function Container({
   );
 }
 
-/** Small uppercase label with a brand dot. Opens most sections. */
+/**
+ * The small uppercase label that opens a band.
+ *
+ * The dot is the accent, and it is deliberately the only rausch in most sections —
+ * the reference's rule is that the brand colour appears once or twice on a page
+ * that is otherwise white and ink.
+ */
 export function Eyebrow({
   children,
   tone = "ink",
@@ -36,14 +51,14 @@ export function Eyebrow({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-2 text-caption-sm font-semibold tracking-[0.16em] uppercase",
-        tone === "light" ? "text-white/65" : "text-muted",
+        "inline-flex items-center gap-2 text-caption-sm font-semibold tracking-[0.14em] uppercase",
+        tone === "light" ? "text-white/70" : "text-muted",
         className,
       )}
     >
       <span
         className={cn(
-          "size-1.5 rounded-full",
+          "size-1.5 shrink-0 rounded-full",
           tone === "light" ? "bg-white/80" : "bg-rausch",
         )}
         aria-hidden
@@ -56,6 +71,17 @@ export function Eyebrow({
 /**
  * Eyebrow + masked display heading + optional lede. Heading accepts the
  * `_accent_` / `|` syntax from `parseHeading`.
+ *
+ * **Left-aligned by default, and every band on the page now takes the default.**
+ * Three sections used to centre themselves and the rest did not, so the page had no
+ * consistent left edge to read down — which is most of what made the scroll feel
+ * assembled rather than designed. The reference centres nothing above its footer.
+ * `align="center"` is kept for the closing band, which sits over a photograph and
+ * genuinely wants it.
+ *
+ * The heading is 600, not 700. That is the reference's central typographic claim:
+ * display weights stay modest because the layout leans on photography and
+ * whitespace for hierarchy.
  */
 export function SectionHeading({
   eyebrow,
@@ -82,7 +108,8 @@ export function SectionHeading({
   return (
     <div
       className={cn(
-        align === "center" ? "mx-auto max-w-3xl text-center" : "max-w-3xl",
+        "max-w-[44rem]",
+        align === "center" && "mx-auto text-center",
         className,
       )}
     >
@@ -96,18 +123,18 @@ export function SectionHeading({
         id={titleId}
         lines={parseHeading(title)}
         className={cn(
-          "mt-5 text-editorial-lg font-semibold",
+          "text-editorial-lg mt-4 font-semibold",
           tone === "light" ? "text-white" : "text-ink",
           titleClassName,
         )}
       />
       {body && (
-        <Reveal delay={0.12}>
+        <Reveal delay={0.1}>
           <p
             className={cn(
-              "mt-6 max-w-2xl text-body-lg leading-relaxed",
+              "text-body-lg mt-4 max-w-[38rem]",
               align === "center" && "mx-auto",
-              tone === "light" ? "text-white/70" : "text-body",
+              tone === "light" ? "text-white/75" : "text-body",
             )}
           >
             {body}
@@ -119,7 +146,25 @@ export function SectionHeading({
   );
 }
 
-/** Vertical rhythm for a page band. */
+/**
+ * Vertical rhythm for a page band: 56 / 64 / 80px.
+ *
+ * Down from 96 / 112 / 128. The reference puts major bands at `{spacing.section}`
+ * — 64px — and says why: tighter than typical SaaS marketing, "because marketplace
+ * pages need higher card density per scroll". This page has a salon grid, a plan
+ * grid and a feature list on it, so the same reasoning applies.
+ *
+ * Read these doubled, because that is how they arrive: two adjacent bands put their
+ * padding back to back, so the old numbers meant **192px of empty canvas** between
+ * the end of one section and the start of the next at desktop — more than a phone
+ * screen. It showed worst under "Near you", which ends in a button and renders no
+ * grid until somebody shares a location. 160px is still generous and no longer
+ * reads as a gap.
+ *
+ * `scroll-margin-top` is the header's own token plus a gap, so an anchored heading
+ * cannot land underneath the bar. It used to be a hardcoded `6rem` here and `7rem`
+ * on one heading in `pricing.tsx`, against a header that is 4.5–5rem.
+ */
 export function Section({
   id,
   children,
@@ -135,11 +180,19 @@ export function Section({
     <section
       id={id}
       aria-labelledby={ariaLabelledBy}
-      className={cn("py-24 sm:py-28 lg:py-32", className)}
-      // Offset so the sticky nav never covers an anchored heading.
-      style={{ scrollMarginTop: "6rem" }}
+      className={cn(
+        "scroll-mt-[calc(var(--site-header-height)+1.5rem)] py-14 sm:py-16 lg:py-20",
+        className,
+      )}
     >
       {children}
     </section>
+  );
+}
+
+/** A full-width hairline between two bands on the same surface. */
+export function BandRule({ className }: { className?: string }) {
+  return (
+    <div className={cn("border-hairline-soft border-t", className)} aria-hidden />
   );
 }

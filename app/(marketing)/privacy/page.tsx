@@ -28,7 +28,12 @@ export default function PrivacyPage() {
   return (
     <>
       <SiteHeader />
-      <main id="main" className="flex-1 pt-28 pb-24 sm:pt-32">
+      {/* Clears the fixed bar off its own token rather than a guessed `pt-28`,
+          which was 112px against a header that is 72-80px. */}
+      <main
+        id="main"
+        className="flex-1 pt-[calc(var(--site-header-height)+2.5rem)] pb-20 sm:pt-[calc(var(--site-header-height)+3.5rem)]"
+      >
         <Container>
           <article className="mx-auto max-w-[46rem]">
             <h1 className="text-editorial-lg font-semibold">

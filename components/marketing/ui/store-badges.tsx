@@ -10,7 +10,7 @@ function AppleMark({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={cn("size-6 shrink-0", className)}
+      className={cn("size-5 shrink-0", className)}
       fill="currentColor"
       aria-hidden
     >
@@ -24,7 +24,7 @@ function PlayMark({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={cn("size-6 shrink-0", className)}
+      className={cn("size-5 shrink-0", className)}
       aria-hidden
     >
       <path d="M2.4 1.6a1.5 1.5 0 0 0-.4 1.03v18.74a1.5 1.5 0 0 0 .4 1.03l9.5-10.4z" fill="#00C3FF" />
@@ -81,13 +81,21 @@ export function StoreBadges({
     },
   ];
 
+  /**
+   * A pill at the same 48px as `Button`, so a badge standing beside a call to
+   * action reads as its sibling rather than as a different control. It was a
+   * `rounded-2xl` slab of a different height that lifted on hover; the reference
+   * rounds every interactive element and specifies "no transform" on press, so
+   * both went.
+   *
+   * The min-width keeps the two the same size when they wrap onto separate lines.
+   */
   const shell = cn(
-    // The min-width keeps both badges the same size when they stack.
-    "group/badge flex min-w-[11rem] items-center gap-3 rounded-2xl px-4 py-2.5 text-left",
-    "transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5",
+    "group/badge inline-flex h-12 min-w-[10.5rem] items-center gap-2.5 rounded-full px-4 text-left",
+    "transition-colors duration-200",
     tone === "ink"
       ? "bg-ink text-white hover:bg-obsidian"
-      : "bg-white/12 text-white ring-1 ring-white/25 ring-inset backdrop-blur-md hover:bg-white/20",
+      : "bg-white/14 text-white ring-1 ring-white/30 ring-inset backdrop-blur-md hover:bg-white/24",
   );
 
   return (
@@ -96,11 +104,11 @@ export function StoreBadges({
         const inner = (
           <>
             {badge.mark}
-            <span className="text-left">
-              <span className="block text-caption-sm tracking-[0.08em] text-white/65 uppercase">
+            <span className="min-w-0 text-left">
+              <span className="block text-badge tracking-[0.1em] text-white/65 uppercase">
                 {badge.href ? badge.top : "Coming soon to"}
               </span>
-              <span className="block text-ui leading-tight font-semibold">
+              <span className="block truncate text-ui leading-tight font-semibold">
                 {badge.store}
               </span>
             </span>

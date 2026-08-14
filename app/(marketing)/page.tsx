@@ -4,6 +4,7 @@ import { FindSalon } from "@/components/marketing/find-salon";
 import { ForSalons } from "@/components/marketing/for-salons";
 import { Hero } from "@/components/marketing/hero";
 import { Pricing } from "@/components/marketing/pricing";
+import { Proof } from "@/components/marketing/proof";
 import { QueueLive } from "@/components/marketing/queue-live";
 import { ServiceMarquee } from "@/components/marketing/service-marquee";
 import { SiteFooter } from "@/components/marketing/site-footer";
@@ -137,7 +138,13 @@ export default async function Home() {
         <QueueLive />
         {/* 5. The owner side. */}
         <ForSalons />
-        {/* 6. Who pays what, 7. questions, 8. download. */}
+        {/* 6. Proof that any of this is real, immediately before the price list.
+            Four counts derived from the same prerendered index the search band
+            filters — deliberately NOT testimonials, which this site removed on
+            purpose because the ones it had were invented. See `proof` in
+            `lib/marketing/content.ts`. Renders nothing when the index is empty. */}
+        <Proof index={salonIndex} />
+        {/* 7. Who pays what, 8. questions, 9. download. */}
         <Pricing />
         <MotifDivider />
         <Faq />

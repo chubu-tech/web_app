@@ -55,11 +55,11 @@ export function ForSalons() {
   }
 
   return (
-    <Section
-      id="for-salons"
-      aria-labelledby="for-salons-title"
-      className="bg-canvas-deep/60"
-    >
+    // Canvas white, not the cream `canvas-deep` tint it carried. With the queue
+    // band above now sitting on `surface-soft`, the page alternates white →
+    // surface-soft → white, which is the reference's whole surface vocabulary; a
+    // third warm tint in the middle of it was the only cream left on the page.
+    <Section id="for-salons" aria-labelledby="for-salons-title">
       <Container>
         <SectionHeading
           eyebrow={forSalons.eyebrow}
@@ -72,10 +72,14 @@ export function ForSalons() {
             single-column *grid* the mock's row is exactly its own height, so it
             would have no room to stick. In block flow its containing block is
             this whole wrapper, so it stays on screen while the list is read. */}
-        <div className="mt-12 sm:mt-14 lg:grid lg:grid-cols-2 lg:items-start lg:gap-14">
+        <div className="mt-10 sm:mt-12 lg:grid lg:grid-cols-2 lg:items-start lg:gap-14">
           <div
             ref={mockRef}
-            className="sticky top-20 z-10 mb-9 self-start sm:top-24 lg:order-2 lg:mb-0"
+            /* Sticks clear of the fixed bar rather than under it: the offset is the
+               header's own token plus a gap, where it used to be a hardcoded
+               `top-20`/`sm:top-24` guessed against a header that has since changed
+               height twice. */
+            className="sticky top-[calc(var(--site-header-height)+1.5rem)] z-10 mb-9 self-start lg:order-2 lg:mb-0"
           >
             <Reveal>
               <MockScreen active={active} />
@@ -102,18 +106,22 @@ export function ForSalons() {
                   aria-controls="salon-panel"
                   onClick={() => choose(i)}
                   className={cn(
-                    "group border-hairline-soft border-b py-6 text-left first:border-t",
-                    "transition-colors duration-300",
+                    "group border-hairline-soft border-b py-5 text-left first:border-t",
+                    "transition-colors duration-200",
                   )}
                 >
                   <span className="flex items-start gap-4">
+                    {/* A circle, and no scale on activation. The reference's
+                        `icon-button-circle` is a `surface-strong` disc; the accent
+                        fill is what marks the active row, so a 5% scale on top of a
+                        colour change was a second signal for the same state. */}
                     <span
                       className={cn(
-                        "grid size-11 shrink-0 place-items-center rounded-2xl",
-                        "transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                        "grid size-11 shrink-0 place-items-center rounded-full",
+                        "transition-colors duration-300",
                         isActive
-                          ? "bg-rausch scale-105 text-white"
-                          : "bg-ink/5 text-muted group-hover:bg-ink/10",
+                          ? "bg-rausch-cta text-white"
+                          : "bg-surface-strong text-muted group-hover:text-ink",
                       )}
                     >
                       <Icon className="size-5" strokeWidth={2} aria-hidden />
@@ -121,7 +129,7 @@ export function ForSalons() {
                     <span className="min-w-0 flex-1">
                       <span
                         className={cn(
-                          "block text-subheading font-semibold transition-colors duration-500",
+                          "text-subheading block font-semibold transition-colors duration-300",
                           isActive ? "text-ink" : "text-muted group-hover:text-ink",
                         )}
                       >
@@ -129,7 +137,7 @@ export function ForSalons() {
                       </span>
                       {/* Always in the DOM — crawlable, and readable at a glance
                           whether or not this row is the active one. */}
-                      <span className="text-body mt-1.5 block leading-relaxed">
+                      <span className="text-body mt-1.5 block text-body-md">
                         {feature.body}
                       </span>
 
@@ -155,7 +163,7 @@ export function ForSalons() {
             })}
 
             <Reveal className="pt-8">
-              <Button href="#salon-plans" size="lg">
+              <Button href="#salon-plans" size="lg" variant="ghost">
                 See salon plans
               </Button>
             </Reveal>
@@ -177,7 +185,7 @@ function MockScreen({ active }: { active: number }) {
   const labels = forSalons.features.map((f) => f.title);
 
   return (
-    <div className="shadow-card rounded-slab relative overflow-hidden bg-white">
+    <div className="bg-canvas ring-hairline shadow-card relative overflow-hidden rounded-md ring-1 ring-inset">
       {/* A window, not a browser: no URL bar, nothing to decode. */}
       <div className="border-hairline-soft flex items-center gap-3 border-b px-5 py-3.5">
         <span className="flex gap-1.5" aria-hidden>
@@ -224,11 +232,10 @@ function MockScreen({ active }: { active: number }) {
         </AnimatePresence>
       </div>
 
-      {/* A light sweep across the mock — it keeps the card feeling alive. */}
-      <span
-        className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 animate-sheen bg-gradient-to-r from-transparent via-white/45 to-transparent"
-        aria-hidden
-      />
+      {/* The `animate-sheen` sweep that used to run across this card for ever is
+          gone with the rest of the ambient motion. The panel already changes every
+          five seconds; a light bar crossing it on a 3.2s loop was a second,
+          unrelated animation on the same element. */}
     </div>
   );
 }
@@ -277,7 +284,16 @@ function BookingsPanel() {
             <span className="text-muted w-14 shrink-0 text-caption">
               {row.name}
             </span>
-            <div className="bg-canvas relative h-9 flex-1 rounded-lg">
+            {/*
+              `bg-surface-soft`, not `bg-canvas` — and this was invisible before,
+              not merely wrong. The mock's own surface is white and `--color-canvas`
+              on the public pages *is* white, so every "background" inside this card
+              resolved to the colour already behind it. Four rows had it.
+
+              `rounded-md` too: `rounded-lg` in this repo is `--radius-lg`, **20px**,
+              not Tailwind's 8px — on a 36px-tall track that is very nearly a pill.
+            */}
+            <div className="bg-surface-soft relative h-9 flex-1 rounded-md">
               {row.blocks.map((block) => (
                 <motion.span
                   key={`${row.name}-${block.start}`}
@@ -285,7 +301,10 @@ function BookingsPanel() {
                   animate={{ scaleX: 1, opacity: 1 }}
                   transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
                   className={cn(
-                    "absolute inset-y-1 origin-left rounded-md",
+                    // `rounded-sm` (8px), not `md` (14px) — on a 28px-tall block
+                    // 14px is a full pill, and a day's bookings should read as
+                    // blocks on a calendar rather than as tags.
+                    "absolute inset-y-1 origin-left rounded-sm",
                     block.state === "confirmed" && "bg-rausch/85",
                     block.state === "next" && "bg-rausch ring-2 ring-rausch/25",
                     block.state === "pending" &&
@@ -337,12 +356,12 @@ function LinePanel() {
             initial={{ opacity: 0, x: -12 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: i * 0.06, ease: EASE }}
-            className="bg-canvas flex items-center gap-3 rounded-xl px-3.5 py-3"
+            className="bg-surface-soft flex items-center gap-3 rounded-md px-3.5 py-3"
           >
             <span
               className={cn(
                 "grid size-7 shrink-0 place-items-center rounded-full text-caption-sm font-semibold",
-                i === 0 ? "bg-ink text-white" : "bg-white text-muted",
+                i === 0 ? "bg-ink text-white" : "bg-canvas text-muted",
               )}
             >
               {i}
@@ -359,9 +378,9 @@ function LinePanel() {
               className={cn(
                 "shrink-0 rounded-full px-2.5 py-1 text-caption-sm font-semibold",
                 i === 1
-                  ? "bg-rausch text-white"
+                  ? "bg-rausch-cta text-white"
                   : i === 0
-                    ? "bg-ink/8 text-ink"
+                    ? "bg-canvas text-ink"
                     : "text-muted",
               )}
             >
@@ -432,7 +451,7 @@ function TeamPanel() {
             initial={{ opacity: 0, scale: 0.94 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4, delay: 0.15 + i * 0.05, ease: EASE }}
-            className="bg-canvas rounded-full px-3 py-1.5 text-caption-sm"
+            className="bg-surface-soft rounded-full px-3 py-1.5 text-caption-sm"
           >
             <span className="text-ink font-medium">{service.name}</span>
             <span className="text-muted"> · {service.meta}</span>
@@ -464,7 +483,7 @@ function WeekPanel() {
           { label: "Came back", value: 63, suffix: "%" },
           { label: "No-shows", value: 4, suffix: "" },
         ].map((kpi) => (
-          <div key={kpi.label} className="bg-canvas rounded-xl px-3 py-2.5">
+          <div key={kpi.label} className="bg-surface-soft rounded-md px-3 py-2.5">
             <span className="text-ink block text-heading leading-tight font-semibold">
               <CountUp value={kpi.value} suffix={kpi.suffix} />
             </span>
@@ -482,8 +501,8 @@ function WeekPanel() {
           <motion.span
             key={i}
             className={cn(
-              "flex-1 rounded-t-md",
-              bar.value >= 92 ? "bg-rausch" : "bg-ink/12",
+              "flex-1 rounded-t-sm",
+              bar.value >= 92 ? "bg-rausch" : "bg-surface-strong",
             )}
             initial={{ height: 0 }}
             animate={{ height: Math.round(bar.value * 0.9) }}

@@ -28,7 +28,10 @@ export function ParallaxImage({
   priority = false,
   sizes = "100vw",
   children,
-  rounded = "rounded-slab",
+  // `--radius-lg`, 20px. The reference clips photo plates at 14-20px; `rounded-slab`
+  // (2rem) belongs to the customer shell's editorial layer, which the public pages
+  // no longer render in.
+  rounded = "rounded-lg",
 }: {
   src: string;
   alt: string;

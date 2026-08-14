@@ -75,9 +75,11 @@ export function SearchPanel({
         aria-controls={open ? panelId : undefined}
         className={cn(
           "flex w-full min-w-0 items-center gap-3 rounded-full px-5 py-3 text-left",
-          "transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
-          // The active segment lifts onto paper, the way the reference does it.
-          open ? "bg-paper shadow-card" : "hover:bg-ink/[0.04]",
+          "transition-colors duration-200",
+          // The bar itself is white now, so the open segment tints *down* rather
+          // than lifting onto paper — a white-on-white lift with a second shadow
+          // inside a shadowed bar was two elevations where the system has one.
+          open ? "bg-surface-soft" : "hover:bg-surface-soft",
         )}
       >
         <Icon className="text-muted size-[1.125rem] shrink-0" aria-hidden />
@@ -107,8 +109,11 @@ export function SearchPanel({
             exit={{ opacity: 0, y: reduced ? 0 : -8 }}
             transition={{ duration: 0.28, ease: EASE }}
             className={cn(
-              "rounded-slab bg-paper shadow-lift absolute top-[calc(100%+0.75rem)] z-30 overflow-hidden",
-              "ring-hairline-soft ring-1 ring-inset",
+              // `rounded-md` + the one shadow tier. The reference applies exactly
+              // this definition to its own dropdowns — account menu, language
+              // picker, date picker — and has no second tier to reach for.
+              "bg-canvas shadow-card absolute top-[calc(100%+0.75rem)] z-30 overflow-hidden rounded-md",
+              "ring-hairline ring-1 ring-inset",
               width,
               align === "right" ? "right-0" : "left-0",
             )}
@@ -141,7 +146,12 @@ export function PanelOption({
       className={cn(
         "flex w-full items-center justify-between gap-3 px-5 py-3 text-left text-ui",
         "transition-colors duration-200",
-        active ? "bg-rausch-soft text-ink font-medium" : "text-body hover:bg-canvas",
+        // `hover:bg-surface-soft`, not `hover:bg-canvas`. The panel's own surface
+        // is canvas, so the hover state resolved to the colour already underneath
+        // it and these rows had no hover feedback at all.
+        active
+          ? "bg-rausch-soft text-ink font-semibold"
+          : "text-body hover:bg-surface-soft",
       )}
     >
       <span className="truncate">{children}</span>
@@ -176,7 +186,7 @@ export function PanelChip({
         "transition-colors duration-200",
         active
           ? "bg-ink text-white"
-          : "text-body ring-hairline hover:ring-ink/40 ring-1 ring-inset",
+          : "text-body ring-hairline hover:ring-border-strong hover:bg-surface-soft ring-1 ring-inset",
       )}
     >
       <span className="block">{children}</span>

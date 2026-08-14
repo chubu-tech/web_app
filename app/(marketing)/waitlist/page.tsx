@@ -45,11 +45,14 @@ export default function WaitlistPage() {
         </Link>
 
         <div className="mt-10">
-          <span className="bg-rausch grid size-11 place-items-center rounded-2xl text-white">
+          {/* `rausch-cta`, because this tile carries a white glyph — the same WCAG
+              rule `Button` states. `rounded-md` matches every other card corner on
+              the site. */}
+          <span className="bg-rausch-cta grid size-11 place-items-center rounded-md text-white">
             <Scissors className="size-5" strokeWidth={2.2} aria-hidden />
           </span>
 
-          <span className="text-rausch mt-7 block text-caption-sm font-semibold tracking-[0.16em] uppercase">
+          <span className="text-rausch mt-7 block text-caption-sm font-semibold tracking-[0.14em] uppercase">
             {waitlist.eyebrow}
           </span>
 
@@ -71,9 +74,7 @@ export default function WaitlistPage() {
             ))}
           </h1>
 
-          <p className="text-body mt-4 text-body-lg leading-relaxed">
-            {waitlist.body}
-          </p>
+          <p className="text-body text-body-lg mt-4">{waitlist.body}</p>
 
           {/* The fallback reserves the form's height so the page does not
               reflow when hydration fills the source in. */}
@@ -83,8 +84,8 @@ export default function WaitlistPage() {
         </div>
       </div>
 
-      <MountainRule className="text-sand h-16 w-full shrink-0 sm:h-20" />
-      <p className="text-body/60 pb-8 text-center text-caption">
+      <MountainRule className="text-surface-strong h-16 w-full shrink-0 sm:h-20" />
+      <p className="text-muted pb-8 text-center text-caption">
         {brand.name} · {brand.cities.join(" · ")}
       </p>
     </main>

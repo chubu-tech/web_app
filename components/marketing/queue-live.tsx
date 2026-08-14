@@ -13,16 +13,15 @@ import { cn } from "@/lib/marketing/utils";
 import { MotifDiamond } from "./ui/bhutan";
 import { Reveal } from "./ui/reveal";
 import { Container, Section, SectionHeading } from "./ui/section";
-import { Spotlight } from "./ui/spotlight";
 
 const TICK_MS = 2600;
 
 type Person = { name: string; service: string };
 
 /**
- * The conveyor. A 5-deep window slides along this ring, so every tick one
- * person leaves the chair and one joins the back — and "You" climbs from the
- * back of the line to the chair once per lap.
+ * The conveyor. A 5-deep window slides along this ring, so every tick one person
+ * leaves the chair and one joins the back — and "You" climbs from the back of the
+ * line to the chair once per lap.
  */
 const RING: Person[] = [
   ...queueSection.queue.map((q) => ({ name: q.name, service: q.service })),
@@ -42,48 +41,63 @@ function windowAt(tick: number) {
   });
 }
 
+/**
+ * The virtual queue, actually moving.
+ *
+ * ## It is a light band now
+ *
+ * This was an obsidian slab with a 2.75rem radius, film grain, and a warm saffron
+ * spotlight that followed the cursor across it. Three separate effects on one
+ * section, and the section's job is to show a list of five names changing.
+ *
+ * The reference has one surface vocabulary — canvas white, `surface-soft` #f7f7f7,
+ * hairlines — and the page now uses it everywhere else, so a dark band here was the
+ * one place the visitor crossed into a different design. `surface-soft` between two
+ * hairlines does the same job the dark slab was doing (it separates this band from
+ * the white ones either side) without introducing a second palette, and the board
+ * reads far better as ink on white than as white on near-black.
+ *
+ * The page keeps exactly one dark moment, and it is the closing call to action —
+ * which is a photograph, not a fill.
+ */
 export function QueueLive() {
   return (
     <Section
       id="queue"
       aria-labelledby="queue-title"
-      className="bg-obsidian grain rounded-slab-lg relative mx-2 overflow-hidden sm:mx-4"
+      className="bg-surface-soft border-hairline-soft border-y"
     >
-      {/* Warm light trailing the cursor across the dark band. */}
-      <Spotlight>
-        <Container>
-          <div className="grid gap-14 lg:grid-cols-2 lg:items-center lg:gap-20">
-            <div>
-              <SectionHeading
-                eyebrow={queueSection.eyebrow}
-                title="Watch the line _move, live_"
-                body={queueSection.body}
-                tone="light"
-                titleId="queue-title"
-              />
+      <Container>
+        <div className="grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
+          <div>
+            <SectionHeading
+              eyebrow={queueSection.eyebrow}
+              title="Watch the line _move, live_"
+              body={queueSection.body}
+              titleId="queue-title"
+            />
 
-              <Reveal delay={0.15} className="mt-9">
-                <div className="inline-flex items-center gap-4 rounded-2xl bg-white/8 p-4 ring-1 ring-white/12 ring-inset">
-                  <QrTile />
-                  <span>
-                    <span className="block text-ui font-semibold text-white">
-                      {queueSection.qrCaption}
-                    </span>
-                    <span className="block text-caption text-white/60">
-                      {queueSection.qrSub}
-                    </span>
+            <Reveal delay={0.12} className="mt-8">
+              <div className="bg-canvas ring-hairline shadow-card inline-flex items-center gap-4 rounded-md p-4 ring-1 ring-inset">
+                <QrTile />
+                <span className="min-w-0">
+                  <span className="text-ink text-ui block font-semibold">
+                    {queueSection.qrCaption}
                   </span>
-                  <MotifDiamond className="text-saffron ml-2 size-5" />
-                </div>
-              </Reveal>
-            </div>
-
-            <Reveal direction="left" delay={0.1}>
-              <QueueBoard />
+                  <span className="text-muted block text-caption">
+                    {queueSection.qrSub}
+                  </span>
+                </span>
+                <MotifDiamond className="text-rausch/45 ml-1 size-5 shrink-0" />
+              </div>
             </Reveal>
           </div>
-        </Container>
-      </Spotlight>
+
+          <Reveal delay={0.08}>
+            <QueueBoard />
+          </Reveal>
+        </div>
+      </Container>
     </Section>
   );
 }
@@ -108,29 +122,29 @@ function QueueBoard() {
   return (
     <div
       ref={ref}
-      className="rounded-slab bg-obsidian-soft/90 relative p-5 ring-1 ring-white/12 ring-inset backdrop-blur-xl sm:p-6"
+      className="bg-canvas ring-hairline shadow-card relative rounded-md p-5 ring-1 ring-inset sm:p-6"
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="bg-rausch grid size-10 place-items-center rounded-xl text-white">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="bg-rausch-cta grid size-10 shrink-0 place-items-center rounded-full text-white">
             <Scissors className="size-5" strokeWidth={2.2} aria-hidden />
           </span>
-          <span>
-            <span className="block text-ui font-semibold text-white">
+          <span className="min-w-0">
+            <span className="text-ink text-ui block truncate font-semibold">
               Norling Hair Studio
             </span>
-            <span className="block text-caption text-white/55">
+            <span className="text-muted block truncate text-caption">
               2 chairs · Thimphu
             </span>
           </span>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 text-caption-sm font-semibold tracking-wider text-white uppercase">
+        <span className="text-muted bg-surface-soft ring-hairline-soft inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-badge font-semibold tracking-[0.08em] uppercase ring-1 ring-inset">
           <span className="bg-rausch size-1.5 animate-pulse rounded-full" />
           Live
         </span>
       </div>
 
-      <ul className="mt-6 flex flex-col gap-2.5">
+      <ul className="mt-5 flex flex-col gap-2">
         <AnimatePresence initial={false} mode="popLayout">
           {list.map((entry, i) => {
             const state = i === 0 ? "in-chair" : i === 1 ? "next" : "waiting";
@@ -140,27 +154,27 @@ function QueueBoard() {
               <motion.li
                 key={entry.id}
                 layout
-                initial={{ opacity: 0, y: 26, scale: 0.96 }}
+                initial={{ opacity: 0, y: 22, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 40, scale: 0.95 }}
-                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+                exit={{ opacity: 0, x: 32, scale: 0.96 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                 className={cn(
-                  "flex items-center gap-3.5 rounded-2xl px-4 py-3.5 ring-1 ring-inset",
+                  "flex items-center gap-3 rounded-md px-3.5 py-3 ring-1 ring-inset",
                   isYou
-                    ? "bg-rausch/14 ring-rausch/45"
+                    ? "bg-rausch-soft ring-rausch/35"
                     : state === "in-chair"
-                      ? "bg-white/10 ring-white/15"
-                      : "bg-white/[0.04] ring-white/10",
+                      ? "bg-surface-strong ring-transparent"
+                      : "bg-surface-soft ring-transparent",
                 )}
               >
                 <span
                   className={cn(
                     "grid size-9 shrink-0 place-items-center rounded-full text-caption font-semibold",
                     state === "in-chair"
-                      ? "bg-white text-ink"
+                      ? "bg-ink text-white"
                       : isYou
-                        ? "bg-rausch text-white"
-                        : "bg-white/10 text-white/70",
+                        ? "bg-rausch-cta text-white"
+                        : "bg-canvas text-muted",
                   )}
                 >
                   {state === "in-chair" ? (
@@ -173,29 +187,29 @@ function QueueBoard() {
                 <span className="min-w-0 flex-1">
                   <span
                     className={cn(
-                      "block truncate text-ui font-medium",
-                      isYou ? "text-white" : "text-white/85",
+                      "text-ui block truncate font-medium",
+                      isYou ? "text-ink font-semibold" : "text-ink",
                     )}
                   >
                     {entry.name}
                   </span>
-                  <span className="block truncate text-caption text-white/50">
+                  <span className="text-muted block truncate text-caption">
                     {entry.service}
                   </span>
                 </span>
 
                 {state === "in-chair" && (
-                  <span className="shrink-0 rounded-full bg-white/12 px-2.5 py-1 text-caption-sm font-semibold tracking-wider text-white/80 uppercase">
+                  <span className="bg-canvas text-muted shrink-0 rounded-full px-2.5 py-1 text-badge font-semibold tracking-[0.08em] uppercase">
                     In chair
                   </span>
                 )}
                 {state === "next" && (
-                  <span className="bg-rausch shrink-0 rounded-full px-2.5 py-1 text-caption-sm font-semibold tracking-wider text-white uppercase">
+                  <span className="bg-rausch-cta shrink-0 rounded-full px-2.5 py-1 text-badge font-semibold tracking-[0.08em] text-white uppercase">
                     Next
                   </span>
                 )}
                 {state === "waiting" && (
-                  <span className="shrink-0 text-caption text-white/45">
+                  <span className="text-muted-soft shrink-0 text-caption tabular-nums">
                     ~{i * 9} min
                   </span>
                 )}
@@ -205,24 +219,25 @@ function QueueBoard() {
         </AnimatePresence>
       </ul>
 
-      {/* The notification that fires when "You" is two turns out. */}
+      {/* The notification that fires when "You" is two turns out. Ink, so the one
+          moment on this band that is meant to interrupt actually does. */}
       <AnimatePresence>
         {youIndex === 2 && (
           <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            initial={{ opacity: 0, y: 14, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.98 }}
-            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-4 flex items-center gap-3 rounded-2xl bg-white px-4 py-3.5"
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className="bg-ink mt-4 flex items-center gap-3 rounded-md px-4 py-3.5"
           >
-            <span className="bg-rausch-soft text-rausch grid size-9 shrink-0 place-items-center rounded-full">
+            <span className="bg-rausch-cta grid size-9 shrink-0 place-items-center rounded-full text-white">
               <Bell className="size-4" strokeWidth={2.2} aria-hidden />
             </span>
             <span className="min-w-0">
-              <span className="text-ink block text-body-sm font-semibold">
+              <span className="block text-body-sm font-semibold text-white">
                 You&apos;re two away — start heading back
               </span>
-              <span className="text-muted block text-caption">
+              <span className="block truncate text-caption text-white/60">
                 Norling Hair Studio · about 18 min
               </span>
             </span>
@@ -234,9 +249,10 @@ function QueueBoard() {
 }
 
 /**
- * A stylised QR mark. The module pattern is derived from the cell coordinates
- * so server and client render identically (no `Math.random`, no hydration
- * mismatch) — it is decoration, not a scannable code.
+ * A stylised QR mark. The module pattern is derived from the cell coordinates so
+ * server and client render identically (no `Math.random`, no hydration mismatch) —
+ * it is decoration, not a scannable code. The real, scannable one is in the download
+ * band.
  */
 function QrTile() {
   const size = 11;
@@ -252,7 +268,7 @@ function QrTile() {
 
   return (
     <span
-      className="grid size-12 shrink-0 gap-[1px] rounded-lg bg-white p-1.5"
+      className="bg-surface-soft ring-hairline-soft grid size-12 shrink-0 gap-[1px] rounded-sm p-1.5 ring-1 ring-inset"
       style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
       aria-hidden
     >

@@ -1,110 +1,138 @@
 
 /* ---------------------------------------------------------------------------
-   Design tokens — mirrors DESIGN.md / app/lib/ui/tokens.dart so the marketing
-   site and the product read as one brand. The landing page adds an editorial
-   layer on top (cream canvas, oversized display type, full-bleed photography)
-   that the in-app system deliberately does not use.
-   Do not hardcode hex values in components; add a token here instead.
+   The marketing site's own layer, on top of the product tokens in `globals.css`.
+
+   ## What this layer is now
+
+   It was an *editorial* layer — a 5rem display clamp, a rotating gradient rim, a
+   breathing halo, a light sheen, a dzong-window arch mask. The redesign moves the
+   public pages onto the system described in `../tho/DESIGN.md`: a white canvas
+   carrying near-black ink, **one** accent voltage, soft rounded shapes, hairline
+   rules, a single shadow tier, and hierarchy carried by photography and whitespace
+   rather than by typographic muscle.
+
+   Three consequences, all deliberate:
+
+   1. **The display scale came down and the weights came with it.** The reference is
+      explicit that display type sits at modest weights — 500/600, not the 700+ that
+      enterprise systems lean on — "because the brand trusts photography and generous
+      whitespace over typographic muscle". A 5rem/900 headline is the opposite of that,
+      and it was the single loudest thing on the page.
+   2. **Radii are the product scale, so this file declares none.** `globals.css`
+      already carries `--radius-sm` 8px, `--radius-md` 14px, `--radius-lg` 20px and
+      `--radius-xl` 32px — which *are* the reference's `rounded.{sm,md,lg,xl}`, to the
+      pixel. `--radius-slab` (2rem) and `--radius-slab-lg` (2.75rem) stay declared in
+      `globals.css` for the customer shell and are simply no longer used out here.
+   3. **Four animations and one mask utility are gone**: the rotating `rim-card` and
+      its `@property` angle, the breathing `glow`, the sweeping `sheen`, the
+      `pulse-ring`, the unused `float`, and the `arch` mask. Each was a decoration
+      competing with the photography for the same attention. What is left is the
+      marquee, the kira rule's wipe, and the film grain over dark photographic bands.
+
+   ## What is NOT taken from the reference
+
+   Its palette. THO keeps its own brand: rausch `#ff385c` is the accent everywhere it
+   is a colour, and `--color-rausch-cta` `#e00b41` is the fill under white text —
+   white on `#ff385c` measures 3.53:1 and fails WCAG AA, which is a fixed rule in
+   `globals.css`, not a preference. The Bhutanese accents below stay for the kira rule
+   and the woven motif; they are identity, and they are ornament only.
+
+   Both tokens and rules here reach **every** route, because `globals.css` imports this
+   file. Everything declared below is verified to be referenced from marketing files
+   only — do not add a token here that a product route would pick up.
 --------------------------------------------------------------------------- */
 @theme {
-  /* Brand voltage (Rausch) — primary CTAs + active states only. */
-
-  /* Ink / text. Never pure black. */
-
-  /* Hairlines. */
-
-  /* Surfaces — the marketing canvas is warm, not white. */
-
-  /* Dark bands (footer, dashboard showcase, CTA). */
-
-  /* Semantic. */
+  /* Semantic. `globals.css` owns the rest of the palette. */
   --color-success: #0b6b3a;
-
-  /* Bhutanese accents — drawn from dzong trim, monastic cloth and kira
-     weaving. Decorative only: rausch stays the single action colour. */
 
   /* --- Type -------------------------------------------------------------
      **One family.** Inter, loaded variable in `app/layout.tsx`, and the same face
-     `../tho_web` and the Flutter app render in — so the seam between marketing and
+     the product and the Flutter app render in — so the seam between marketing and
      product is a URL change and nothing else.
 
-     This replaced three families: DM Sans for body, Inter Black 900 for the hero,
-     Instrument Serif italic for accent words inside headings. `--font-serif` and
-     `--font-display` are gone with them. Emphasis in a heading is now weight
-     contrast (see `components/ui/text-reveal.tsx`), which is the whole reason one
-     family is enough. */
+     Every step carries its own leading and tracking. Two rules the numbers follow,
+     both from the reference:
 
-  /* Display scale (marketing only), capped so the hero still breaks on its
-     intended two lines inside the 7-of-12 column it occupies.
+     1. **Leading opens as size drops** — 1.08 at the display end, 1.65 at prose.
+     2. **Tracking tightens as size grows, and only above ~20px.** Inter is drawn for
+        negative tracking at display sizes and needs none below that.
 
-     Every step now carries its own leading and tracking. They used to carry
-     neither: the clamps set a size and inherited body's 1.5, which at 5rem is
-     around 40px of daylight inside a two-line headline. Inter also needs real
-     negative tracking above ~2rem or the caps drift apart. */
-  --text-display-2xl: clamp(2.75rem, 5.6vw, 5rem);
-  --text-display-2xl--line-height: 1.02;
-  --text-display-2xl--letter-spacing: -0.035em;
-  --text-editorial-xl: clamp(2.25rem, 5.5vw, 4.5rem);
-  --text-editorial-xl--line-height: 1.05;
-  --text-editorial-xl--letter-spacing: -0.032em;
-  --text-editorial-lg: clamp(1.875rem, 3.6vw, 3rem);
-  --text-editorial-lg--line-height: 1.1;
-  --text-editorial-lg--letter-spacing: -0.025em;
-  --text-editorial-md: clamp(1.5rem, 2.4vw, 2rem);
-  --text-editorial-md--line-height: 1.18;
-  --text-editorial-md--letter-spacing: -0.02em;
+     The display steps stay `clamp()`ed because this is a page read at 390px and at
+     1440px, and a fixed 56px headline is a four-line headline on a phone. */
 
-  /* --- Text scale -------------------------------------------------------
-     There was no scale here at all. 143 elements carried an arbitrary
-     bracket size across **18 distinct values** — 11px, 12px, 13px, 14px, 15px,
-     16px, 17px, 18px, 19px, 20px, 22px, 24px, 28px, 32px … — none of them
-     carrying a line-height or any tracking, so everything inherited body's flat
-     1.5. Eighteen sizes chosen one component at a time is not a hierarchy, and
-     it is most of what read as generic.
+  /* The hero, and nothing else. Was clamp(2.75rem, 5.6vw, 5rem) at weight 900 —
+     80px of near-black display type carrying a page whose real subject is the
+     photography behind it. */
+  --text-display-2xl: clamp(2.375rem, 4vw, 3.375rem); /* 38 → 54 */
+  --text-display-2xl--line-height: 1.08;
+  --text-display-2xl--letter-spacing: -0.026em;
 
-     These six steps absorb all 143. Same names and roles as `../tho_web`'s scale
-     so the two repos describe type the same way, plus `body-lg` — marketing prose
-     wants a more generous measure than product UI, and 17px at 1.65 is that. */
+  /* The closing call to action — the one band that still speaks over a photograph. */
+  --text-editorial-xl: clamp(1.9375rem, 3.1vw, 2.625rem); /* 31 → 42 */
+  --text-editorial-xl--line-height: 1.12;
+  --text-editorial-xl--letter-spacing: -0.022em;
 
-  /* Section headings and card titles below the display sizes. */
-  --text-heading: 1.375rem; /* 22px */
-  --text-heading--line-height: 1.25;
-  --text-heading--letter-spacing: -0.018em;
+  /* Every section heading. */
+  --text-editorial-lg: clamp(1.625rem, 2.3vw, 2.125rem); /* 26 → 34 */
+  --text-editorial-lg--line-height: 1.18;
+  --text-editorial-lg--letter-spacing: -0.018em;
 
-  /* Sub-headings, plan names, feature titles. */
-  --text-subheading: 1.125rem; /* 18px */
-  --text-subheading--line-height: 1.35;
-  --text-subheading--letter-spacing: -0.01em;
+  /* Sub-section headings, the mobile nav's rows, big figures inside a card. */
+  --text-editorial-md: clamp(1.25rem, 1.7vw, 1.5rem); /* 20 → 24 */
+  --text-editorial-md--line-height: 1.28;
+  --text-editorial-md--letter-spacing: -0.012em;
+
+  /* Band titles and plan names — the reference's `display-sm`. */
+  --text-heading: 1.3125rem; /* 21px */
+  --text-heading--line-height: 1.3;
+  --text-heading--letter-spacing: -0.012em;
+
+  /* Card titles. Deliberately the same size as `body-lg`: the reference sets card
+     titles and running text at one size and lets **weight** carry the difference,
+     which is what keeps a card grid from reading as a stack of headlines. */
+  --text-subheading: 1.0625rem; /* 17px */
+  --text-subheading--line-height: 1.4;
+  --text-subheading--letter-spacing: -0.006em;
 
   /* Marketing prose — the generous measure. */
   --text-body-lg: 1.0625rem; /* 17px */
   --text-body-lg--line-height: 1.65;
 
-  /* Default prose and dense copy. */
-
   /* The UI voice: nav links, buttons, labels, chips. Carries 500. */
   --text-ui: 0.9375rem; /* 15px */
   --text-ui--line-height: 1.4;
-  --text-ui--letter-spacing: -0.006em;
+  --text-ui--letter-spacing: -0.004em;
 
-  /* Secondary copy and table rows. */
+  /* --- Chrome ------------------------------------------------------------
+     The public header's height, in its own token because four things subtract it:
+     the header itself, the hero's top padding, `/privacy`'s, and every
+     `scroll-margin-top` on an anchored heading. It was a literal in all four and
+     they had drifted 24px apart, which is what put an anchored heading under the
+     bar.
 
-  /* Captions, metadata, footnotes — usually `text-muted`. */
+     Outside `@theme` deliberately — Tailwind prunes a theme variable that no
+     utility references, and these are read only from inside `calc()` in an
+     arbitrary value, which the scanner cannot see as a use. Same reasoning as
+     `--header-height` in `globals.css`. */
 
-  /* Eyebrows and the smallest labels. Positive tracking is what makes 12px
-     uppercase readable rather than a smudge. */
-
-  /* Radii — generous, matching the reference's soft rounded slabs. */
-
-  /* Motion. */
+  /* --- Motion -----------------------------------------------------------
+     Three, down from eight. `glow`, `sheen`, `spin-rim`, `pulse-ring` and `float`
+     went with the decorations that used them. */
   --animate-marquee: marquee 42s linear infinite;
   --animate-marquee-slow: marquee 70s linear infinite;
-  --animate-float: float 7s ease-in-out infinite;
-  --animate-pulse-ring: pulse-ring 2.4s ease-out infinite;
   --animate-draw-x: draw-x 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
-  --animate-glow: glow 4.5s ease-in-out infinite;
-  --animate-sheen: sheen 3.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-  --animate-spin-rim: spin-rim 7s linear infinite;
+}
+
+/* See the note in `@theme` above: consumed only from `calc()` inside arbitrary
+   values, so it has to be emitted unconditionally. */
+:root {
+  --site-header-height: 4.5rem; /* 72px below sm */
+}
+
+@media (min-width: 40rem) {
+  :root {
+    --site-header-height: 5rem; /* 80px — the reference's `top-nav` height */
+  }
 }
 
 @keyframes marquee {
@@ -116,30 +144,6 @@
   }
 }
 
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-12px);
-  }
-}
-
-/* Animatable angle for the rotating gradient rim on the recommended plan.
-   Registered so it can be tweened; without @property it would snap. */
-@property --rim-angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
-
-@keyframes spin-rim {
-  to {
-    --rim-angle: 360deg;
-  }
-}
-
 /* Left-anchored wipe — the kira rule draws itself in. */
 @keyframes draw-x {
   from {
@@ -147,44 +151,6 @@
   }
   to {
     transform: scaleX(1);
-  }
-}
-
-/* Slow breathing halo behind the recommended plan. */
-@keyframes glow {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: scale(0.97);
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.03);
-  }
-}
-
-/* Light sweeping across a surface. */
-@keyframes sheen {
-  0% {
-    transform: translateX(-120%);
-  }
-  60%,
-  100% {
-    transform: translateX(220%);
-  }
-}
-
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.85);
-    opacity: 0.55;
-  }
-  70% {
-    transform: scale(1.7);
-    opacity: 0;
-  }
-  100% {
-    opacity: 0;
   }
 }
 
@@ -217,12 +183,11 @@
     color: #fff;
   }
 
-  /* Tracking is per-step now, on the tokens, so the blanket `-0.02em` that used to
-     sit here is gone. It was wrong at both ends: a `text-display-2xl` needs about
-     -0.035em and a 15px `h3` needs none at all, and one value cannot be both. It
-     also silently applied to every heading that set no `text-` utility.
+  /* Tracking is per-step, on the tokens above — a blanket value here would be wrong
+     at both ends, since a display clamp wants about -0.026em and a 15px label wants
+     none at all.
 
-     `text-wrap: balance` stays — it is what stops a two-line heading leaving one
+     `text-wrap: balance` stays: it is what stops a two-line heading leaving one
      orphaned word, and it has nothing to do with tracking. */
   h1,
   h2,
@@ -244,20 +209,19 @@
 }
 
 @utility shadow-card {
-  /* The one shadow tier from DESIGN.md — a surface either has it or none. */
+  /* The one shadow tier from DESIGN.md — a surface either has it or none. There is
+     no second tier out here any more: the reference applies this *same* definition
+     to hover-floated cards, to the search bar at rest and to every dropdown, and
+     says so explicitly ("This is the single shadow definition in the entire
+     system"). `shadow-lift` stays declared in `globals.css` for the customer shell;
+     nothing under `(marketing)` uses it. */
   box-shadow:
     0 0 0 1px rgb(0 0 0 / 0.02),
     0 2px 6px rgb(0 0 0 / 0.04),
     0 4px 8px rgb(0 0 0 / 0.1);
 }
 
-@utility shadow-lift {
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / 0.02),
-    0 18px 40px -12px rgb(0 0 0 / 0.28);
-}
-
-/* Edge-to-edge fade used on marquees and the logo strip. */
+/* Edge-to-edge fade used on the category strip and the motif divider. */
 @utility mask-edges {
   mask-image: linear-gradient(
     to right,
@@ -266,31 +230,6 @@
     black 92%,
     transparent
   );
-}
-
-/* Dzong-window arch: an elliptical head over a squared foot. Used on the
-   pictorial cards so the photography reads as Bhutanese architecture. */
-@utility arch {
-  border-radius: 50% 50% 2rem 2rem / 30% 30% 3% 3%;
-}
-
-/* A white card with a slowly rotating brand rim. Two backgrounds on one
-   element — the flat fill clipped to padding-box, the spinning gradient to
-   border-box — so there is no extra layer to fight over z-index. */
-@utility rim-card {
-  border: 2px solid transparent;
-  background:
-    linear-gradient(var(--color-paper), var(--color-paper)) padding-box,
-    conic-gradient(
-        from var(--rim-angle),
-        color-mix(in oklab, var(--color-rausch) 12%, transparent) 0deg,
-        var(--color-rausch) 60deg,
-        var(--color-saffron) 105deg,
-        color-mix(in oklab, var(--color-rausch) 12%, transparent) 190deg,
-        color-mix(in oklab, var(--color-rausch) 12%, transparent) 360deg
-      )
-      border-box;
-  animation: var(--animate-spin-rim);
 }
 
 @utility grain {

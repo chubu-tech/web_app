@@ -1,34 +1,68 @@
 "use client";
 
-import { motion, useMotionValue, useReducedMotion, useSpring } from "motion/react";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/marketing/utils";
 
 type Variant = "primary" | "ink" | "ghost" | "light";
 
+/**
+ * Four fills, and the accent is spent on exactly one of them.
+ *
+ * `primary` is `--color-rausch-cta` (#e00b41), **not** `--color-rausch` (#ff385c).
+ * That is not a shade preference: white on #ff385c measures 3.53:1 and fails WCAG
+ * AA, and the deeper step measures 4.89:1. `globals.css` states the rule and this is
+ * the only place on the public site that puts white text on a brand fill, so it is
+ * the only place it matters. #ff385c stays THO's accent everywhere it is a *colour*
+ * rather than a *background under white* — the wordmark, rules, dots, active states,
+ * icon tints, the search orb's ring.
+ *
+ * `ghost` is the reference's `button-secondary`: canvas fill, ink label, a 1px
+ * stroke that darkens on hover. `light` is the same idea over photography.
+ */
 const VARIANTS: Record<Variant, string> = {
-  // Brand voltage — reserved for the single primary action in a band.
-  primary: "bg-rausch text-white hover:bg-rausch-active",
+  primary: "bg-rausch-cta text-white hover:bg-rausch-cta-pressed",
   ink: "bg-ink text-white hover:bg-obsidian",
   ghost:
-    "bg-transparent text-ink ring-1 ring-inset ring-ink/15 hover:ring-ink/40 hover:bg-ink/[0.03]",
+    "bg-canvas text-ink ring-1 ring-inset ring-border-strong hover:ring-ink hover:bg-surface-soft",
   light:
-    "bg-white/12 text-white ring-1 ring-inset ring-white/25 backdrop-blur-md hover:bg-white/20",
+    "bg-white/14 text-white ring-1 ring-inset ring-white/30 backdrop-blur-md hover:bg-white/24",
 };
 
 /**
- * Pill CTA. It is magnetic: the button leans a few pixels toward the cursor and
- * springs back on leave, and the arrow lifts diagonally — the small repeated
- * interaction that makes every call to action feel handled.
+ * Two heights, and only two, so every call to action on the page is one of a pair.
  *
- * Pass `href` for a link, or `onClick` for a real `<button>`. Everything on this
- * page used to be a link; the search band needs a submit control, and it should
- * look identical rather than be a fork of this file.
+ * 48px is the reference's `button-primary` height and its stated touch-target
+ * floor; 56px is the same button given the room a closing band wants. The label
+ * steps 15 → 16px with it and the weight stays 500 at both — the reference sets
+ * `button-md` at 16/500 and `button-sm` at 14/500, and never goes heavier.
+ */
+const SIZES = {
+  md: "h-12 px-6 text-ui",
+  lg: "h-14 px-7 text-body-md",
+} as const;
+
+/**
+ * The page's one button.
+ *
+ * **It no longer moves.** It used to be magnetic — a spring that leaned the pill a
+ * few pixels toward the cursor and sprang back, plus an arrow that lifted
+ * diagonally. Two reasons it went. The reference documents its press state as
+ * "no transform, no shadow change", and a pill that dodges the pointer is the
+ * opposite of the restraint the rest of this redesign is built on. And it made every
+ * call to action on the site a `motion` component with two springs and a
+ * `pointermove` handler, on a page that has eleven of them.
+ *
+ * What is left is a colour transition, which is what the reference specifies.
+ *
+ * Pass `href` for a link, or `onClick` for a real `<button>`. `arrow` now defaults
+ * to **false** — the reference's buttons carry a label and nothing else — but the
+ * prop is kept because the two "keep reading" links in the hero are genuinely
+ * directional and read better with one.
  */
 type Common = {
   children: React.ReactNode;
   variant?: Variant;
-  size?: "md" | "lg";
+  size?: keyof typeof SIZES;
   arrow?: boolean;
   className?: string;
 };
@@ -46,51 +80,25 @@ export function Button(props: AsLink | AsButton) {
     children,
     variant = "primary",
     size = "md",
-    arrow = true,
+    arrow = false,
     className,
   } = props;
 
-  const reduced = useReducedMotion();
-  const spring = { stiffness: 260, damping: 18, mass: 0.4 };
-  const x = useSpring(useMotionValue(0), spring);
-  const y = useSpring(useMotionValue(0), spring);
-
-  function pull(event: React.PointerEvent<HTMLElement>) {
-    if (reduced || event.pointerType !== "mouse") return;
-    const box = event.currentTarget.getBoundingClientRect();
-    // Cap the travel so the pill never detaches from its layout slot.
-    x.set(((event.clientX - (box.left + box.width / 2)) / box.width) * 14);
-    y.set(((event.clientY - (box.top + box.height / 2)) / box.height) * 10);
-  }
-
-  function release() {
-    x.set(0);
-    y.set(0);
-  }
-
-  const shared = {
-    onPointerMove: pull,
-    onPointerLeave: release,
-    style: reduced ? undefined : { x, y },
-    className: cn(
-      "group/btn inline-flex shrink-0 items-center gap-2 rounded-full font-medium",
-      "transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
-      size === "lg" ? "h-14 px-7 text-body-lg" : "h-12 px-6 text-ui",
-      VARIANTS[variant],
-      "disabled:pointer-events-none disabled:opacity-50",
-      className,
-    ),
-  };
+  const classes = cn(
+    "group/btn inline-flex shrink-0 items-center justify-center gap-2 rounded-full font-medium",
+    "transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
+    SIZES[size],
+    VARIANTS[variant],
+    "disabled:pointer-events-none disabled:opacity-50",
+    className,
+  );
 
   const inner = (
     <>
-      <span>{children}</span>
+      <span className="truncate">{children}</span>
       {arrow && (
         <ArrowUpRight
-          className={cn(
-            "size-[1.15em] shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
-            "group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5",
-          )}
+          className="size-[1.15em] shrink-0 transition-transform duration-200 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5"
           strokeWidth={2}
           aria-hidden
         />
@@ -100,20 +108,20 @@ export function Button(props: AsLink | AsButton) {
 
   if (props.href !== undefined) {
     return (
-      <motion.a href={props.href} {...shared}>
+      <a href={props.href} className={classes}>
         {inner}
-      </motion.a>
+      </a>
     );
   }
 
   return (
-    <motion.button
+    <button
       type={props.type ?? "button"}
       onClick={props.onClick}
       disabled={props.disabled}
-      {...shared}
+      className={classes}
     >
       {inner}
-    </motion.button>
+    </button>
   );
 }

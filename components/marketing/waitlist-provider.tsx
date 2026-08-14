@@ -183,23 +183,27 @@ function WaitlistDialog({
           // is the same bug that made every `Sheet` in the product a sliver; see
           // `components/ui/sheet.tsx`. Here it left the waitlist modal 24px wide
           // with its heading, field and button spilling out beside it.
-          "bg-canvas relative w-full max-w-[32rem] p-6 shadow-2xl sm:p-9",
+          "bg-canvas shadow-card relative w-full max-w-[32rem] p-6 sm:p-8",
           // A sheet on a phone, a card on everything else — the modal is the
           // full width of a 390px screen either way, so squaring off the
           // bottom corners is the honest shape there.
-          "rounded-t-slab sm:rounded-slab max-h-[92dvh] overflow-y-auto",
+          //
+          // `lg`/`md` are the product radii (20px / 14px), matching every other card
+          // on the redesigned page. `shadow-2xl` went with them: this page has one
+          // shadow tier and a modal already has a scrim doing the separating.
+          "rounded-t-lg sm:rounded-md max-h-[92dvh] overflow-y-auto",
         ].join(" ")}
       >
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="text-ink ring-ink/12 hover:bg-ink/5 absolute top-5 right-5 grid size-9 place-items-center rounded-full ring-1 ring-inset transition-colors"
+          className="text-ink ring-hairline hover:bg-surface-soft hover:ring-border-strong absolute top-5 right-5 grid size-9 place-items-center rounded-full ring-1 ring-inset transition-colors"
         >
           <X className="size-4" strokeWidth={2} aria-hidden />
         </button>
 
-        <span className="text-rausch text-caption-sm font-semibold tracking-[0.16em] uppercase">
+        <span className="text-rausch text-caption-sm font-semibold tracking-[0.14em] uppercase">
           {waitlist.eyebrow}
         </span>
 
@@ -222,7 +226,7 @@ function WaitlistDialog({
           ))}
         </h2>
 
-        <p id={`${id}-body`} className="text-body mt-3 text-ui leading-relaxed">
+        <p id={`${id}-body`} className="text-body text-body-md mt-3">
           {waitlist.body}
         </p>
 

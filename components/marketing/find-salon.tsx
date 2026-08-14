@@ -143,7 +143,7 @@ export function FindSalon({ index }: { index: SalonIndex }) {
                 <button
                   type="button"
                   onClick={() => setQuery(EMPTY_QUERY)}
-                  className="text-muted hover:text-ink text-body-sm font-medium underline decoration-current/30 underline-offset-4 transition-colors"
+                  className="text-muted hover:text-ink text-ui font-medium underline decoration-current/30 decoration-2 underline-offset-4 transition-colors"
                 >
                   {searchCopy.clear}
                 </button>
@@ -184,11 +184,17 @@ export function FindSalon({ index }: { index: SalonIndex }) {
                 body={origin ? copy.nearbyBody : copy.nearbyPrompt}
                 action={
                   origin ? undefined : (
+                    // Geometry matched to `Button`'s `ghost` variant — 48px tall,
+                    // pill, hairline stroke — so the one control inside a band
+                    // header is the same object as every other control on the page.
+                    // It stays a bare `<button>` rather than becoming one because it
+                    // carries a leading icon, and `Button` wraps its children in a
+                    // truncating span.
                     <button
                       type="button"
                       onClick={locate}
                       disabled={locating}
-                      className="text-ink ring-hairline hover:ring-ink/40 inline-flex items-center gap-2 rounded-full px-4 py-2 text-body-sm font-medium ring-1 ring-inset transition-colors disabled:opacity-50"
+                      className="text-ink ring-border-strong hover:ring-ink hover:bg-surface-soft text-ui inline-flex h-12 shrink-0 items-center gap-2 rounded-full px-5 font-medium ring-1 ring-inset transition-colors disabled:opacity-50"
                     >
                       <LocateFixed className="text-rausch size-4" aria-hidden />
                       {locating ? searchCopy.place.locating : copy.nearbyAction}
@@ -227,11 +233,14 @@ function Band({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mt-14 first:mt-12">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+    /* A hairline opens each band after the first — the reference separates
+       long-scrolling editorial sections with a 1px rule rather than with more
+       whitespace, which is what keeps a page of card grids reading as one page. */
+    <div className="border-hairline-soft mt-12 border-t pt-10 first:mt-10 first:border-t-0 first:pt-0">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0">
           <Eyebrow>{title}</Eyebrow>
-          <p className="text-body mt-2 max-w-2xl text-ui">{body}</p>
+          <p className="text-body text-body-lg mt-2 max-w-[38rem]">{body}</p>
         </div>
         {action}
       </div>
@@ -240,9 +249,22 @@ function Band({
   );
 }
 
+/**
+ * The reference's collapsing rule, verbatim: "drop column counts cleanly at each
+ * breakpoint — never reflow rows; always reduce columns." 4 → 3 → 2 → 1.
+ *
+ * The `xl` step is new. It used to jump 2 → 4 at `lg` (1024px), which put four
+ * cards and their meta into 944px of content — a 216px card holding a salon name, a
+ * rating, a town and a services line. Three columns until 1280px is where those
+ * fields actually fit.
+ *
+ * The row gap is larger than the column gap on purpose: with no card surface, the
+ * gap *is* the separation, and equal gaps made the meta of one row read as part of
+ * the photo below it.
+ */
 function Grid({ matches }: { matches: Match[] }) {
   return (
-    <ul className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <ul className="mt-7 grid grid-cols-1 gap-x-5 gap-y-9 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {matches.map((match, i) => (
         <li key={match.salon.id}>
           <Reveal delay={Math.min(i, 6) * 0.05}>
@@ -256,7 +278,7 @@ function Grid({ matches }: { matches: Match[] }) {
 
 function Note({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-slab bg-paper/60 ring-hairline-soft text-muted mt-6 px-6 py-8 text-center text-ui ring-1 ring-inset">
+    <p className="bg-surface-soft ring-hairline-soft text-muted text-ui mt-7 rounded-md px-6 py-8 text-center ring-1 ring-inset">
       {children}
     </p>
   );
@@ -264,9 +286,9 @@ function Note({ children }: { children: React.ReactNode }) {
 
 function Empty() {
   return (
-    <div className="rounded-slab bg-paper/60 ring-hairline-soft mt-6 px-6 py-14 text-center ring-1 ring-inset">
-      <p className="text-subheading font-semibold">{copy.emptyTitle}</p>
-      <p className="text-muted mt-2 text-ui">{copy.emptyBody}</p>
+    <div className="bg-surface-soft ring-hairline-soft mt-7 rounded-md px-6 py-14 text-center ring-1 ring-inset">
+      <p className="text-heading text-ink font-semibold">{copy.emptyTitle}</p>
+      <p className="text-muted text-body-lg mt-2">{copy.emptyBody}</p>
     </div>
   );
 }

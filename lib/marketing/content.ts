@@ -337,6 +337,44 @@ export const forSalons = {
 } as const;
 
 /**
+ * The proof band, between the owner section and the price list.
+ *
+ * ## Why this is figures and not quotes
+ *
+ * The slot it fills is the one a landing page normally gives to testimonials, and
+ * this page deliberately has none. `MARKETING-ARCHITECTURE.md` records why, under
+ * "Before this goes live": *"Social proof was removed on purpose: the earlier
+ * testimonials and stat figures were invented. Add them back only with real,
+ * consented quotes and measured numbers."* Writing a salon owner's words for them
+ * is not a design decision, and a redesign is not a licence to reopen it.
+ *
+ * So the band answers the same question — *is anyone actually using this?* — with
+ * the only material that needs nobody's consent: **counts of what is already live**,
+ * read from the same build-time salon index the search band runs on. Every figure is
+ * derived at render from `SalonIndex`; there is no number typed into this file, and
+ * there is nothing here that can drift from what the search band shows a few
+ * hundred pixels above it.
+ *
+ * The band renders **nothing at all** when the index is empty — a build that could
+ * not reach the database would otherwise print four zeroes under a heading that says
+ * "live right now".
+ *
+ * When there are real, consented quotes, they belong beside this — not instead of
+ * it.
+ */
+export const proof = {
+  eyebrow: "Live right now",
+  title: "Already open for business",
+  body: "Counted from the salons on Tho today, refreshed every hour. Nothing on this page is a projection.",
+  stats: {
+    salons: "Salons listed",
+    treatments: "Treatments to book",
+    professionals: "Stylists and barbers",
+    towns: "Towns covered",
+  },
+} as const;
+
+/**
  * **Prices are mirrored from `../tho/app/lib/business/plans/plans_config.dart`, never
  * set here.** That file is what a salon owner actually sees inside the app, and it is
  * explicit: the final launch prices set 2026-08-03 are **Nu 399 / 699 / 1,499** a month,

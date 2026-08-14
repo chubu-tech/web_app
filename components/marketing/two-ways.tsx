@@ -3,17 +3,35 @@ import { twoWays } from "@/lib/marketing/content";
 import { HoverZoomImage } from "./ui/parallax-image";
 import { Reveal, RevealGroup } from "./ui/reveal";
 import { Container, Section, SectionHeading } from "./ui/section";
-import { Curtain } from "./ui/curtain";
-import { Tilt } from "./ui/tilt";
 
 const ICONS = [CalendarCheck, QrCode];
 
 /**
- * The two paths into a chair — book ahead, or scan on arrival. This is the
- * whole product in one screen, so it sits directly under the hero.
+ * The two paths into a chair — book ahead, or scan on arrival. This is the whole
+ * product in one screen, so it sits directly under the search band.
  *
- * The photographs wear a dzong-window arch (`arch` utility) — the page's main
- * Bhutanese architectural cue.
+ * ## The arch is gone, and that was a considered trade
+ *
+ * The photographs used to sit inside a dzong-window arch: an elliptical head over a
+ * squared foot, drawn by a five-value `border-radius` in the `arch` utility, lifted
+ * by a `Curtain` on entry and leaned toward the cursor by a `Tilt`. It was the
+ * strongest Bhutanese architectural cue on the page.
+ *
+ * It went because the brief here is the reference's **card language**, and that
+ * language has exactly one card shape — a rounded rectangle at `{rounded.md}` — with
+ * the meta stacked beneath it. An arch is a different object, and once the salon
+ * grid, the plan cards and the live board are all rounded rectangles, two arches in
+ * the middle of the page read as a section that belongs to another site.
+ *
+ * THO's Bhutanese identity is not carried by this shape and does not leave with it:
+ * the kira rule opens the hero and the footer, the woven diamond runs through the
+ * category strip and the section divider, the greeting is above the headline, and
+ * the Himalayan skyline still closes the page. Identity here is ornament and
+ * language, which is what `MARKETING-ARCHITECTURE.md` says it was always meant to
+ * be — "deliberately restrained; three motifs, used as ornament only".
+ *
+ * If the arch is wanted back, it is one utility in `app/marketing-tokens.css` and
+ * one class on the photo box; nothing else depended on it.
  */
 export function TwoWays() {
   return (
@@ -23,59 +41,52 @@ export function TwoWays() {
           eyebrow={twoWays.eyebrow}
           title="Two ways into _the chair_"
           body={twoWays.body}
-          align="center"
           titleId="how-it-works-title"
         />
 
         <RevealGroup
-          className="mt-14 grid gap-8 sm:mt-18 lg:grid-cols-2 lg:gap-12"
-          stagger={0.12}
+          className="mt-10 grid gap-8 sm:mt-12 lg:grid-cols-2 lg:gap-10"
+          stagger={0.1}
         >
           {twoWays.options.map((option, i) => {
             const Icon = ICONS[i];
 
             return (
               <Reveal asChild key={option.tag}>
-                <article className="group flex flex-col items-center text-center">
-                  {/* 24rem written out, not `max-w-sm`: a named width resolves
-                      against `--spacing-*` first, so `sm` meant 8px and the arch
-                      photo was a sliver. See `components/ui/sheet.tsx`. */}
-                  <Tilt className="w-full max-w-[24rem]">
-                    <Curtain className="arch aspect-4/5 w-full overflow-hidden" delay={i * 0.1}>
-                      <div className="absolute inset-0">
-                        <HoverZoomImage
-                          src={option.image}
-                          alt={option.alt}
-                          sizes="(min-width: 1024px) 44vw, 92vw"
-                        />
-                        <div
-                          className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent"
-                          aria-hidden
-                        />
-                        <span className="absolute top-6 left-1/2 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/35 px-3.5 py-2 text-caption-sm font-semibold tracking-[0.14em] text-white uppercase ring-1 ring-white/25 ring-inset backdrop-blur-md">
-                          <Icon
-                            className="size-3.5"
-                            strokeWidth={2.2}
-                            aria-hidden
-                          />
-                          {option.tag}
-                        </span>
-                      </div>
-                    </Curtain>
-                  </Tilt>
+                <article className="group flex flex-col">
+                  <div className="bg-surface-soft relative aspect-[4/3] w-full overflow-hidden rounded-md">
+                    <HoverZoomImage
+                      src={option.image}
+                      alt={option.alt}
+                      sizes="(min-width: 1024px) 46vw, 92vw"
+                    />
 
-                  <h3 className="text-ink mt-7 max-w-[24rem] text-heading font-semibold">
+                    {/* The reference's floating badge: white pill, one shadow tier,
+                        top-left over the photo. It was a dark glass capsule centred
+                        on the arch's crown — which only had a crown to sit on. */}
+                    <span className="bg-canvas text-ink shadow-card absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-badge font-semibold tracking-[0.08em] uppercase">
+                      <Icon className="size-3.5" strokeWidth={2.4} aria-hidden />
+                      {option.tag}
+                    </span>
+                  </div>
+
+                  <h3 className="text-ink text-heading mt-5 font-semibold">
                     {option.title}
                   </h3>
-                  <p className="text-body mt-3 max-w-[28rem] leading-relaxed">
+                  <p className="text-body text-body-lg mt-2 max-w-[34rem]">
                     {option.body}
                   </p>
 
-                  <ul className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2">
+                  {/* Stacked, hairline-separated rows rather than a wrapped inline
+                      list. The reference's `amenity-row` is a one-column list with
+                      12px of row padding closed by a rule, and it is the right shape
+                      here for the same reason: two short claims side by side read as
+                      one run-on sentence at 390px. */}
+                  <ul className="border-hairline-soft mt-5 flex flex-col border-t">
                     {option.points.map((point) => (
                       <li
                         key={point}
-                        className="text-muted flex items-center gap-2 text-body-sm"
+                        className="border-hairline-soft text-body flex items-center gap-3 border-b py-3 text-body-md"
                       >
                         <Check
                           className="text-rausch size-4 shrink-0"

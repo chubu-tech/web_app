@@ -162,21 +162,27 @@ export function WaitlistForm({
           }}
           className={cn(
             "h-12 min-w-0 flex-1 rounded-full px-5 text-ui",
-            "ring-1 ring-inset transition-shadow duration-300 outline-none",
+            "ring-1 ring-inset transition-shadow duration-200 outline-none",
+            // The reference's `text-input` focus: the stroke thickens to 2px and
+            // flips to ink. No glow, no ring colour of its own.
             "focus:ring-2",
             dark
               ? "bg-white/10 text-white placeholder:text-white/40"
-              : "text-ink placeholder:text-body/50 bg-white",
+              : "text-ink placeholder:text-muted-soft bg-canvas",
             error
-              ? "ring-rausch focus:ring-rausch"
+              // `error-text` (#c13515), not rausch. They are different reds for a
+              // reason: rausch is the submit button sitting immediately beside this
+              // field, so an invalid address used to outline itself in the same
+              // colour as the control that would accept it.
+              ? "ring-error-text focus:ring-error-text"
               : dark
-                ? "ring-white/20 focus:ring-white/60"
-                : "ring-ink/15 focus:ring-ink/50",
+                ? "ring-white/25 focus:ring-white/70"
+                : "ring-hairline focus:ring-ink",
             "disabled:opacity-60",
           )}
         />
 
-        <Button type="submit" disabled={busy} arrow={!busy} className="justify-center">
+        <Button type="submit" disabled={busy}>
           {busy ? (
             <span className="inline-flex items-center gap-2">
               <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -205,7 +211,10 @@ export function WaitlistForm({
               animate={{ opacity: 1, y: 0 }}
               exit={reduced ? undefined : { opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="text-rausch text-caption"
+              className={cn(
+                "text-caption",
+                dark ? "text-rausch-disabled" : "text-error-text",
+              )}
             >
               {error}
             </motion.p>

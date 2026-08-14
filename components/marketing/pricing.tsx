@@ -7,9 +7,26 @@ import { Container, Section, SectionHeading } from "./ui/section";
 import { WaitlistCta } from "./waitlist-cta";
 
 /**
- * Who pays what. The customer panel comes first and is visually separate from
- * the salon plans, because the single most likely misreading of this page is
- * "do I have to pay to book?".
+ * Who pays what. The customer panel comes first and is visually separate from the
+ * salon plans, because the single most likely misreading of this page is "do I have
+ * to pay to book?".
+ *
+ * ## Three decorations went, and the cards read as a price list now
+ *
+ * The recommended plan wore `rim-card` — a conic gradient rotating around its border
+ * for ever, driven by an `@property` angle — plus `shadow-lift`, the page's second
+ * elevation tier, plus a 16px upward offset that took it out of the row. The
+ * customer panel had a 288px rausch halo behind it breathing on a 4.5s loop.
+ *
+ * All three are gone, and what marks the recommended plan now is what the reference
+ * uses to mark anything: a 2px stroke in the brand colour, a small badge, and the
+ * one filled call to action in the group. That is enough — it was always enough —
+ * and it means the three cards sit on one baseline, which is how a price list is
+ * read.
+ *
+ * The prices themselves are mirrored from `plans_config.dart` upstream and are not
+ * set here. See the long note on `pricing` in `lib/marketing/content.ts` before
+ * changing a figure.
  */
 export function Pricing() {
   return (
@@ -19,45 +36,40 @@ export function Pricing() {
           eyebrow={pricing.eyebrow}
           title="Customers never pay. _Only salons do._"
           body={pricing.body}
-          align="center"
           titleId="pricing-title"
         />
 
-        {/* 1. Customers — free. */}
-        <Reveal className="mt-14 sm:mt-16">
-          <div className="rounded-slab bg-ink relative overflow-hidden p-7 text-white sm:p-9">
-            {/* Soft brand halo, breathing. */}
-            <span
-              className="bg-rausch/25 animate-glow pointer-events-none absolute -top-24 -right-16 size-72 rounded-full blur-3xl"
-              aria-hidden
-            />
-            <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-              {/* 36rem, not `max-w-xl` — that resolves to `--spacing-xl`, 32px.
-                  See `components/ui/sheet.tsx`. */}
+        {/* ── 1. Customers — free ─────────────────────────────────────── */}
+        <Reveal className="mt-10 sm:mt-12">
+          <div className="bg-surface-soft ring-hairline rounded-lg p-6 ring-1 ring-inset sm:p-8">
+            <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-12">
               <div className="max-w-[36rem]">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-caption-sm font-semibold tracking-[0.14em] uppercase ring-1 ring-white/20 ring-inset">
+                <span className="bg-canvas text-ink ring-hairline inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-badge font-semibold tracking-[0.1em] uppercase ring-1 ring-inset">
                   <Smartphone className="size-3.5" strokeWidth={2.2} aria-hidden />
                   {pricing.customer.label}
                 </span>
 
+                {/* The band's one loud figure. The reference reserves its largest
+                    type for a single trust signal per page and sets everything else
+                    modestly; "Nu 0" is that signal here. */}
                 <p className="mt-5 flex items-baseline gap-2">
-                  <span className="text-[3.25rem] leading-none font-semibold tracking-tight">
+                  <span className="text-ink text-editorial-lg font-semibold">
                     {pricing.customer.price}
                   </span>
-                  <span className="text-body-md text-white/60">
+                  <span className="text-muted text-body-md">
                     {pricing.customer.period}
                   </span>
                 </p>
 
-                <p className="mt-4 text-body-lg leading-relaxed text-white/75">
+                <p className="text-body text-body-lg mt-3">
                   {pricing.customer.body}
                 </p>
 
-                <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-2">
+                <ul className="mt-5 flex flex-wrap gap-x-6 gap-y-2">
                   {pricing.customer.points.map((point) => (
                     <li
                       key={point}
-                      className="flex items-center gap-2 text-body-sm text-white/85"
+                      className="text-body flex items-center gap-2 text-body-sm"
                     >
                       <Check
                         className="text-rausch size-4 shrink-0"
@@ -77,16 +89,16 @@ export function Pricing() {
           </div>
         </Reveal>
 
-        {/* 2. Salons — the three plans. `#salon-plans` is reached from the footer's
-            "List your shop" (`lib/content.ts`), the `for-salons.tsx` CTA and the
-            JSON-LD in `app/page.tsx`. The header used to jump here as well, then
-            pointed at the app's sign-in instead; that button is now removed until
-            `../tho_web` is deployed, so the header reaches this section not at all.
-            The anchor sits on the heading, not the section, so the scroll-margin
-            below lands the heading clear of the fixed header. */}
-        <div id="salon-plans" style={{ scrollMarginTop: "7rem" }}>
-          <Reveal className="mt-16 flex items-center gap-4 sm:mt-20">
-            <h3 className="text-ink inline-flex shrink-0 items-center gap-2.5 text-subheading font-semibold">
+        {/* ── 2. Salons — the three plans ─────────────────────────────────
+            `#salon-plans` is reached from the footer's quick links, the
+            `for-salons.tsx` call to action and the JSON-LD in
+            `app/(marketing)/page.tsx`. The anchor sits on the heading, not the
+            section, so the scroll margin lands the heading clear of the fixed
+            header — and the margin is the header's own token now, where it used to
+            be a hardcoded `7rem` against a bar that is 4.5–5rem. */}
+        <div className="scroll-mt-[calc(var(--site-header-height)+2rem)]" id="salon-plans">
+          <Reveal className="mt-14 flex items-center gap-4 sm:mt-16">
+            <h3 className="text-ink text-heading inline-flex shrink-0 items-center gap-2.5 font-semibold">
               <Store className="text-rausch size-5" strokeWidth={2} aria-hidden />
               {pricing.salonHeading}
             </h3>
@@ -95,53 +107,46 @@ export function Pricing() {
         </div>
 
         <RevealGroup
-          className="mt-8 grid items-start gap-5 lg:grid-cols-3"
-          stagger={0.1}
+          className="mt-8 grid items-stretch gap-5 lg:grid-cols-3"
+          stagger={0.08}
         >
           {pricing.tiers.map((tier) => (
             <Reveal asChild key={tier.name}>
               <div
                 className={cn(
-                  "rounded-slab relative flex h-full flex-col p-7 sm:p-8",
-                  "transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                  "bg-canvas relative flex h-full flex-col rounded-md p-6 ring-inset",
+                  "transition-shadow duration-300",
                   tier.featured
-                    ? // The rim rotates slowly around this card only.
-                      "rim-card shadow-lift lg:-mt-4 lg:pb-11"
-                    : "bg-white shadow-card hover:-translate-y-1.5",
+                    ? "ring-rausch ring-2"
+                    : "ring-hairline hover:shadow-card ring-1",
                 )}
               >
                 {tier.featured && (
-                  <span className="bg-rausch absolute -top-3 left-7 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-caption-sm font-semibold tracking-[0.14em] text-white uppercase sm:left-8">
+                  <span className="bg-rausch-cta absolute -top-3 left-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-badge font-semibold tracking-[0.1em] text-white uppercase">
                     <Sparkles className="size-3.5" strokeWidth={2.4} aria-hidden />
                     Most salons pick this
                   </span>
                 )}
 
-                <h4 className="text-ink text-subheading font-semibold">
+                <h4 className="text-ink text-heading font-semibold">
                   {tier.name}
                 </h4>
-                <p className="text-muted mt-1.5 text-ui">
-                  {tier.tagline}
-                </p>
+                <p className="text-muted text-ui mt-1">{tier.tagline}</p>
 
-                <p className="mt-7 flex items-baseline gap-1">
-                  <span className="text-ink text-[2.5rem] leading-none font-semibold tracking-tight">
+                <p className="mt-6 flex items-baseline gap-1">
+                  <span className="text-ink text-editorial-md font-semibold">
                     {tier.price}
                   </span>
-                  <span className="text-muted text-ui">
-                    {tier.period}
-                  </span>
+                  <span className="text-muted text-ui">{tier.period}</span>
                 </p>
 
-                <ul className="mt-7 flex flex-1 flex-col gap-3">
+                <ul className="border-hairline-soft mt-6 flex flex-1 flex-col gap-3 border-t pt-6">
                   {tier.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-3">
                       <span className="bg-rausch-soft text-rausch mt-0.5 grid size-5 shrink-0 place-items-center rounded-full">
                         <Check className="size-3" strokeWidth={3.2} aria-hidden />
                       </span>
-                      <span className="text-body text-ui leading-snug">
-                        {feature}
-                      </span>
+                      <span className="text-body text-body-sm">{feature}</span>
                     </li>
                   ))}
                 </ul>
@@ -149,9 +154,7 @@ export function Pricing() {
                 <Button
                   href="#download"
                   variant={tier.featured ? "primary" : "ghost"}
-                  size="lg"
-                  arrow={false}
-                  className="mt-8 w-full justify-center"
+                  className="mt-7 w-full"
                 >
                   {tier.cta}
                 </Button>
@@ -160,8 +163,8 @@ export function Pricing() {
           ))}
         </RevealGroup>
 
-        <Reveal delay={0.15}>
-          <p className="text-muted mx-auto mt-10 max-w-2xl text-center text-body-sm leading-relaxed">
+        <Reveal delay={0.12}>
+          <p className="text-muted mt-8 max-w-[44rem] text-body-sm">
             {pricing.note}
           </p>
         </Reveal>

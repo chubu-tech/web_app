@@ -28,6 +28,13 @@ export function TextileRule({
     { color: "bg-saffron", w: "w-16" },
   ];
 
+  /*
+    The kira weave keeps all four colours, and it is the **only** place on the site
+    that saffron, maroon and jade still appear. That is the point of it: a woven
+    band is where a palette belongs, and confining them here is what lets the rest
+    of the page hold to one accent without the brand losing its Bhutanese voice.
+  */
+
   return (
     <span
       className={cn(
@@ -61,8 +68,11 @@ export function MotifDivider({ className }: { className?: string }) {
           <div key={half} className="flex shrink-0 items-center">
             {run.map((_, i) => (
               <span key={i} className="flex items-center gap-6 px-3">
-                <MotifDiamond className="text-saffron/70 size-4" />
-                <span className="bg-hairline h-px w-16" />
+                {/* Rausch, not saffron. The single-accent rule means the ornament
+                    tints toward the brand colour rather than introducing a second
+                    one; at 35% it is a tone rather than a statement. */}
+                <MotifDiamond className="text-rausch/35 size-4" />
+                <span className="bg-hairline-soft h-px w-16" />
               </span>
             ))}
           </div>

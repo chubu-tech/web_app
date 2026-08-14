@@ -10,108 +10,100 @@ import { TextReveal } from "./ui/text-reveal";
 import { WaitlistCta } from "./waitlist-cta";
 
 /**
- * Where the QR points. An absolute URL because the whole point is that it is
- * read by a camera on a different device, which has no origin to resolve
- * against — and `?src=qr` is what makes a scan distinguishable from a click in
+ * Where the QR points. An absolute URL because the whole point is that it is read by
+ * a camera on a different device, which has no origin to resolve against — and
+ * `?src=qr` is what makes a scan distinguishable from a click in
  * `app_waitlist.source`.
  */
 const QR_TARGET = `https://${brand.domain}/waitlist?src=qr`;
 
 /**
- * Closing download band. The page's primary action appears twice — here and in
- * the hero — because everything between them is the argument for tapping it.
+ * Closing call to action. The page's primary action appears twice — here and in the
+ * hero — because everything between them is the argument for tapping it.
  *
- * Pre-launch that action is the waitlist, and this band is the one place that
- * gets a **scannable** QR beside it. It is here rather than in the hero for the
- * same reason the band exists at all: somebody at the bottom of the page has
- * read the argument, and they are the ones who will pick up a phone. It
- * resolves to `/waitlist` — a real route — because a camera cannot open a
- * modal.
+ * **This is the page's one dark surface, and it is a photograph rather than a
+ * fill.** The queue band and the footer were both dark before; with those on the
+ * light system this band is the single full stop, which is what it was always for.
+ * The reference's canvas is white everywhere and its contrast comes from
+ * photography — this is that, once.
+ *
+ * The scannable QR sits here rather than in the hero for the same reason the band
+ * exists: somebody at the bottom of the page has read the argument, and they are the
+ * ones who will pick up a phone. It resolves to `/waitlist` — a real route — because
+ * a camera cannot open a modal.
  */
 export function DownloadBand() {
   return (
     <section
       id="download"
       aria-labelledby="download-title"
-      className="pb-6"
-      style={{ scrollMarginTop: "6rem" }}
+      className="scroll-mt-[calc(var(--site-header-height)+1.5rem)] pt-2 pb-14 sm:pb-16 lg:pb-20"
     >
       <Container>
         <ParallaxImage
           src={download.image}
           alt={download.alt}
-          className="rounded-slab-lg grain min-h-[28rem] w-full sm:min-h-[32rem]"
-          sizes="100vw"
-          strength={9}
+          className="grain min-h-[26rem] w-full sm:min-h-[30rem]"
+          rounded="rounded-lg"
+          sizes="(min-width: 1280px) 1280px, 100vw"
+          strength={8}
         >
           <div
-            className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/35 to-black/75"
+            className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-black/75"
             aria-hidden
           />
 
-          <div className="relative flex min-h-[28rem] flex-col items-center justify-center px-6 py-20 text-center sm:min-h-[32rem]">
+          <div className="relative flex min-h-[26rem] flex-col items-center justify-center px-6 py-16 text-center sm:min-h-[30rem] sm:px-10">
             <Reveal>
-              <span className="text-rausch text-caption-sm font-semibold tracking-[0.16em] uppercase">
+              <span className="text-rausch text-caption-sm font-semibold tracking-[0.14em] uppercase">
                 {download.eyebrow}
               </span>
             </Reveal>
 
-            {/* Rausch, matching the eyebrow above and the Sign in button — this band
-                was the last saffron text on the page. Note this accent does sit beside
-                real controls (the waitlist button and the QR card below), which the
-                hero's accent deliberately does not; the weight drop and the display
-                size are what keep it reading as a headline rather than a link. */}
             <TextReveal
               as="h2"
               id="download-title"
               lines={parseHeading("The chair is ready _when you are_")}
-              className="text-editorial-xl mt-4 max-w-3xl font-semibold text-white"
+              className="text-editorial-xl mt-3 max-w-[38rem] font-semibold text-white"
               accentClassName="text-rausch"
             />
 
-            <Reveal delay={0.12}>
-              {/* 32rem, not `max-w-lg` — that resolves to `--spacing-lg`, 24px.
-                  See `components/ui/sheet.tsx`. */}
-              <p className="mt-5 max-w-[32rem] text-body-lg leading-relaxed text-white/80">
+            <Reveal delay={0.1}>
+              {/* 32rem written out, not `max-w-lg` — that resolves to
+                  `--spacing-lg`, 24px. See `components/ui/sheet.tsx`. */}
+              <p className="text-body-lg mt-4 max-w-[32rem] text-white/80">
                 {download.body}
               </p>
             </Reveal>
 
-            <Reveal delay={0.16}>
-              <div className="mt-8 flex flex-col items-center gap-6 sm:flex-row sm:items-stretch sm:justify-center">
+            <Reveal delay={0.14}>
+              <div className="mt-8 flex flex-col items-center gap-5 sm:flex-row sm:justify-center">
                 <WaitlistCta source="download_button" size="lg" />
 
-                {/* The scan route, offered beside the tap route rather than
-                    instead of it — a laptop reader taps, a phone reader scans,
-                    and neither should have to switch device. */}
-                <div className="flex items-center gap-4 rounded-2xl bg-white/10 p-3 ring-1 ring-white/20 ring-inset backdrop-blur-md">
+                {/* The scan route, offered beside the tap route rather than instead
+                    of it — a laptop reader taps, a phone reader scans, and neither
+                    should have to switch device. */}
+                <div className="bg-canvas shadow-card flex items-center gap-4 rounded-md p-3 pr-4">
                   {/*
-                    Square corners, and `rounded-none` rather than dropping the class —
-                    stating the zero is what stops the next reader "restoring" a radius.
-
-                    It was `rounded-xl`, which in this repo is `--radius-xl` — **32px**,
-                    not Tailwind's 12px. On an 80px tile that is a deep bite out of three
-                    corners, and those are exactly where a QR's finder patterns sit. The
-                    white square here *is* the quiet zone (`qr-code.tsx` bakes `margin: 0`
-                    into the SVG precisely so this element owns it), so rounding it was
-                    eating the margin a camera needs to lock on. Zero is the correct value
-                    for a scannable code, not only the requested one.
-
-                    The logo lockups elsewhere keep `rounded-xl` deliberately — this is a
-                    per-element change, not a token change.
+                    Square corners, and `rounded-none` rather than dropping the class
+                    — stating the zero is what stops the next reader "restoring" a
+                    radius. The white square here *is* the quiet zone
+                    (`qr-code.tsx` bakes `margin: 0` into the SVG precisely so this
+                    element owns it), and a camera needs it square to lock onto the
+                    finder patterns in the corners.
                   */}
-                  <div className="rounded-none bg-white p-2">
+                  <div className="rounded-none bg-white">
                     <QrCode
                       value={QR_TARGET}
                       label={`QR code — scan to ${waitlist.cta.toLowerCase()} for ${brand.appName}`}
                       className="size-16"
                     />
                   </div>
-                  <span className="pr-2 text-left">
-                    <span className="block text-ui font-semibold text-white">
+                  <span className="text-left">
+                    <span className="text-ink text-ui block font-semibold">
                       {waitlist.qr.caption}
                     </span>
-                    <span className="block text-caption text-white/65">
+                    <span className="text-muted block text-caption">
                       {waitlist.qr.sub}
                     </span>
                   </span>
@@ -119,14 +111,14 @@ export function DownloadBand() {
               </div>
             </Reveal>
 
-            <Reveal delay={0.24}>
+            <Reveal delay={0.2}>
               <StoreBadges tone="light" className="mt-7 justify-center" />
             </Reveal>
           </div>
 
-          {/* Himalayan skyline closing the band — misted white so it reads
-              against the photograph rather than disappearing into it. */}
-          <MountainRule className="absolute inset-x-0 bottom-0 h-16 text-white/20 sm:h-20" />
+          {/* Himalayan skyline closing the band — misted white so it reads against
+              the photograph rather than disappearing into it. */}
+          <MountainRule className="absolute inset-x-0 bottom-0 h-14 text-white/20 sm:h-20" />
         </ParallaxImage>
       </Container>
     </section>

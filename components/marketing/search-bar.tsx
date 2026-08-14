@@ -13,7 +13,6 @@ import { search as copy } from "@/lib/marketing/content";
 import type { SalonIndex } from "@/lib/marketing/salons";
 import { TIME_WINDOWS, type Coords, type Query, type TimeWindow } from "@/lib/marketing/search";
 import { cn } from "@/lib/marketing/utils";
-import { Button } from "./ui/button";
 import {
   PanelChip,
   PanelHeading,
@@ -96,14 +95,27 @@ export function SearchBar({
 
   return (
     <div className="flex flex-col gap-3">
+      {/*
+        **The signature element of the reference, and now of this page.**
+
+        `search-bar-pill`: a white surface at 9999px radius and 64px tall, carrying
+        the one shadow tier, divided into segments by vertical hairlines and
+        terminated by a circular accent orb. Every measurement here comes from
+        `../tho/DESIGN.md` — 64px bar, 48px orb, hairline dividers.
+
+        It used to be a cream `rounded-slab-lg` tray with a black "Search" pill on
+        the end. On a page whose canvas is now white, a cream tray reads as an
+        unexplained second surface, and the black pill spent the strongest control
+        on the page on the one action that fetches nothing.
+
+        No `backdrop-blur` here on purpose: `backdrop-filter` creates a stacking
+        context, which would trap the open panel's z-index inside this row and let
+        the salon grid paint over it.
+      */}
       <div
         className={cn(
-          // No backdrop-blur here on purpose: `backdrop-filter` creates a
-          // stacking context, which would trap the open panel's z-index inside
-          // this row and let the salon grid paint over it. The bar sits on the
-          // cream canvas anyway, so the blur bought nothing.
-          "bg-canvas-deep/70 rounded-slab-lg ring-hairline-soft flex flex-col gap-1 p-2 ring-1 ring-inset",
-          "sm:flex-row sm:items-center sm:rounded-full sm:gap-0",
+          "bg-canvas ring-hairline shadow-card flex flex-col gap-1 rounded-lg p-2 ring-1 ring-inset",
+          "sm:h-16 sm:flex-row sm:items-center sm:gap-0 sm:rounded-full sm:py-0 sm:pr-2 sm:pl-2",
         )}
       >
         <SearchPanel
@@ -303,15 +315,27 @@ export function SearchBar({
           </div>
         </SearchPanel>
 
-        <div className="p-1 sm:pl-2">
-          <Button
-            variant="ink"
-            arrow={false}
+        {/*
+          The `search-orb`. Circular and 48px from `sm` up, where it is the hottest
+          single colour moment on the page; a full-width labelled pill below that,
+          because a bare 48px circle at the foot of a stacked column of three
+          segments reads as a decoration rather than the control that closes them.
+
+          `sm:sr-only` keeps the word in the accessible name at every width, so the
+          orb needs no `aria-label` that could drift from the visible label.
+        */}
+        <div className="p-1 sm:p-0 sm:pl-2">
+          <button
+            type="button"
             onClick={close}
-            className="w-full justify-center sm:w-auto"
+            className={cn(
+              "bg-rausch-cta hover:bg-rausch-cta-pressed text-ui inline-flex h-12 w-full items-center justify-center gap-2 rounded-full font-medium text-white",
+              "transition-colors duration-200 sm:size-12 sm:w-12 sm:shrink-0",
+            )}
           >
-            {copy.submit}
-          </Button>
+            <Search className="size-5 shrink-0" strokeWidth={2.2} aria-hidden />
+            <span className="sm:sr-only">{copy.submit}</span>
+          </button>
         </div>
       </div>
 
@@ -335,7 +359,9 @@ function Divider() {
 
 function CountChip({ label, value }: { label: string; value: number }) {
   return (
-    <span className="bg-canvas text-body inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-caption-sm font-medium">
+    // `bg-surface-soft`, not `bg-canvas`: the panel this sits in is canvas-white,
+    // so a canvas chip on it was invisible. Same bug the option rows had.
+    <span className="bg-surface-soft text-body inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-caption-sm font-medium">
       {label}
       <span className="text-muted tabular-nums">{value}</span>
     </span>
@@ -374,7 +400,7 @@ function MonthGrid({
           type="button"
           onClick={() => onMonth(new Date(year, monthIndex - 1, 1))}
           aria-label="Previous month"
-          className="text-muted hover:text-ink hover:bg-canvas grid size-8 place-items-center rounded-full transition-colors"
+          className="text-muted hover:text-ink hover:bg-surface-soft grid size-8 place-items-center rounded-full transition-colors"
         >
           <ChevronLeft className="size-4" aria-hidden />
         </button>
@@ -385,7 +411,7 @@ function MonthGrid({
           type="button"
           onClick={() => onMonth(new Date(year, monthIndex + 1, 1))}
           aria-label="Next month"
-          className="text-muted hover:text-ink hover:bg-canvas grid size-8 place-items-center rounded-full transition-colors"
+          className="text-muted hover:text-ink hover:bg-surface-soft grid size-8 place-items-center rounded-full transition-colors"
         >
           <ChevronRight className="size-4" aria-hidden />
         </button>
@@ -418,8 +444,8 @@ function MonthGrid({
                 value === selected
                   ? "bg-ink font-semibold text-white"
                   : value === todayIso
-                    ? "ring-rausch/40 text-ink font-semibold ring-1 ring-inset hover:bg-canvas"
-                    : "text-body hover:bg-canvas",
+                    ? "ring-rausch/50 text-ink font-semibold ring-1 ring-inset hover:bg-surface-soft"
+                    : "text-body hover:bg-surface-soft",
               )}
             >
               {Number(value.slice(-2))}
