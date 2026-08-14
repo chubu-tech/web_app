@@ -102,14 +102,23 @@ const WHEEL_LINE_PX = 16;
  *
  * Nothing is sticky and nothing is positioned over anything else.
  *
- * ## The hand
+ * ## The hand, twice — because the two sizes have different affordances
  *
- * Below `lg` a small pointing hand sits under the chips and mimes the swipe — see
- * `SwipeHint`. The chips look like a segmented control to somebody who has used
- * one before; the panel being *draggable* is the part nothing on screen announces,
- * and the timer moving it on its own reads as a slideshow rather than as an
- * invitation. The hand is the invitation, and it is spent the moment it is
- * accepted: `taken` both stops the demo and collapses the hint away.
+ * Both sizes get a pink pointing hand, and they are two components rather than one
+ * with a breakpoint prop, because they answer two different questions.
+ *
+ * - **Below `lg`, `SwipeHint`** sits under the chips and mimes the swipe. The chips
+ *   look like a segmented control to anybody who has used one before; the panel
+ *   being *draggable* is the part nothing on screen announces.
+ * - **At `lg`, `RailHint`** taps the rail row the demo is about to move to. The
+ *   rail rows carry no button chrome — they are a title, a sentence and an icon,
+ *   and the selected one is distinguished only by a soft fill — so on a still
+ *   screenshot the column reads as a legend for the card beside it rather than as
+ *   four controls. Hover says otherwise, but only after you have already guessed.
+ *
+ * Either way the timer moving the panel on its own reads as a slideshow rather
+ * than as an invitation. The hand is the invitation, and it is spent the moment it
+ * is accepted: `taken` stops the demo and takes both hints with it.
  */
 export function ForSalons() {
   const features = forSalons.features;
@@ -118,6 +127,20 @@ export function ForSalons() {
   const cardRef = useRef<HTMLDivElement>(null);
   const inView = useInView(cardRef, { amount: 0.3 });
   const reduced = useReducedMotion();
+
+  /**
+   * Where the rail's four rows sit, so the desktop hand can park beside one of
+   * them. Measured rather than derived: the rows are as tall as their sentences
+   * wrap, so they are four different heights and no two viewports agree about
+   * which. `offsetTop` is relative to the rail wrapper, which is the rows'
+   * offset parent because it is the only positioned ancestor.
+   *
+   * Empty below `lg` — the wrapper is `display: none` there, so every row
+   * measures 0 — which is also what keeps the hand out of the DOM at those
+   * widths without a second breakpoint to keep in step.
+   */
+  const railRef = useRef<HTMLDivElement>(null);
+  const [rowCentres, setRowCentres] = useState<number[]>([]);
 
   /** `dir` is +1 for a leftward slide, -1 for a rightward one. */
   const [slide, setSlide] = useState({ active: 0, dir: 1 });
@@ -158,6 +181,26 @@ export function ForSalons() {
     },
     [count],
   );
+
+  useEffect(() => {
+    const el = railRef.current;
+    if (!el) return;
+    // Same shape as the panel's height observer below: the callback fires once
+    // on `observe()`, so the first measurement arrives without a `setState` in
+    // the effect body. A row cannot change height without changing the column's,
+    // so observing the wrapper alone catches every reflow — including the one
+    // that matters most, `display: none` giving way to a box at `lg`.
+    const observer = new ResizeObserver(() => {
+      const rows = el.querySelectorAll<HTMLElement>('[role="tab"]');
+      setRowCentres(
+        el.offsetHeight === 0
+          ? []
+          : Array.from(rows, (row) => row.offsetTop + row.offsetHeight / 2),
+      );
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // One timer per panel rather than one interval for the section: keying it on
   // `active` restarts the dwell whenever the panel changes for any reason, which
@@ -220,15 +263,23 @@ export function ForSalons() {
               `hidden lg:block` is `display: none`, so below `lg` this is out of the
               accessibility tree and out of the tab order — which is what lets the
               chips inside the card be the only tablist on a phone — while its four
-              titles and sentences stay in the HTML for a crawler. */}
+              titles and sentences stay in the HTML for a crawler.
+
+              The wrapper exists for two reasons: it is what the hand is positioned
+              against, and it keeps the hand *out* of the tablist, whose children
+              should be tabs and nothing else. */}
           <div
-            role="tablist"
-            aria-label="What you can do from one screen"
-            aria-orientation="vertical"
-            onKeyDown={onTabKeyDown}
-            className="hidden lg:col-start-1 lg:row-start-1 lg:flex lg:flex-col lg:gap-2"
+            ref={railRef}
+            className="relative hidden lg:col-start-1 lg:row-start-1 lg:block"
           >
-            {features.map((feature, i) => {
+            <div
+              role="tablist"
+              aria-label="What you can do from one screen"
+              aria-orientation="vertical"
+              onKeyDown={onTabKeyDown}
+              className="flex flex-col gap-2"
+            >
+              {features.map((feature, i) => {
               const Icon = ICONS[i];
               const isActive = active === i;
 
@@ -299,6 +350,20 @@ export function ForSalons() {
                 </button>
               );
             })}
+            </div>
+
+            {/* Held back until the rows have been measured, so it appears beside
+                the row it means rather than sliding down from the top of the
+                column on the first paint. An empty array is also how "below `lg`"
+                is spelled — see the observer. */}
+            {rowCentres.length === count && (
+              <RailHint
+                y={rowCentres[(active + 1) % count]}
+                hinting={!taken}
+                animate={running}
+                reduced={Boolean(reduced)}
+              />
+            )}
           </div>
 
           {/* ── The card ─────────────────────────────────────────────────── */}
@@ -766,6 +831,122 @@ function SwipeHint({
         </span>
       </div>
     </motion.div>
+  );
+}
+
+/**
+ * One tap, then a longer rest than the tap itself.
+ *
+ * The mobile hand fades out between passes because it is miming a gesture that
+ * has a beginning and an end. This one does not: it is parked beside a row, and
+ * a pointer that blinks out every two seconds reads as a glitch rather than as a
+ * rest. So only the *tap* is periodic — the hand stays put — which is also what
+ * keeps it on the quiet side of noticeable.
+ */
+const TAP_LOOP: Transition = {
+  duration: 1.4,
+  times: [0, 0.3, 0.55, 1],
+  repeat: Infinity,
+  repeatDelay: 1.2,
+  ease: "easeInOut",
+};
+
+/**
+ * The desktop nudge: a hand resting on the next rail row, tapping it.
+ *
+ * ## Where it sits, and why there is no room anywhere else
+ *
+ * Straddling the **right edge** of the row it is pointing at, half over the row's
+ * own 16px padding and half in the 56px column gap. Both halves are empty by
+ * construction — padding has no text in it and the gap has no column in it — so
+ * this is the one place near a row that cannot overlap anything at any width. The
+ * alternatives all fail on the same point: the rows' text runs the full width
+ * between the icon and the right padding, and the 8px between rows is smaller
+ * than the hand.
+ *
+ * It is `pointer-events-none`, which matters more here than it looks: it overlaps
+ * a real control, and a hint that swallowed the click it is asking for would be
+ * worse than no hint.
+ *
+ * ## It points at the *next* row, not a fixed one
+ *
+ * `(active + 1) % count`, so it is always beside a row that is **not** selected —
+ * the requirement, since a hand on the row already showing says nothing. It
+ * follows the demo down the column and takes the long way back to the top on the
+ * wrap, which has the side effect of making the auto-advance look intended: the
+ * hand taps a row, and a moment later that row is the one on screen.
+ *
+ * ## Motion
+ *
+ * Three states, and `prefers-reduced-motion` gets the third rather than nothing:
+ * the hand still parks beside the next row at full opacity, still moves with the
+ * selection, and simply does not tap. Guidance is the point; the tap was only the
+ * delivery. The travel between rows is the same 0.55s ease as everything else in
+ * this section, and it is the only movement that survives the setting — under it
+ * the panel does not advance on its own, so the hand does not move either.
+ *
+ * Spent on first use, like the mobile one: `hinting` is `!taken`, and it leaves by
+ * fading and shrinking rather than by unmounting, so nothing snaps.
+ */
+function RailHint({
+  y,
+  hinting,
+  animate,
+  reduced,
+}: {
+  y: number;
+  hinting: boolean;
+  animate: boolean;
+  reduced: boolean;
+}) {
+  const settle: Transition = { duration: 0.3, ease: EASE };
+
+  return (
+    <motion.span
+      aria-hidden
+      // `-right-4` puts the 28px box's centre 2px outside the column: the 18px
+      // hand reaches 11px into the row's 16px padding and 7px into the gap.
+      className="pointer-events-none absolute top-0 -right-4 grid size-7 place-items-center"
+      initial={false}
+      animate={{
+        // The box is 28px tall, so half of it is what centres the hand on the row.
+        y: y - 14,
+        opacity: hinting ? 1 : 0,
+        scale: hinting ? 1 : 0.7,
+      }}
+      transition={reduced ? { duration: 0 } : { duration: 0.55, ease: EASE }}
+    >
+      {/* The touch point, expanding out from under the finger on the press. */}
+      <motion.span
+        className="bg-rausch/25 absolute inset-0 m-auto size-6 rounded-full"
+        initial={false}
+        animate={
+          animate
+            ? { scale: [0.45, 0.6, 1.4, 1.4], opacity: [0, 0.7, 0, 0] }
+            : { scale: 1, opacity: 0 }
+        }
+        transition={animate ? TAP_LOOP : settle}
+      />
+      <motion.span
+        className="text-rausch relative"
+        initial={false}
+        animate={
+          animate
+            ? {
+                x: [0, -4, -4, 0],
+                y: [0, 2, 2, 0],
+                // Tilted toward the row it is tapping, and straightening slightly
+                // as it presses — the wrist of the gesture, in two degrees.
+                rotate: [-18, -10, -10, -18],
+                scale: [1, 0.9, 0.9, 1],
+              }
+            : { x: 0, y: 0, rotate: -18, scale: 1 }
+        }
+        transition={animate ? TAP_LOOP : settle}
+      >
+        <Pointer className="size-[1.125rem]" strokeWidth={2.4} aria-hidden />
+      </motion.span>
+    </motion.span>
   );
 }
 
