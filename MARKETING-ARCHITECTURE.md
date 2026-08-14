@@ -122,7 +122,10 @@ app/
   (marketing)/
     layout.tsx          WaitlistProvider only — no data-shell wrapper
     page.tsx            composition + JSON-LD graph
-    privacy/ waitlist/
+    waitlist/           the QR target — mounts no header, on purpose
+    (documents)/
+      layout.tsx        SiteHeader + 46rem column + SiteFooter, for all four
+      help/ privacy/ legal/terms/ legal/content-policy/
 components/marketing/
   site-header.tsx       floating bar that condenses to a pill, mobile sheet
   hero.tsx / service-marquee.tsx / find-salon.tsx / search-bar.tsx
@@ -308,8 +311,8 @@ file's own header comment for what is verbatim and what is not.
 ### The top bar floats, so nothing beneath it knows its height
 
 The bar is `fixed` and reserves nothing. `--site-header-height` (72px below `sm`,
-80px above) is still what the hero, `/privacy` and every `scroll-mt` gutter is built
-from, and it is deliberately **not** the bar's own height any more: the bar is 88px
+80px above) is still what the hero, the four documents and every `scroll-mt` gutter is
+built from, and it is deliberately **not** the bar's own height any more: the bar is 88px
 open and 80px condensed at `sm` and up, 80/72 below it. Measured, the condensed pill
 occupies exactly the reserved 72/80 including its 12px top margin, and the open bar
 is 8px taller than the reservation against a hero gutter that is 24–48px larger
@@ -347,8 +350,51 @@ does neither under reduced motion; the sheet is `aria-modal` with focus on its c
 button, five 20px/600 links, a circle reveal that becomes a plain fade under reduced
 motion, and Escape closes it and hands focus back to the hamburger. All five nav
 anchors land with their heading 121–288px clear of the condensed bar, on desktop and
-through the sheet. `/privacy` renders the same bar; `/waitlist` deliberately renders
-none.
+through the sheet. All four documents render the same bar; `/waitlist` deliberately
+renders none.
+
+### The footer's Legal column now lands on this site, not in the app
+
+Four links — Help, Terms of Service, Privacy Policy, Content policy — and until this
+change **three of them rendered the customer app**. The hrefs were right and every
+destination answered 200, which is why it survived: `/legal/terms` lived under
+`app/(customer)/`, so pressing it from the landing page handed a signed-out reader the
+product's own nav — Bookings, Messages, Saved — wrapped around a policy. They were
+reachable at all only because `requireLiveAccount()` turns away a deleted or suspended
+account and nothing else.
+
+All four now live in **`app/(marketing)/(documents)/`**, a nested route group, so not
+one URL moved: `/privacy` is still what both app stores have on file, `/legal/terms`
+and `/legal/content-policy` are still what `TermsGate` and `ReportSheet` link to from
+inside the product, and `next.config.ts` still redirects `/legal/privacy` to
+`/privacy`. The layout mounts `SiteHeader`, a 46rem column and `SiteFooter` once —
+`/privacy` used to write those out inside the page, which is what let the other three
+drift.
+
+Three things this settled, all measured:
+
+- **The three that moved are now static.** They no longer call `requireLiveAccount()`,
+  so they read no cookies and prerender — `○` in the build tree where they were `ƒ`.
+  A suspended account can also still read the terms it is being judged against.
+- **A `scroll-mt` on each page's `<article>` is load-bearing.** Reaching a document
+  from inside the product is a top-level route-group change, so Next scrolls the
+  changed segment into view — and `shouldSkipElement` passes over the progress line
+  and the header because both are `fixed`, leaving the page's root element as the
+  target. Measured on a build: `article.scrollIntoView()` lands at scrollY 136 with
+  the `<h1>` at viewport 0, **underneath an 80px bar**, while `main.scrollIntoView()`
+  lands at 0 — which is exactly why arriving from `/` was fine and arriving from
+  `/discover` was not. `/privacy` had this defect before the move and now does not.
+- **The words are unchanged.** Only the type scale moved, from the product's
+  `display-xl`/`body-md` onto the marketing `editorial-lg`/`body-lg`, so the four read
+  as one family. `/help` swapped its white-on-cream cards for the divided-row idiom
+  the FAQ band uses, because `bg-paper` is `#ffffff` and this canvas is too.
+
+Verified at 390 / 834 / 1440 by pressing each link in the footer rather than typing the
+URL: right path, right `<h1>`, no `[data-shell]` anywhere in the tree, the logo
+resolving `/#top`, the marketing footer beneath, a 736px centred column, no horizontal
+overflow, and the heading clear of the bar. Then the logo back to `/`, `/legal/privacy`
+still redirecting, and the same four links from inside `/discover` — which still
+renders the customer shell — landing here.
 
 ### The salon screen: nothing is sticky, and the card carries its own controls
 

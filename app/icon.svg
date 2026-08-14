@@ -1,5 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <rect width="32" height="32" rx="8" fill="#FF385C" />
+  <!-- rx = half the box, so the tile is a circle — the shape every rendering of the
+       mark takes now, in the two headers, both footers and the share card. -->
+  <rect width="32" height="32" rx="16" fill="#FF385C" />
   <g
     fill="none"
     stroke="#FFFFFF"

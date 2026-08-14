@@ -30,12 +30,10 @@ import { WaitlistCta } from "./waitlist-cta";
  *
  * 1. **A blank `href` is not rendered.** The filter stays because it is what makes
  *    the next policy a one-line paste — same mechanism as `brand.stores`. All four
- *    legal routes exist and **all four were verified anonymously** before being
- *    linked: 200, with their own `<h1>`, not a redirect to `/sign-in`. Three of them
- *    live under `app/(customer)/`, whose layout calls `requireLiveAccount()` — a
- *    name that reads as "members only" and is not; it turns away a deleted or
- *    suspended account and nothing else. Re-run the check if that helper grows a
- *    third redirect.
+ *    legal routes exist and **all four now render this footer**: they live together
+ *    under `app/(marketing)/(documents)/`, so following one of these links no longer
+ *    hands the reader the customer app's nav. Three of them used to, and it was
+ *    invisible from here — the hrefs were right and the destinations answered 200.
  * 2. **The signup is a button, not an inline form.** The email is asked for in the
  *    modal it opens, which renders the same `WaitlistForm` with the same validation
  *    and the same "already on the list is a success" state, and rows still land with
@@ -100,8 +98,10 @@ export function SiteFooter() {
               <span className="flex items-center gap-2.5">
                 {/* The header's lockup. The mark carries its own crimson ground, so
                     it needs no tile — but it does need `overflow-hidden` to take the
-                    rounded corners. */}
-                <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md">
+                    shape. `rounded-full`, matching the bar above and the product's own
+                    lockup: this was `rounded-md` while the bar clamped to a circle, so
+                    the top and the bottom of the same page disagreed about the mark. */}
+                <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full">
                   <Image
                     src="/tho-logo.webp"
                     alt=""

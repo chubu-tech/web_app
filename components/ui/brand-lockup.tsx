@@ -14,11 +14,18 @@ import { cn } from "@/lib/utils";
  *
  * - **`alt=""`.** The wordmark beside it is the accessible name and the link carries
  *   `aria-label`; two copies of "Tho" to a screen reader is worse than none.
- * - **`rounded-md` (14px), not the editorial `slab`.** 2rem on a 36px box is a circle.
- *   This tile is chrome, so it takes the product radius scale even on the cream canvas.
+ * - **`rounded-full`, and it is the same call in all four places the mark renders.** This
+ *   used to be `rounded-md` (14px) here and in the marketing footer, while both header
+ *   marks were `rounded-xl` — 32px against a 36px box, which the browser clamps to a
+ *   circle. So the product wore a rounded square and the public site wore a circle, from
+ *   one asset, and the difference was invisible in the class names. Stating the radius
+ *   rather than relying on the clamp is what stops that happening again: change the tile
+ *   size and `rounded-xl` silently stops being round.
  *
  * The 12° tilt over 500ms on `../landing_page`'s easing curve is `site-header.tsx`'s own
- * hover, and it sits on the **tile** rather than the whole lockup, matching it.
+ * hover, and it sits on the **tile** rather than the whole lockup, matching it. A circle
+ * is the one shape a rotation cannot reveal, so the tilt now reads only on the artwork
+ * inside — which is the intent, since the syllable is the thing that should lean.
  */
 export function BrandLockup({
   href = "/",
@@ -46,7 +53,7 @@ export function BrandLockup({
         width={36}
         height={36}
         priority={priority}
-        className="size-9 shrink-0 rounded-md object-cover transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:rotate-12"
+        className="size-9 shrink-0 rounded-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:rotate-12"
       />
       {/* "THO" in ink, not "Tho" in rausch. `brand.name` on the marketing site is the
           uppercase form and its wordmark is `text-ink`; the pink mixed-case version was a

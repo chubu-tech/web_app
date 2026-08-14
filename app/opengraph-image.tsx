@@ -30,7 +30,8 @@ export default async function Image() {
             style={{
               width: 64,
               height: 64,
-              borderRadius: 18,
+              // Half the box: a circle, matching every other rendering of the mark.
+              borderRadius: 32,
               background: "#ff385c",
               display: "flex",
               alignItems: "center",

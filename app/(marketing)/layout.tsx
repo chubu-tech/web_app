@@ -1,7 +1,8 @@
 import { WaitlistProvider } from "@/components/marketing/waitlist-provider";
 
 /**
- * The public marketing site's shell — `/`, `/waitlist`, `/privacy`.
+ * The public marketing site's shell — `/`, `/waitlist`, and the four documents in
+ * `(documents)`: `/help`, `/legal/terms`, `/privacy` and `/legal/content-policy`.
  *
  * ## Why this exists at all
  *
@@ -15,7 +16,8 @@ import { WaitlistProvider } from "@/components/marketing/waitlist-provider";
  *
  * `app/(marketing)/page.tsx` is `/`, not `/marketing`. That is the whole point: the landing
  * page stays the public-facing homepage while the product keeps its own URLs, and the two
- * only meet at the root layout.
+ * only meet at the root layout. The nested `(documents)` group works the same way, which is
+ * how three policy pages moved out of `app/(customer)/` without one URL changing.
  *
  * ## No `data-shell` wrapper
  *

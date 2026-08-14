@@ -63,7 +63,7 @@ Every gap the audit found. Nothing on this list is outstanding.
 | M5 | **Terms gate** before a first review and a first message | `components/ui/terms-gate.tsx`, called at both write sites |
 | M6 | **Report** content — all five targets | `components/ui/report-sheet.tsx`, `report-button.tsx` |
 | M7 | **Block / unblock**, and a blocked-users list | `components/customer/thread-safety-menu.tsx`, `/profile/blocked` |
-| M8 | Terms, Privacy, Content policy, Help | `app/(customer)/legal/{terms,privacy,content-policy}`, `/help` |
+| M8 | Terms, Privacy, Content policy, Help | `app/(marketing)/(documents)/{help,privacy,legal/terms,legal/content-policy}` — same URLs, public shell |
 | P1 | `link_staff_member` **removed** | `lib/api/owner-setup.ts` — see the RPC table above |
 
 **One deviation from the plan, deliberate.** The plan called for a route at `/staff/invite`.

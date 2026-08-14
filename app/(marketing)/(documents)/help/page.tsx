@@ -20,27 +20,45 @@ export const metadata: Metadata = {
  * enforces: the cancellation window is the salon's own `cancellation_window_hours`, the
  * queue is `queue_active_line`, cash on collection is the whole payment model, and points
  * are awarded by `handle_booking_status_event` on completion.
+ *
+ * ## It is a public document now, and that changes who reads it
+ *
+ * This is the first of the footer's four Legal links, and it used to render inside the
+ * customer app — a page of "here is where that is in the product" wrapped in the product's
+ * own nav, which is the one audience that did not need it. It renders in the public shell
+ * now (see `(documents)/layout.tsx`), so somebody deciding whether to sign up can read what
+ * the thing does first. The six answers are unchanged, links included: they still point
+ * into the app, which is where those things are, and a signed-out reader meets the sign-in
+ * wall at the destination rather than at the explanation.
+ *
+ * The rows are the divided list the landing page's FAQ band uses, not the accordion. These
+ * are six short answers somebody arrives at from a footer with a question already in mind —
+ * an accordion would hide five of them behind a press, and a document that cannot fail to
+ * render is worth more here than a gesture.
  */
 export default function HelpPage() {
   return (
-    <div className="px-base py-xl tablet:px-lg mx-auto w-full max-w-[680px]">
-      <h1 className="text-display-xl text-ink font-semibold">Help</h1>
-      <p className="text-body-md text-body mt-base">
+    <article className="scroll-mt-[calc(var(--site-header-height)+1.5rem)]">
+      <h1 className="text-editorial-lg font-semibold">Help</h1>
+
+      <p className="text-body mt-6 text-body-lg leading-relaxed">
         The things people ask most. Each one ends where you can go and do it.
       </p>
 
-      <div className="gap-lg mt-xl flex flex-col">
+      <div className="bg-hairline-soft mt-10 h-px" />
+
+      <div className="flex flex-col">
         {TOPICS.map((topic) => (
           <section
             key={topic.q}
-            className="border-hairline-soft bg-paper p-lg rounded-lg border"
+            className="border-hairline-soft border-b py-7 last:border-b-0"
           >
-            <h2 className="text-title text-ink font-semibold">{topic.q}</h2>
-            <p className="text-body-sm text-body mt-xs">{topic.a}</p>
+            <h2 className="text-ink text-subheading font-semibold">{topic.q}</h2>
+            <p className="text-body mt-2 text-body-lg leading-relaxed">{topic.a}</p>
             {topic.href ? (
               <Link
                 href={topic.href}
-                className="text-title text-rausch-cta gap-xs mt-sm inline-flex items-center font-medium"
+                className="text-rausch-cta hover:text-ink mt-4 inline-flex items-center gap-1.5 text-ui font-medium transition-colors"
               >
                 {topic.cta}
                 <Icons.forward
@@ -52,7 +70,7 @@ export default function HelpPage() {
           </section>
         ))}
       </div>
-    </div>
+    </article>
   );
 }
 

@@ -22,7 +22,8 @@ import { readySecondary, readyTabs } from "./destinations";
  * can be. That reasoning was right and the premise expired: `accept_terms` made agreeing
  * to the Terms a precondition for posting anything, so the document it asks people to
  * accept has to be reachable without being mid-way through a review. All four are real
- * routes under `app/(customer)/legal/` and `/help`.
+ * routes, and they live under `app/(marketing)/(documents)/` — the public site's shell,
+ * not this one. The addresses are unchanged; only the chrome around them is.
  *
  * There is still no About and no app-store badge, for the original reason.
  *
@@ -91,6 +92,12 @@ export function SiteFooter({
     // deliberately absent from the nav and from `/profile`'s row list. They are written
     // out because there is no `ready` flag to consult — the routes either exist or the
     // build fails.
+    //
+    // All four leave this shell: they live under `app/(marketing)/(documents)/` and render
+    // the public site's header and footer, as `/privacy` always did. That is deliberate —
+    // a policy is one document with one address, not a product page and a marketing copy
+    // of it — and it is why these four are the only links here that are not `/`-relative
+    // product routes in disguise.
     {
       label: "Legal",
       items: [

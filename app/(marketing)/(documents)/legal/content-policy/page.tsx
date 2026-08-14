@@ -22,34 +22,53 @@ export const metadata: Metadata = {
  * The nine rules are the same nine `report_reason` values the report sheet offers, in the
  * same order, because a reason somebody can pick and a rule nobody wrote down would be a
  * moderator's problem rather than a reporter's.
+ *
+ * **The public site's shell, on the marketing type scale** — see `(documents)/layout.tsx`.
+ * The nine rules and both blocks of prose are unchanged.
+ *
+ * `Icons.close` keeps `--color-error-text` rather than taking the site's single rausch
+ * accent. Nine identical coral crosses would spend the page's one accent colour on
+ * decoration, and a prohibition is the one thing on this site that genuinely is an error
+ * state.
  */
 export default function ContentPolicyPage() {
   return (
-    <article>
-      <h1 className="text-display-xl text-ink font-semibold">Content policy</h1>
-      <p className="text-body-md text-body mt-base">{CONTENT_POLICY_INTRO}</p>
+    <article className="scroll-mt-[calc(var(--site-header-height)+1.5rem)]">
+      <h1 className="text-editorial-lg font-semibold">Content policy</h1>
 
-      <ul className="gap-lg mt-xl flex flex-col">
+      <p className="text-body mt-6 text-body-lg leading-relaxed">
+        {CONTENT_POLICY_INTRO}
+      </p>
+
+      <div className="bg-hairline-soft mt-10 h-px" />
+
+      <ul className="mt-10 flex flex-col gap-7">
         {CONTENT_RULES.map((rule) => (
-          <li key={rule.title} className="gap-base flex items-start">
+          <li key={rule.title} className="flex items-start gap-4">
             <Icons.close
               className="text-error-text mt-1 shrink-0"
               style={{ width: IconSize.xs, height: IconSize.xs }}
               aria-hidden
             />
             <div>
-              <h2 className="text-title text-ink font-semibold">{rule.title}</h2>
-              <p className="text-body-sm text-body mt-xxs">{rule.body}</p>
+              <h2 className="text-ink text-subheading font-semibold">
+                {rule.title}
+              </h2>
+              <p className="text-body mt-1.5 text-body-lg leading-relaxed">
+                {rule.body}
+              </p>
             </div>
           </li>
         ))}
       </ul>
 
-      <section className="border-hairline-soft mt-xl pt-lg border-t">
-        <h2 className="text-display-sm text-ink font-semibold">
+      <section className="border-hairline-soft mt-14 border-t pt-10">
+        <h2 className="text-ink text-heading leading-snug font-semibold">
           What happens when you report
         </h2>
-        <p className="text-body-md text-body mt-sm">{WHAT_HAPPENS_WHEN_YOU_REPORT}</p>
+        <p className="text-body mt-4 text-body-lg leading-relaxed">
+          {WHAT_HAPPENS_WHEN_YOU_REPORT}
+        </p>
       </section>
     </article>
   );

@@ -721,14 +721,15 @@ export const footer = {
    * public.** Terms and Cookie sat here with empty hrefs when `/privacy` was the only one
    * built; `/help`, `/legal/terms` and `/legal/content-policy` have since shipped.
    *
-   * Each was checked **anonymously** before being linked — 200, with its own `<h1>`, not a
-   * redirect to `/sign-in` and not the 404 boundary. That check is the whole reason this
-   * is safe rather than a guess: three of the four live under `app/(customer)/`, whose
-   * layout calls `requireLiveAccount()`, and a name like that reads as "members only". It
-   * is not — it turns away a *deleted or suspended* account and nothing else, so a visitor
-   * with no session passes straight through. Re-run the check if that helper ever grows a
-   * third redirect, because a footer is exactly where somebody goes looking for a policy
-   * and a sign-in wall there is worse than an absence.
+   * **All four now live under `app/(marketing)/(documents)/` and render the public site's
+   * own header and footer.** Three of them used to sit under `app/(customer)/`, so a link
+   * in this footer handed a signed-out reader the *product's* nav — Bookings, Messages,
+   * Saved — wrapped around a policy. They were only ever reachable because
+   * `requireLiveAccount()` turns away a deleted or suspended account and nothing else; a
+   * visitor with no session passed straight through, which made a real defect look like a
+   * working link. The group calls no auth helper at all now, so nothing about a session can
+   * put a wall in front of a policy — and a footer is exactly where somebody goes looking
+   * for one.
    *
    * **A blank `href` is still dropped by the filter in `site-footer.tsx`.** That stays: it
    * is what makes adding a fifth policy a one-line paste. Cookie Policy is gone rather
@@ -737,7 +738,7 @@ export const footer = {
    *
    * Help is not a legal document, and is grouped here on purpose: it is the other thing a
    * reader scrolls to the bottom for, and it is a page of links into the product rather
-   * than a support address (see the note on `app/(customer)/help/page.tsx`).
+   * than a support address (see the note on `app/(marketing)/(documents)/help/page.tsx`).
    */
   legal: {
     title: "Legal",

@@ -188,14 +188,17 @@ export function SiteHeader() {
             {/*
               The brand mark: the Dzongkha syllable "Tho" in gold on crimson. The
               tile carries no fill of its own — the artwork brings its ground — and
-              `overflow-hidden` is what clips a square JPEG to those corners.
-              `rounded-xl` is 32px against a 36px box, so the browser clamps it to a
-              circle; that is what the original rendered and it is why the mark is
-              round here and was a squircle in the redesign.
+              `overflow-hidden` is what clips a square image to the shape.
+
+              `rounded-full`, stated. This was `rounded-xl` — 32px against a 36px
+              box, which the browser clamps to a circle — so it *rendered* round for
+              the wrong reason: the roundness was a side effect of the box being
+              small, and a larger tile would have silently become a squircle. See
+              `components/ui/brand-lockup.tsx` for the rest of that story.
             */}
             <span
               className={cn(
-                "grid size-9 shrink-0 place-items-center overflow-hidden rounded-xl",
+                "grid size-9 shrink-0 place-items-center overflow-hidden rounded-full",
                 "transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:rotate-12",
               )}
             >
@@ -320,7 +323,7 @@ export function SiteHeader() {
                   {/* The sheet's lockup is the bar's, minus the hover rotate — it
                       opens from the bar and must not look like a different brand
                       for the 600ms the reveal takes. */}
-                  <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-xl">
+                  <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full">
                     <Image
                       src="/tho-logo.webp"
                       alt=""
