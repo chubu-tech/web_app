@@ -1,8 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion, useInView, useReducedMotion } from "motion/react";
-import { CalendarDays, Users, UsersRound, TrendingUp } from "lucide-react";
+import {
+  motion,
+  useInView,
+  useReducedMotion,
+  type Transition,
+} from "motion/react";
+import {
+  CalendarDays,
+  Pointer,
+  Users,
+  UsersRound,
+  TrendingUp,
+} from "lucide-react";
 import { forSalons } from "@/lib/marketing/content";
 import { cn } from "@/lib/marketing/utils";
 import { Button } from "./ui/button";
@@ -71,6 +82,15 @@ const SWIPE_COMMIT_PX = 56;
  *   while the card is on screen, and not at all under `prefers-reduced-motion`.
  *
  * Nothing is sticky and nothing is positioned over anything else.
+ *
+ * ## The hand
+ *
+ * Below `lg` a small pointing hand sits under the chips and mimes the swipe — see
+ * `SwipeHint`. The chips look like a segmented control to somebody who has used
+ * one before; the panel being *draggable* is the part nothing on screen announces,
+ * and the timer moving it on its own reads as a slideshow rather than as an
+ * invitation. The hand is the invitation, and it is spent the moment it is
+ * accepted: `taken` both stops the demo and collapses the hint away.
  */
 export function ForSalons() {
   const features = forSalons.features;
@@ -130,9 +150,8 @@ export function ForSalons() {
     const index = ((to % count) + count) % count;
     go(index, true);
 
-    const tabs = event.currentTarget.querySelectorAll<HTMLButtonElement>(
-      '[role="tab"]',
-    );
+    const tabs =
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
     tabs[index]?.focus();
   }
 
@@ -253,6 +272,7 @@ export function ForSalons() {
               active={active}
               dir={dir}
               running={running}
+              hinting={!taken}
               reduced={Boolean(reduced)}
               onSelect={(i) => go(i, true)}
               onStep={(delta) => go(active + delta, true)}
@@ -289,6 +309,7 @@ function ShopScreen({
   active,
   dir,
   running,
+  hinting,
   reduced,
   onSelect,
   onStep,
@@ -299,6 +320,7 @@ function ShopScreen({
   active: number;
   dir: number;
   running: boolean;
+  hinting: boolean;
   reduced: boolean;
   onSelect: (index: number) => void;
   onStep: (delta: number) => void;
@@ -346,34 +368,38 @@ function ShopScreen({
         replaced put the fourth one off the right edge behind a mask, with no
         scrollbar and no indication it moved.
       */}
-      <div
-        role="tablist"
-        aria-label="What you can do from one screen"
-        aria-orientation="horizontal"
-        onKeyDown={onTabKeyDown}
-        className="border-hairline-soft flex flex-wrap gap-1.5 border-b px-4 py-3 sm:px-5 lg:hidden"
-      >
-        {features.map((feature, i) => (
-          <button
-            key={feature.title}
-            type="button"
-            role="tab"
-            id={`salon-chip-${i}`}
-            aria-selected={active === i}
-            aria-controls="salon-panel"
-            tabIndex={active === i ? 0 : -1}
-            onClick={() => onSelect(i)}
-            className={cn(
-              "rounded-full px-3 py-1.5 text-caption font-medium",
-              "transition-colors duration-300",
-              active === i
-                ? "bg-ink text-white"
-                : "bg-surface-soft text-body hover:text-ink",
-            )}
-          >
-            {feature.title}
-          </button>
-        ))}
+      <div className="border-hairline-soft border-b px-4 py-3 sm:px-5 lg:hidden">
+        <div
+          role="tablist"
+          aria-label="What you can do from one screen"
+          aria-orientation="horizontal"
+          onKeyDown={onTabKeyDown}
+          className="flex flex-wrap gap-1.5"
+        >
+          {features.map((feature, i) => (
+            <button
+              key={feature.title}
+              type="button"
+              role="tab"
+              id={`salon-chip-${i}`}
+              aria-selected={active === i}
+              aria-controls="salon-panel"
+              tabIndex={active === i ? 0 : -1}
+              onClick={() => onSelect(i)}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-caption font-medium",
+                "transition-colors duration-300",
+                active === i
+                  ? "bg-ink text-white"
+                  : "bg-surface-soft text-body hover:text-ink",
+              )}
+            >
+              {feature.title}
+            </button>
+          ))}
+        </div>
+
+        <SwipeHint hinting={hinting} animate={running} reduced={reduced} />
       </div>
 
       {/* At `lg` the rail beside the card is the control, so this row states which
@@ -479,6 +505,143 @@ function ShopScreen({
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * One press-drag-lift, then a beat of nothing before the hand comes back.
+ *
+ * The split matters and the first attempt had it wrong: at `[0, .16, .62, .78, 1]`
+ * over 2.2s with a 0.7s gap the hand was **absent for nearly half the loop**, and
+ * six screenshots 300ms apart caught it four times as an empty row. A hint you
+ * have to wait for is not a hint. Visible now runs about three times as long as
+ * the pause — present enough to be caught by a glance, still punctuated rather
+ * than a hand sliding back and forth for ever.
+ */
+const HINT_LOOP: Transition = {
+  duration: 2.6,
+  times: [0, 0.1, 0.55, 0.86, 1],
+  repeat: Infinity,
+  repeatDelay: 0.35,
+  ease: "easeInOut",
+};
+
+/**
+ * The mobile-only nudge: a small hand that presses, drags left and lifts.
+ *
+ * ## Why it is here and not over the panel
+ *
+ * The obvious place for a swipe hint is floating on the thing you swipe, and it
+ * is the wrong place in this card: every one of the four panels fills its box to
+ * the bottom edge — the legend under the day, the fourth person in the line, the
+ * price pills, "Saturday 2–6pm is your busiest time" — so a floating hand would
+ * cover live content in all four. It sits in the chip band instead, under the
+ * chips and above the panel, which is between the two things it is talking about
+ * and on top of neither. That also costs no new hairline: the band already has
+ * one.
+ *
+ * ## The hand points up, which is the whole reason for this icon
+ *
+ * Lucide's `Pointer` is a hand with the index finger extended **upwards**, so
+ * sitting below the chips it points at them while it travels sideways — the two
+ * halves of the message ("these are the options" / "you can swipe between them")
+ * in one glyph, rather than an arrow for one and a label for the other. The
+ * travel is leftward because that is the drag that advances, matching what
+ * `onDragEnd` actually commits.
+ *
+ * ## Four things keep it from becoming a nag
+ *
+ * - **It is spent on first use.** `hinting` is `!taken`, the same flag that stops
+ *   the auto-advance, so a tap, a swipe or an arrow key collapses it away — height
+ *   and opacity together, so nothing is left behind and no gap opens where it was.
+ * - **It rests between loops.** The hand fades out at the end of each pass and
+ *   `repeatDelay` holds it there, so the band is still for about as long as it
+ *   moves.
+ * - **It only runs while the card is on screen**, because `animate` is the card's
+ *   own `running` flag.
+ * - **`prefers-reduced-motion` gets the still frame**, not nothing: the hand
+ *   parks in the middle at full opacity and the sentence stays. The guidance is
+ *   the point; the movement was only ever the delivery.
+ *
+ * Every moving part stays inside a fixed 44×24 track, so the row's height never
+ * changes and the chips above it never move. The ±12px travel is the widest that
+ * fits: an 18px hand centred in 44px reaches 1px and 43px at the two ends, and
+ * the 20px touch point reaches 0 and 44. Going further would put the hand in the
+ * 8px gap before the sentence, which is the one direction there is no room in.
+ */
+function SwipeHint({
+  hinting,
+  animate,
+  reduced,
+}: {
+  hinting: boolean;
+  animate: boolean;
+  reduced: boolean;
+}) {
+  const settle: Transition = { duration: 0.3, ease: EASE };
+
+  return (
+    <motion.div
+      className="overflow-hidden"
+      // `aria-hidden` once spent, because a collapsed box is still readable by a
+      // screen reader — and the tablist above already announces itself as tabs,
+      // so this sentence is for the eye that gets no such announcement.
+      aria-hidden={!hinting}
+      initial={false}
+      animate={{ height: hinting ? "auto" : 0, opacity: hinting ? 1 : 0 }}
+      transition={reduced ? { duration: 0 } : { duration: 0.4, ease: EASE }}
+    >
+      <div className="flex items-center gap-2 pt-2.5">
+        <span
+          className="relative grid h-6 w-11 shrink-0 place-items-center"
+          aria-hidden
+        >
+          {/* The touch point, travelling with the finger. `inset-0 m-auto`
+              centres it without a transform, which `motion` owns here. */}
+          <motion.span
+            className="bg-rausch/25 absolute inset-0 m-auto size-5 rounded-full"
+            initial={false}
+            animate={
+              animate
+                ? {
+                    x: [12, 12, -12, -12, 12],
+                    scale: [0.4, 1.05, 1.05, 1.15, 0.4],
+                    opacity: [0, 0.9, 0.55, 0, 0],
+                  }
+                : { x: 0, scale: 1, opacity: 0 }
+            }
+            transition={animate ? HINT_LOOP : settle}
+          />
+          <motion.span
+            className="text-rausch relative"
+            initial={false}
+            animate={
+              animate
+                ? {
+                    x: [12, 12, -12, -12, 12],
+                    rotate: [10, 0, -6, -6, 10],
+                    scale: [0.86, 1, 1, 0.9, 0.86],
+                    opacity: [0, 1, 1, 0, 0],
+                  }
+                : { x: 0, rotate: 0, scale: 1, opacity: 1 }
+            }
+            transition={animate ? HINT_LOOP : settle}
+          >
+            {/* 18px, not `size-4` — a 16px hand beside 12px type read as a
+                smudge rather than a hand. `size-5` is as tall as the track. */}
+            <Pointer
+              className="size-[1.125rem]"
+              strokeWidth={2.4}
+              aria-hidden
+            />
+          </motion.span>
+        </span>
+
+        <span className="text-muted text-caption-sm">
+          Swipe, or tap a title above
+        </span>
+      </div>
+    </motion.div>
   );
 }
 
@@ -653,7 +816,10 @@ function TeamPanel() {
 
   return (
     <div>
-      <PanelHeading title="Your team & prices" meta="3 stylists · 12 services" />
+      <PanelHeading
+        title="Your team & prices"
+        meta="3 stylists · 12 services"
+      />
       <div className="flex flex-col gap-2.5">
         {staff.map((person) => (
           <div key={person.name} className="flex items-center gap-3">

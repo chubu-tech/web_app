@@ -279,6 +279,7 @@ product working or marks a change of state; ambient decoration is gone.**
 | Card photos | scale to 1.04 under a fixed rounded mask on hover |
 | Queue board | a 5-deep window slides along a ring every 2.6s; "You" climbs to the chair; the "two away" notification fires at position #2. Pauses when off-screen |
 | Salon screen | panels slide in with a direction, the card's height animates to whatever the panel measures, and a dwell bar fills along its foot; tap a chip or the rail, **swipe the panel**, or use the arrow keys — any of which stops the auto-advance for good |
+| Salon screen — the hand | **below `lg` only.** A pink pointing hand under the chips presses, drags left and lifts, ~2s on to ~1s off. It is spent on first use: the same flag that stops the auto-advance collapses it away |
 | Numbers | `CountUp` on the hero card and the week figures |
 | Pricing | plan cards take the one shadow tier on hover |
 | Motif divider | drifts on CSS alone |
@@ -322,7 +323,7 @@ is `display: none` — out of the tab order and the accessibility tree below `lg
 exactly one tablist is ever exposed, while its four sentences stay in the HTML for a
 crawler at every width.
 
-Four things about the mechanism are load-bearing:
+Five things about the mechanism are load-bearing:
 
 - **The panel's height is measured, not guessed.** A `ResizeObserver` reports the
   active panel's `offsetHeight` and the wrapper animates to it. The four panels run
@@ -340,6 +341,22 @@ Four things about the mechanism are load-bearing:
   `useInView` sensor is on the card, not the section, whose intersection ratio on a
   phone is unstable) and not at all under `prefers-reduced-motion`, which also
   disables the drag.
+- **A hand mimes the swipe, below `lg` only, and it is spent on first use.** The
+  chips read as a segmented control to anyone who has met one; the panel being
+  *draggable* is the part nothing on screen announces, and the timer moving it on its
+  own reads as a slideshow rather than as an invitation. `SwipeHint` is that
+  invitation. It sits **in the chip band, not floating on the panel** — every one of
+  the four panels fills its box to the bottom edge, so a hand over the panel would
+  cover live content in all four; and the band already has a hairline, so it costs no
+  new rule. Lucide's `Pointer` points **upwards**, so under the chips it indicates
+  them while travelling sideways: "these are the options" and "you can swipe between
+  them" in one glyph. The travel is leftward because that is the drag `onDragEnd`
+  commits. `hinting` is `!taken`, the same flag that stops the auto-advance, so the
+  first tap, swipe or arrow key collapses the row — height and opacity together, and
+  `aria-hidden` with them, because a collapsed box is still readable by a screen
+  reader. Under `prefers-reduced-motion` the hand parks in the middle at full opacity
+  and the sentence stays: the guidance was the point, the movement only the delivery.
+  Everything moves inside a fixed 44×24 track, so the chips above never shift.
 
 Verified at 360 / 390 / 430 / 744 / 834 / 1024 / 1280 / 1440: no element escapes the
 viewport, the card's box never intersects the call to action's, the height wrapper is
@@ -348,6 +365,15 @@ tablist is visible, and both a tap and `ArrowLeft` move `aria-selected`. Plus, a
 and 1280: the timer advances once on its own, a swipe steps forward and back, a 20px
 nudge does not commit, the timer is stopped 8s after an interaction, and the page
 still scrolls vertically under a pointer that starts on the panel.
+
+The hand is measured on the same eight widths: present and animating below 1024,
+`display: none` at and above it, never leaving its 44px track, never overlapping the
+chips above or the panel below, collapsed to 0px and `aria-hidden` after a tap **and**
+after a swipe, not returning on a later tick, and — with `prefers-reduced-motion` —
+visible at full opacity with a transform that does not change across 1.6s. Its duty
+cycle was measured rather than eyeballed, because the first version was wrong: at 2.2s
+with a 0.7s gap the hand was absent for nearly half the loop, and six screenshots
+300ms apart caught it four times as an empty row.
 
 ### Responsive behaviour
 
