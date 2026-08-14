@@ -68,8 +68,16 @@ export function QueueLive() {
       className="bg-surface-soft border-hairline-soft border-y"
     >
       <Container>
+        {/* `min-w-0` on both columns, and it is the fix for a page-wide bug rather
+            than a precaution. A grid item's default `min-width: auto` refuses to
+            shrink below its own min-content, and the board's notification row makes
+            that 328px — so on any viewport under ~368 this one track pushed the
+            **whole document** wider than the window and every section on the site
+            scrolled sideways with it. Measured at 320px: 348 against a 320 window.
+            The board's own rows already carry `truncate` and `min-w-0`, so the only
+            thing that was missing was permission to use them. */}
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
-          <div>
+          <div className="min-w-0">
             <SectionHeading
               eyebrow={queueSection.eyebrow}
               title="Watch the line _move, live_"
@@ -93,7 +101,7 @@ export function QueueLive() {
             </Reveal>
           </div>
 
-          <Reveal delay={0.08}>
+          <Reveal delay={0.08} className="min-w-0">
             <QueueBoard />
           </Reveal>
         </div>

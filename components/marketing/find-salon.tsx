@@ -15,7 +15,8 @@ import {
   type Query,
 } from "@/lib/marketing/search";
 import { Container, Eyebrow, Section, SectionHeading } from "./ui/section";
-import { Reveal } from "./ui/reveal";
+import { Rail } from "./ui/rail";
+import { Reveal, RevealGroup } from "./ui/reveal";
 import { SalonCard } from "./salon-card";
 import { SearchBar } from "./search-bar";
 
@@ -152,7 +153,10 @@ export function FindSalon({ index }: { index: SalonIndex }) {
               {found.matches.length === 0 ? (
                 <Empty />
               ) : (
-                <Grid matches={found.matches} />
+                <SalonRail
+                  matches={found.matches}
+                  label={copy.resultsTitle}
+                />
               )}
             </Band>
 
@@ -161,7 +165,10 @@ export function FindSalon({ index }: { index: SalonIndex }) {
                 opening-hours row is the salon's gap, not a reason to hide them. */}
             {found.unverified.length > 0 && (
               <Band title={copy.partialHeading} body={copy.partialBody}>
-                <Grid matches={found.unverified.slice(0, PAGE)} />
+                <SalonRail
+                  matches={found.unverified.slice(0, PAGE)}
+                  label={copy.partialHeading}
+                />
               </Band>
             )}
           </>
@@ -175,7 +182,10 @@ export function FindSalon({ index }: { index: SalonIndex }) {
                   title={copy.recommendedTitle}
                   body={copy.recommendedBody}
                 >
-                  <Grid matches={bands.recommended} />
+                  <SalonRail
+                    matches={bands.recommended}
+                    label={copy.recommendedTitle}
+                  />
                 </Band>
               )}
 
@@ -204,7 +214,10 @@ export function FindSalon({ index }: { index: SalonIndex }) {
               >
                 {origin ? (
                   bands.nearby.length > 0 ? (
-                    <Grid matches={bands.nearby} />
+                    <SalonRail
+                      matches={bands.nearby}
+                      label={copy.nearbyTitle}
+                    />
                   ) : (
                     <Note>{copy.nearbyNone}</Note>
                   )
@@ -250,29 +263,83 @@ function Band({
 }
 
 /**
- * The reference's collapsing rule, verbatim: "drop column counts cleanly at each
- * breakpoint — never reflow rows; always reduce columns." 4 → 3 → 2 → 1.
+ * How wide one card is, as a share of the rail — and therefore how much of the next
+ * one shows past it.
  *
- * The `xl` step is new. It used to jump 2 → 4 at `lg` (1024px), which put four
- * cards and their meta into 944px of content — a 216px card holding a salon name, a
- * rating, a town and a services line. Three columns until 1280px is where those
- * fields actually fit.
+ * **Percentages, not `vw`.** A flex item's percentage width resolves against the
+ * scroll container's content box, which is the `Container`'s width *after* its
+ * gutters. A `vw` figure would have to guess at those gutters, and would guess wrong
+ * three times, because they step at 640 and again at 1024. This way the peek is the
+ * same fraction of the row at 320px and at 1440px, with nothing to keep in step.
  *
- * The row gap is larger than the column gap on purpose: with no card surface, the
- * gap *is* the separation, and equal gaps made the meta of one row read as part of
- * the photo below it.
+ * The old grid's collapsing rule survives the change intact — the reference's "drop
+ * column counts cleanly at each breakpoint; never reflow rows" — because 4 → 3 → 2 → 1
+ * is exactly what these four numbers say. What is new is the remainder: every step
+ * leaves a tenth of the row over (18% at the phone step, where one card is the whole
+ * view and the peek has to be unmistakable), so there is always a slice of the next
+ * card showing rather than a clean edge that reads as the end of the band.
  */
-function Grid({ matches }: { matches: Match[] }) {
+const CARD_WIDTHS = "w-[82%] sm:w-[45%] lg:w-[30%] xl:w-[22.5%]";
+
+/**
+ * `grow` is what stops the peek becoming a hole.
+ *
+ * A width that leaves room for the next card also leaves that room when there *is* no
+ * next card — and "Recommended" is capped at four, so at 1280 the band always held
+ * exactly four cards and always ended 60px short of the right gutter it shares with the
+ * search bar and the hairline above it. That reads as a misalignment, not as a peek.
+ *
+ * With `grow` the row asks for the leftover only when there is leftover: four cards at
+ * 1280 stretch to fill the container exactly, and a band with more salons than fit has
+ * no free space to distribute, so the widths above stand and the next card shows past
+ * the edge. `shrink-0` is the other half — without it the items would compress to fit
+ * instead of overflowing, and there would be nothing to swipe.
+ */
+const CARD_FLEX = "shrink-0 grow snap-start";
+
+/**
+ * The same widths, told to the image optimiser.
+ *
+ * Deliberately in the same file, on the line below: `sizes` is a *description* of the
+ * layout, and the two drift the moment they live apart. Each figure is the card width
+ * as a share of the viewport rather than of the row — the row is the viewport less the
+ * gutters, so at the top end 22.5% of a capped 1280px container is a flat 280px, not a
+ * fraction of a 1920px window.
+ */
+const CARD_SIZES =
+  "(min-width: 1280px) 280px, (min-width: 1024px) 29vw, (min-width: 640px) 43vw, 78vw";
+
+/**
+ * One band of salons, as a swipeable rail.
+ *
+ * This was a grid that collapsed to `grid-cols-1` below 640, which is to say four
+ * salons stacked vertically — a phone screen and a half of photographs to scroll past
+ * before the next section of the page, and no way to tell from the first card that
+ * there were three more. The rail puts the whole band in one screen at every width:
+ * see `ui/rail.tsx` for the mechanics and for why the arrows stop at 640.
+ *
+ * **`RevealGroup` rather than a `Reveal` per card**, and that is a correctness fix
+ * rather than a tidier way to stagger. `Reveal` animates on `whileInView`, so inside a
+ * horizontal scroller every card past the right edge is out of view *at rest* — the
+ * grid's per-card observers would have left the second, third and fourth salons at
+ * `opacity: 0` until each was swiped into view, which on a rail whose whole job is to
+ * suggest there is more looks exactly like a band with one salon in it. The group
+ * observes the row as a whole and staggers its children from there, so the cards you
+ * cannot see yet are already drawn when you reach them.
+ */
+function SalonRail({ matches, label }: { matches: Match[]; label: string }) {
   return (
-    <ul className="mt-7 grid grid-cols-1 gap-x-5 gap-y-9 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {matches.map((match, i) => (
-        <li key={match.salon.id}>
-          <Reveal delay={Math.min(i, 6) * 0.05}>
-            <SalonCard match={match} />
-          </Reveal>
-        </li>
-      ))}
-    </ul>
+    <RevealGroup className="mt-7" stagger={0.06}>
+      <Rail label={label}>
+        {matches.map((match) => (
+          <li key={match.salon.id} className={`${CARD_WIDTHS} ${CARD_FLEX}`}>
+            <Reveal asChild>
+              <SalonCard match={match} sizes={CARD_SIZES} />
+            </Reveal>
+          </li>
+        ))}
+      </Rail>
+    </RevealGroup>
   );
 }
 

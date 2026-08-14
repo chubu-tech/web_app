@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import type { RevealLines } from "@/lib/marketing/heading";
 import { cn } from "@/lib/marketing/utils";
@@ -22,6 +23,22 @@ import { cn } from "@/lib/marketing/utils";
  * or 700, so an accent word at 400 reads as emphasis on its own, and a touch of
  * positive tracking keeps the lighter weight from looking merely thinner. One family,
  * hierarchy from weight — which is the point of the whole exercise.
+ *
+ * ## The word gap is a real space, between the masks — and that is a wrapping fix
+ *
+ * It used to be an `&nbsp;` in a span *inside* each mask, which left the parent line
+ * box with **no break opportunity anywhere**: adjacent inline-flex boxes with no
+ * whitespace between them cannot be broken apart, so a heading could only ever be as
+ * many lines as `parseHeading`'s explicit `|` gave it. Every heading was one
+ * unbreakable line that overflowed its container rather than wrapping, which is
+ * invisible until the viewport is narrow enough for a real one to do it: at 320px
+ * "Watch the line move, live" measured 328px in a 280px column and pushed the **whole
+ * page** 28px wide, so every section on the site scrolled sideways.
+ *
+ * A plain space between the masks gives the line somewhere to break and renders the
+ * same gap. It changes nothing where a heading already fits — a line that fits on one
+ * line still does, break opportunities or not — so this only ever un-breaks the
+ * headings that were broken.
  */
 export function TextReveal({
   lines,
@@ -77,39 +94,38 @@ export function TextReveal({
                 : (word.accent ?? false);
 
             return (
-              <span
-                key={`${lineIndex}-${wordIndex}`}
-                // The mask. The pb/-mb pair gives descenders room to sit
-                // outside the clip so "g" and "y" are not sheared off.
-                className="-mb-[0.14em] inline-flex overflow-hidden pb-[0.14em] align-bottom"
-              >
-                <motion.span
-                  className={cn(
-                    "inline-block will-change-transform",
-                    wordClassName,
-                    isAccent &&
-                      cn("font-normal tracking-[-0.01em]", accentClassName),
-                  )}
-                  variants={{
-                    hidden: {
-                      y: reduced ? 0 : "115%",
-                      opacity: reduced ? 0 : 1,
-                    },
-                    shown: {
-                      y: 0,
-                      opacity: 1,
-                      transition: {
-                        duration: reduced ? 0 : 0.95,
-                        ease: [0.16, 1, 0.3, 1],
-                      },
-                    },
-                  }}
+              <Fragment key={`${lineIndex}-${wordIndex}`}>
+                <span
+                  // The mask. The pb/-mb pair gives descenders room to sit
+                  // outside the clip so "g" and "y" are not sheared off.
+                  className="-mb-[0.14em] inline-flex overflow-hidden pb-[0.14em] align-bottom"
                 >
-                  {text}
-                </motion.span>
-                {/* The word gap lives outside the mask so it never animates. */}
-                <span className="inline-block">&nbsp;</span>
-              </span>
+                  <motion.span
+                    className={cn(
+                      "inline-block will-change-transform",
+                      wordClassName,
+                      isAccent &&
+                        cn("font-normal tracking-[-0.01em]", accentClassName),
+                    )}
+                    variants={{
+                      hidden: {
+                        y: reduced ? 0 : "115%",
+                        opacity: reduced ? 0 : 1,
+                      },
+                      shown: {
+                        y: 0,
+                        opacity: 1,
+                        transition: {
+                          duration: reduced ? 0 : 0.95,
+                          ease: [0.16, 1, 0.3, 1],
+                        },
+                      },
+                    }}
+                  >
+                    {text}
+                  </motion.span>
+                </span>{" "}
+              </Fragment>
             );
           })}
         </span>

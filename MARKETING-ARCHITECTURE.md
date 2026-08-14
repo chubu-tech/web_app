@@ -278,7 +278,7 @@ product working or marks a change of state; ambient decoration is gone.**
 | Closing photo | `ParallaxImage` — spring-damped drift as the slab crosses the viewport |
 | Card photos | scale to 1.04 under a fixed rounded mask on hover |
 | Queue board | a 5-deep window slides along a ring every 2.6s; "You" climbs to the chair; the "two away" notification fires at position #2. Pauses when off-screen |
-| Salon screen | panels advance on a 5s timer with a dwell bar per row; tapping a row takes over |
+| Salon screen | panels slide in with a direction, the card's height animates to whatever the panel measures, and a dwell bar fills along its foot; tap a chip or the rail, **swipe the panel**, or use the arrow keys — any of which stops the auto-advance for good |
 | Numbers | `CountUp` on the hero card and the week figures |
 | Pricing | plan cards take the one shadow tier on hover |
 | Motif divider | drifts on CSS alone |
@@ -294,17 +294,60 @@ are deleted files.
 `prefers-reduced-motion` is honoured: `useReducedMotion` drops travel and loops, and
 `marketing-tokens.css` collapses all durations and iteration counts.
 
-### Why the salon section is on a timer, not on scroll
+### The salon screen: nothing is sticky, and the card carries its own controls
 
-It used to pin the mock and pick the active feature from scroll position. That
-only worked on a wide screen: on a phone the mock had scrolled away by the time
-you reached the feature it was illustrating. Now a plain 5s timer drives the
-active index (tap to take over), and the mock is `sticky` inside a **block-flow**
-wrapper that only becomes a grid at `lg` — in a single-column *grid* the mock's
-row is exactly its own height, so it would have no room to stick. The
-`useInView` sensor is on the mock, not the whole block: the block is taller than
-a phone screen, so its intersection ratio is unstable and the timer would die
-the moment it dipped below the threshold.
+Two versions of this section have now been thrown away, and both failed the same
+way — by asking a phone to display a desktop composition.
+
+The **first** pinned the mock and read the active feature off scroll position. On a
+phone the mock had scrolled away before you reached the feature it illustrated.
+
+The **second** replaced scroll with a 5s timer, which was right, and kept the mock
+`sticky` in a block-flow wrapper, which was not. Its containing block was the whole
+section, four feature rows tall, so with `z-10` the card pinned itself under the
+header and the rows scrolled *behind* it. Measured at 390px: the heading "The
+walk-in line" was half-covered, and further down the card sat on top of the "See
+salon plans" button. Two more faults came with it — the segmented control inside the
+mock was `<span>`s in a scrolling strip, so it looked like the control, ran off the
+right edge mid-word and did nothing; and the real control underneath was four
+headings, four paragraphs and four rules, which is the shape of an article.
+
+The **third** stops trying to have one layout. Below `lg` the card *is* the section:
+its own `role="tab"` chips wrap inside it so all four are visible, the panel is
+swipeable, and the active feature's sentence sits in a caption row under the panel —
+so there is nothing stacked outside the card to scroll past. From `lg` the rail
+returns beside it as a column of selectable cards and the chips give way to a static
+label, because the rail is already the control. The rail is `hidden lg:flex`, which
+is `display: none` — out of the tab order and the accessibility tree below `lg`, so
+exactly one tablist is ever exposed, while its four sentences stay in the HTML for a
+crawler at every width.
+
+Four things about the mechanism are load-bearing:
+
+- **The panel's height is measured, not guessed.** A `ResizeObserver` reports the
+  active panel's `offsetHeight` and the wrapper animates to it. The four panels run
+  from about 220px to 300px at 360px wide, against the `min-h-[17rem]` the old one
+  used — so every switch either clipped or padded.
+- **No `AnimatePresence` around the panel.** React swaps a keyed child in a single
+  commit, so the measured box is never momentarily empty and the height cannot
+  collapse between two panels. `mode="wait"` would leave a gap, and the gap is what
+  the measurement would read.
+- **The slide has a direction, and the wrap takes the short way round.** Advancing
+  from the last panel to the first slides forward rather than winding back through
+  the middle.
+- **The auto-advance stops permanently on the first tap, swipe or arrow key**, and
+  the dwell bar empties with it. It runs only while the card is in view (the
+  `useInView` sensor is on the card, not the section, whose intersection ratio on a
+  phone is unstable) and not at all under `prefers-reduced-motion`, which also
+  disables the drag.
+
+Verified at 360 / 390 / 430 / 744 / 834 / 1024 / 1280 / 1440: no element escapes the
+viewport, the card's box never intersects the call to action's, the height wrapper is
+never shorter than the panel inside it (before **or** after a switch), exactly one
+tablist is visible, and both a tap and `ArrowLeft` move `aria-selected`. Plus, at 390
+and 1280: the timer advances once on its own, a swipe steps forward and back, a 20px
+nudge does not commit, the timer is stopped 8s after an interaction, and the page
+still scrolls vertically under a pointer that starts on the panel.
 
 ### Responsive behaviour
 
@@ -372,7 +415,15 @@ every width.
    both `.well-known` files now exist; `/terms` still does not.
 6. Social proof was removed on purpose: the earlier testimonials and stat
    figures were invented. Add them back only with real, consented quotes and
-   measured numbers.
+   measured numbers. **`proof.tsx` does not discharge this** — it is four counts
+   computed from `SalonIndex` at render, which is the honest half of the job. The
+   quotes are still owed, and when they arrive they go beside that band rather than
+   replacing it.
+7. **`/` has no canonical.** The root `app/layout.tsx` sets `metadataBase`, Open
+   Graph and Twitter for every route but no `alternates.canonical`, and the marketing
+   home page declares no metadata of its own — so `/privacy` and `/waitlist` carry a
+   canonical and the homepage does not. Pre-existing and untouched by the redesign;
+   one `export const metadata` in `app/(marketing)/page.tsx` closes it.
 
 ## Deep links
 
