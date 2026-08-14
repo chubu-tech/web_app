@@ -31,6 +31,25 @@ const DWELL_MS = 6000;
 const SWIPE_COMMIT_PX = 56;
 
 /**
+ * The same step, from a trackpad. Lower than the drag's 56px because the two
+ * gestures cost different amounts: a drag is a deliberate press-move-release, so
+ * a high bar only stops accidents, while a two-finger flick is over in a moment
+ * and 56px of it feels like the card ignored you.
+ */
+const WHEEL_COMMIT_PX = 42;
+
+/**
+ * A gap this long ends the gesture. macOS keeps sending wheel events for up to a
+ * second after the fingers lift — the momentum tail — and those are the *same*
+ * flick, so they must not each count as a swipe. Everything up to a real pause is
+ * one gesture and steps once.
+ */
+const WHEEL_REST_MS = 220;
+
+/** `deltaMode` 1 is lines, not pixels. Roughly one line of body text. */
+const WHEEL_LINE_PX = 16;
+
+/**
  * The owner half of the story: one screen, four things you do on it.
  *
  * ## What was here, and why all of it went
@@ -122,6 +141,24 @@ export function ForSalons() {
     [count],
   );
 
+  /**
+   * A relative move, for the two gestures that have a direction but no target:
+   * the drag and the trackpad. Separate from `go` so it can be **stable** — it
+   * reads the current panel out of the updater rather than closing over `active`,
+   * which is what lets the wheel listener be attached once for the life of the
+   * card instead of being torn down and rebuilt on every panel change.
+   */
+  const step = useCallback(
+    (delta: number) => {
+      setSlide((prev) => ({
+        active: (((prev.active + delta) % count) + count) % count,
+        dir: delta > 0 ? 1 : -1,
+      }));
+      setTaken(true);
+    },
+    [count],
+  );
+
   // One timer per panel rather than one interval for the section: keying it on
   // `active` restarts the dwell whenever the panel changes for any reason, which
   // is also what keeps the progress bar and the panel in step.
@@ -133,7 +170,7 @@ export function ForSalons() {
 
   /** Arrow keys move the selection and take focus with it — roving tabindex. */
   function onTabKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    const step: Record<string, number> = {
+    const arrow: Record<string, number> = {
       ArrowRight: 1,
       ArrowDown: 1,
       ArrowLeft: -1,
@@ -141,7 +178,7 @@ export function ForSalons() {
     };
 
     let to: number | null = null;
-    if (event.key in step) to = active + step[event.key];
+    if (event.key in arrow) to = active + arrow[event.key];
     else if (event.key === "Home") to = 0;
     else if (event.key === "End") to = count - 1;
     if (to === null) return;
@@ -275,7 +312,7 @@ export function ForSalons() {
               hinting={!taken}
               reduced={Boolean(reduced)}
               onSelect={(i) => go(i, true)}
-              onStep={(delta) => go(active + delta, true)}
+              onStep={step}
               onTabKeyDown={onTabKeyDown}
             />
           </Reveal>
@@ -302,6 +339,10 @@ type Feature = (typeof forSalons.features)[number];
  * 360px wide — hand over without a jump and without any of them being clipped.
  * `offsetHeight` rather than `contentRect`, because the measured element is also
  * the drag target and needs its padding counted.
+ *
+ * The same element takes a **native `wheel` listener** so a two-finger trackpad
+ * swipe steps the panel too — see the block comment on that effect for why it
+ * cannot be an `onWheel` prop.
  */
 function ShopScreen({
   ref,
@@ -339,6 +380,85 @@ function ShopScreen({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  /*
+    ## The trackpad
+
+    A two-finger horizontal swipe is not a drag. It never presses a pointer down,
+    so `motion`'s `drag` — and every `onDragEnd` threshold behind it — is blind to
+    it: on a laptop the panel had a `cursor-grab` and a hand miming a swipe, and
+    the swipe every laptop actually offers did nothing. It arrives as `wheel`
+    events carrying `deltaX`.
+
+    Four things this has to get right, and the first two are why it is a native
+    listener rather than an `onWheel` prop:
+
+    - **React registers `wheel` passively**, so `preventDefault()` from `onWheel`
+      is ignored with a console warning. It has to be, hence
+      `{ passive: false }`.
+    - **The default is a page exit.** An unconsumed horizontal wheel is also the
+      browser's back-navigation gesture, so without `preventDefault` the swipe
+      that was meant to show the walk-in line leaves the site instead. Cancelled
+      only when the event is horizontal, so a normal vertical scroll over the card
+      still scrolls the page.
+    - **Momentum is not a second swipe.** macOS keeps sending events for up to a
+      second after the fingers lift; `spent` swallows the whole tail and only a
+      real pause (`WHEEL_REST_MS`) starts a new gesture. Without it one flick runs
+      through all four panels.
+    - **Intent is read per event, not from the running total.** A diagonal scroll
+      has some `deltaX` in it, and judging by the accumulated sum would eventually
+      hijack a gesture that was mostly a page scroll.
+
+    Deliberately **not** gated on `prefers-reduced-motion`, unlike the drag. That
+    setting asks for less movement, not fewer ways in — and with the transitions
+    already collapsed to zero, a wheel step here swaps the panel outright.
+  */
+  useEffect(() => {
+    const el = measure.current;
+    if (!el) return;
+
+    let travel = 0;
+    let last = 0;
+    let spent = false;
+
+    // An arrow bound after the null guard, not a hoisted declaration: TypeScript
+    // treats a `function` here as created before the guard and loses the
+    // narrowing on `el`.
+    const onWheel = (event: WheelEvent) => {
+      // Lines and pages are scaled to pixels on both axes, so the comparison
+      // below is unaffected and only the threshold sees the difference.
+      const scale =
+        event.deltaMode === 1
+          ? WHEEL_LINE_PX
+          : event.deltaMode === 2
+            ? el.clientHeight
+            : 1;
+      const dx = event.deltaX * scale;
+      const dy = event.deltaY * scale;
+
+      if (Math.abs(dx) <= Math.abs(dy)) return;
+      event.preventDefault();
+
+      if (event.timeStamp - last > WHEEL_REST_MS) {
+        travel = 0;
+        spent = false;
+      }
+      last = event.timeStamp;
+      if (spent) return;
+
+      travel += dx;
+      if (Math.abs(travel) < WHEEL_COMMIT_PX) return;
+
+      // Fingers left, content right — the same direction a leftward drag moves
+      // the panel, and the direction the hand in `SwipeHint` mimes.
+      onStep(travel > 0 ? 1 : -1);
+      travel = 0;
+      spent = true;
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [onStep]);
 
   const ActiveIcon = ICONS[active];
   const panels = [BookingsPanel, LinePanel, TeamPanel, WeekPanel];
@@ -437,11 +557,15 @@ function ShopScreen({
           // would leave the reference dangling at one size or the other.
           aria-label={features[active].title}
           tabIndex={0}
-          // Drag is the phone affordance and costs nothing on a pointer. The
+          // Drag is the phone affordance and costs nothing on a mouse. The
           // constraints pin it to its slot and the elasticity is what makes a
           // half-swipe spring back instead of committing. `drag="x"` sets
           // `touch-action: pan-y` itself, so the page still scrolls vertically
           // under a finger that starts here; `touch-pan-y` states it anyway.
+          //
+          // A trackpad reaches the same step through the `wheel` listener above,
+          // not through this: two fingers on a trackpad never press a pointer
+          // down, so nothing here ever sees the gesture.
           drag={reduced ? false : "x"}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.14}

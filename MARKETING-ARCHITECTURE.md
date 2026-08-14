@@ -278,7 +278,7 @@ product working or marks a change of state; ambient decoration is gone.**
 | Closing photo | `ParallaxImage` — spring-damped drift as the slab crosses the viewport |
 | Card photos | scale to 1.04 under a fixed rounded mask on hover |
 | Queue board | a 5-deep window slides along a ring every 2.6s; "You" climbs to the chair; the "two away" notification fires at position #2. Pauses when off-screen |
-| Salon screen | panels slide in with a direction, the card's height animates to whatever the panel measures, and a dwell bar fills along its foot; tap a chip or the rail, **swipe the panel**, or use the arrow keys — any of which stops the auto-advance for good |
+| Salon screen | panels slide in with a direction, the card's height animates to whatever the panel measures, and a dwell bar fills along its foot; tap a chip or the rail, **swipe the panel** (finger, mouse drag or two-finger trackpad), or use the arrow keys — any of which stops the auto-advance for good |
 | Salon screen — the hand | **below `lg` only.** A pink pointing hand under the chips presses, drags left and lifts, ~2s on to ~1s off. It is spent on first use: the same flag that stops the auto-advance collapses it away |
 | Numbers | `CountUp` on the hero card and the week figures |
 | Pricing | plan cards take the one shadow tier on hover |
@@ -323,7 +323,7 @@ is `display: none` — out of the tab order and the accessibility tree below `lg
 exactly one tablist is ever exposed, while its four sentences stay in the HTML for a
 crawler at every width.
 
-Five things about the mechanism are load-bearing:
+Six things about the mechanism are load-bearing:
 
 - **The panel's height is measured, not guessed.** A `ResizeObserver` reports the
   active panel's `offsetHeight` and the wrapper animates to it. The four panels run
@@ -357,6 +357,24 @@ Five things about the mechanism are load-bearing:
   reader. Under `prefers-reduced-motion` the hand parks in the middle at full opacity
   and the sentence stays: the guidance was the point, the movement only the delivery.
   Everything moves inside a fixed 44×24 track, so the chips above never shift.
+- **A two-finger trackpad swipe is a third input, not a variant of the drag.** It
+  never presses a pointer down, so `motion`'s `drag` and every `onDragEnd`
+  threshold behind it are blind to it — the panel carried a `cursor-grab` and a
+  hand miming a swipe while the gesture every laptop actually offers did nothing.
+  It arrives as `wheel` events with `deltaX`, handled by a **native listener with
+  `{ passive: false }`**, because React registers `wheel` passively and
+  `preventDefault()` from an `onWheel` prop is ignored with a console warning.
+  Cancelling matters for more than tidiness: an unconsumed horizontal wheel is
+  also the browser's **back-navigation gesture**, so without it the swipe meant to
+  show the walk-in line leaves the site. Only horizontal-dominant events are
+  cancelled, judged per event rather than on the running total, so a vertical or
+  diagonal scroll over the card still scrolls the page. `spent` swallows macOS's
+  momentum tail — up to a second of events after the fingers lift — so one flick is
+  one step however far it travels; only a real pause starts another. Not gated on
+  `prefers-reduced-motion`, unlike the drag: that setting asks for less movement,
+  not fewer ways in. The relative move is its own stable `step` callback rather
+  than `go(active + delta)`, which is what lets the listener attach once for the
+  life of the card instead of being rebuilt on every panel change.
 
 Verified at 360 / 390 / 430 / 744 / 834 / 1024 / 1280 / 1440: no element escapes the
 viewport, the card's box never intersects the call to action's, the height wrapper is
@@ -365,6 +383,16 @@ tablist is visible, and both a tap and `ArrowLeft` move `aria-selected`. Plus, a
 and 1280: the timer advances once on its own, a swipe steps forward and back, a 20px
 nudge does not commit, the timer is stopped 8s after an interaction, and the page
 still scrolls vertically under a pointer that starts on the panel.
+
+The trackpad path has its own harness, because `page.mouse.wheel` exercises nothing
+the drag harness touches and the drag harness exercises nothing this does. At 390 /
+744 / 1280 / 1440: a flick each way steps one panel each way; **2100px of unbroken
+events over ~1.1s still steps exactly once**; two flicks separated by a pause step
+twice; an 18px nudge does not commit; a vertical wheel over the panel scrolls the
+page and a mostly-vertical diagonal does not touch the panel; a horizontal wheel
+comes back `defaultPrevented` and a vertical one does not; and a wheel step counts
+as an interaction — the auto-advance is still stopped 8s later and the hint has
+collapsed.
 
 The hand is measured on the same eight widths: present and animating below 1024,
 `display: none` at and above it, never leaving its 44px track, never overlapping the
