@@ -77,17 +77,22 @@ export const brand = {
    */
   adminUrl: (process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3002").replace(/\/+$/, ""),
   /**
-   * The mailbox on the footer, in the Organization JSON-LD, and now the same address
-   * `legal.contactEmail` uses.
+   * The mailbox on the footer and in the Organization JSON-LD. **Two readers, one
+   * constant** — the structured data a crawler files under this Organization has to name
+   * the same address a human reads at the bottom of the page, or the two disagree about
+   * how to reach the same company.
    *
-   * It was `hello@bhutansalons.com`, which **did not exist** — nobody read it, and the
-   * note on `legal.contactEmail` said so and kept a second address for the one thing that
-   * legally has to arrive (account deletion). One real mailbox is better than a branded
-   * one nobody opens: a support address that bounces is worse than a personal one that is
-   * read. Point both at a role address when there is a role address to point at, and they
-   * are already one constant apart.
+   * It was `hello@bhutansalons.com`, which **did not exist**, and then briefly a personal
+   * address, on the reasoning that a real mailbox beats a branded one nobody opens. This
+   * is that role address arriving: branded *and* read.
+   *
+   * **`legal.contactEmail` is deliberately still the old one and is not this.** It is the
+   * address on a legal obligation — account deletion within `legal.deletionDays` — so it
+   * moves when somebody decides it moves, not as a side effect of retitling the support
+   * inbox. The two being one constant apart is exactly what makes that a decision rather
+   * than a search-and-replace.
    */
-  supportEmail: "chemsbhai@gmail.com",
+  supportEmail: "thobhutansalons@gmail.com",
   /**
    * **A real number now**, replacing the `+975 17 00 00 00` placeholder. Two things read
    * it, so it had to be a form both accept: the footer's phone row (`tel:`) and the
@@ -758,12 +763,13 @@ export const footer = {
  * Both app stores read `/privacy`, and every value here is a commitment made to
  * a regulator and to users — not marketing copy. Change them only deliberately.
  *
- * `contactEmail` used to be deliberately different from `brand.supportEmail`, because
+ * `contactEmail` is deliberately different from `brand.supportEmail`, because
  * account-deletion requests legally land here and so this has to be a mailbox somebody
- * actually reads — and `hello@bhutansalons.com` was not one. **The two now agree**, since
- * `brand.supportEmail` is this same address. Keep them as two constants anyway: the day a
- * monitored role address exists, the support inbox and the address on a legal obligation
- * are the kind of thing that should be able to move separately.
+ * actually reads. The two briefly agreed, while `brand.supportEmail` was this same
+ * address; the support inbox has since moved to `thobhutansalons@gmail.com` and **this
+ * has not followed**, which is the case the two constants exist for. Moving it is a
+ * decision about a published commitment — `/privacy` names it twice and promises a reply
+ * within `deletionDays` — so make it deliberately, not because the footer changed.
  */
 export const legal = {
   operator: "Chojay Wangchuk",
