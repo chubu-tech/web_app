@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowRight, BadgeCheck, Star } from "lucide-react";
+import { ArrowRight, Star } from "lucide-react";
 import { brand, hero } from "@/lib/marketing/content";
 import { CountUp } from "./ui/count-up";
 import { Container } from "./ui/section";
@@ -105,17 +105,6 @@ export function Hero() {
               className="text-body text-body-lg mt-5 max-w-[34rem]"
             >
               {hero.purpose}
-            </motion.p>
-
-            {/* Who pays — answered before anyone can wonder. */}
-            <motion.p
-              initial={{ opacity: 0, y: reduced ? 0 : 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.6, ease: EASE }}
-              className="ring-hairline bg-surface-soft text-ink mt-6 inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-caption font-medium ring-1 ring-inset"
-            >
-              <BadgeCheck className="text-rausch size-4 shrink-0" aria-hidden />
-              {hero.freeNote}
             </motion.p>
 
             {/* Download next — it is the primary action on this page. */}

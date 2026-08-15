@@ -186,7 +186,7 @@ export const search = {
   /* No `_accent_` markers: this heading reads in one voice. The serif italic is
      still the house style for an emphasised word elsewhere — see `pricing.title`. */
   title: "What do you need, and when?",
-  body: "Every salon here is live on Tho. Pick what you want done, where, and roughly when — then book or join the queue in the app.",
+  body: "Every salon here is live on Tho. Pick what you want then book or join the queue.",
   treatment: {
     label: "What you want done",
     placeholder: "Anything",
@@ -250,11 +250,9 @@ export const hero = {
   eyebrow: brand.cities.join(" · "),
   titleLines: [["Book", "your", "chair."], ["Skip", "the", "wait."]],
   accents: ["wait."],
-  /** The product's purpose, in one sentence. Says both halves: customer + salon. */
+  /** The product's purpose, in one sentence. Addressed to the customer. */
   purpose:
-    "Book your appointment online, or scan the QR at the door to join the live queue — so you stop waiting around. Salons get one simple screen for bookings, staff and services.",
-  /** Who pays. Stated in the hero so nobody assumes there is a booking fee. */
-  freeNote: "Always free for customers",
+    "Book ahead or scan the QR code to join the queue and avoid waiting in line.",
   ownerCta: { label: "I run a salon", href: "#for-salons" },
   image: u("photo-1585747860715-2ba37e788b70", 1800, 1200),
   imageAlt: "Warmly lit Bhutanese salon interior with mirrors and styling chairs",
@@ -286,7 +284,7 @@ export const twoWays = {
     {
       tag: "Book ahead",
       title: "Pick a time that fits your day",
-      body: "Choose the salon, the stylist and the slot. Confirmed on the spot, with a reminder before you go.",
+      body: "Choose the salon, the stylist and the slot. Confirmed on the spot, with a reminder before your schedule.",
       points: ["Prices shown up front", "Reschedule in two taps"],
       image: u("photo-1521590832167-7bcbfaa6381f", 900, 1100),
       alt: "Bright salon floor with styling chairs and mirrors",
@@ -370,7 +368,7 @@ export const forSalons = {
 export const proof = {
   eyebrow: "Live right now",
   title: "Already open for business",
-  body: "Counted from the salons on Tho today, refreshed every hour. Nothing on this page is a projection.",
+  body: "Counted from the salons on Tho today, refreshed every hour.",
   stats: {
     salons: "Salons listed",
     treatments: "Treatments to book",
@@ -393,9 +391,10 @@ export const proof = {
  * the one number here that has to be right.
  *
  * **What is still free is the customer**, and that is a different claim carried by
- * different copy: `hero.freeNote`, the `customer` panel below (Nu 0, forever), the first
- * FAQ answer and the download band. None of those changed and none of them should — see
- * the "Say who pays" rule in `AGENTS.md`.
+ * different copy: the `customer` panel below (Nu 0, forever), the first FAQ answer and
+ * the download band. None of those changed and none of them should — see the "Say who
+ * pays" rule in `AGENTS.md`. (`hero.freeNote` was a fourth carrier of it and is gone —
+ * the hero badge was removed, so the hero itself no longer says who pays.)
  *
  * ## The feature lists mirror the entitlements gate, not a wish list
  *
@@ -445,8 +444,8 @@ export const proof = {
 export const pricing = {
   eyebrow: "Who pays what",
   title: "Customers never pay. Only salons do.",
-  body: "Booking a chair and joining a queue cost you nothing — no booking fee, no charge at the door. Salons pay a monthly plan, starting at Nu 399.",
-  note: "Paid salon plans are billed monthly in Ngultrum. Pay by bank transfer or mBoB — we switch your plan on within a day. Customers are never charged anything.",
+  body: "Booking a chair and joining a queue cost you no booking fee.",
+  note: "Paid salon plans are billed monthly in Ngultrum. Pay by bank transfer or mBoB — we switch your plan on within a day.",
   /** The free-for-customers panel that sits beside the salon plans. */
   customer: {
     label: "If you're booking a haircut",

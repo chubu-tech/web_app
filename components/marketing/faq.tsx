@@ -22,7 +22,7 @@ export function Faq() {
             <SectionHeading
               eyebrow="Questions"
               title="The things _everyone asks_"
-              body="Still stuck? Message us on WhatsApp — a real person in Thimphu answers."
+              body="Still stuck? Message us on WhatsApp"
               titleId="faq-title"
             />
           </div>
