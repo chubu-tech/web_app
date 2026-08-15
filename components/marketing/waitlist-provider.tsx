@@ -192,6 +192,10 @@ function WaitlistDialog({
           // on the redesigned page. `shadow-2xl` went with them: this page has one
           // shadow tier and a modal already has a scrim doing the separating.
           "rounded-t-lg sm:rounded-md max-h-[92dvh] overflow-y-auto",
+          // Only the sheet branch touches the bottom edge of the screen, so only
+          // it has to clear the home indicator — the last line of copy sat under
+          // it on a phone. `sm:pb-8` puts the centred card back on plain `p-8`.
+          "pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-8",
         ].join(" ")}
       >
         <button

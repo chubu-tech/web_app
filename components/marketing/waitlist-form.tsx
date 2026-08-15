@@ -161,7 +161,16 @@ export function WaitlistForm({
             if (submitted.current) setError(validateEmail(event.target.value));
           }}
           className={cn(
-            "h-12 min-w-0 flex-1 rounded-full px-5 text-ui",
+            // `flex-1` is deliberately **not** unconditional, and this is the one
+            // line that made the modal look broken on a phone. Stacked, the column
+            // is the *main* axis, so `flex-basis: 0%` replaces `h-12` as the base
+            // size — and a percentage against an auto-height container cannot
+            // resolve, so it falls back to the input's max-content height: 21px of
+            // `text-ui` leading, with `px-5` supplying no vertical padding to pad
+            // it out. A half-height field beside a 48px button. It sizes the
+            // *width* and only the width, so it belongs on the row branch alone.
+            "h-12 w-full min-w-0 rounded-full px-5 text-ui",
+            !stacked && "sm:flex-1",
             "ring-1 ring-inset transition-shadow duration-200 outline-none",
             // The reference's `text-input` focus: the stroke thickens to 2px and
             // flips to ink. No glow, no ring colour of its own.
