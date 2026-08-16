@@ -95,7 +95,8 @@ export default async function OwnerLayout({
       */}
       <SalonSwitcher active={active} businesses={businesses} />
 
-      <main className="flex-1">{children}</main>
+      {/* `id="main"` — the root layout's skip link targets it on every route. */}
+        <main id="main" className="flex-1">{children}</main>
 
       {/*
         Thirty minutes without interaction signs this console out. Here rather than on the

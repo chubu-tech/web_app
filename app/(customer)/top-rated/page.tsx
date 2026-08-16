@@ -10,8 +10,17 @@ import { createClient } from "@/lib/supabase/server";
 import { topRated } from "@/lib/recommendations";
 
 export const metadata: Metadata = {
-  title: "Top rated salons",
-  description: "Every rated salon in Bhutan on Tho, best first.",
+  title: "Best-Rated Salons in Bhutan",
+  description:
+    "The highest-rated salons and barbershops in Bhutan on THO, ordered by customer rating. Every rating comes from a customer who booked through THO. Book online or join a walk-in queue.",
+  alternates: { canonical: "/top-rated" },
+  openGraph: {
+    type: "website",
+    url: "/top-rated",
+    title: "Best-Rated Salons in Bhutan",
+    description:
+      "The highest-rated salons and barbershops in Bhutan, ordered by customer rating.",
+  },
 };
 
 /**
@@ -65,11 +74,11 @@ export default async function TopRatedPage() {
   return (
     <div className="px-base py-lg tablet:px-lg w-full">
       <Header
-        title="Top rated salons"
+        title="Best-rated salons in Bhutan"
         blurb={
           rated.length > 0
-            ? `Every salon with reviews, best first — ${rated.length} of them.`
-            : "Every salon with reviews, best first."
+            ? `The ${rated.length} salons and barbershops on THO that customers have reviewed, highest rated first. Every rating comes from a customer who booked through THO.`
+            : "Salons are listed here once customers have reviewed them."
         }
       />
 
@@ -88,7 +97,13 @@ export default async function TopRatedPage() {
           }
         />
       ) : (
-        <SalonGrid businesses={rated} favouriteIds={[...favouriteIds]} chips={chips} />
+        <>
+          {/* `h2` between the `h1` and the cards' `h3`s — see the note on `/salons`. */}
+          <h2 className="text-display-md text-ink mb-md font-semibold">
+            {rated.length === 1 ? "1 rated salon" : `${rated.length} rated salons`}
+          </h2>
+          <SalonGrid businesses={rated} favouriteIds={[...favouriteIds]} chips={chips} />
+        </>
       )}
     </div>
   );

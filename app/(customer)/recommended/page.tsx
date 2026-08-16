@@ -13,6 +13,21 @@ import { createClient } from "@/lib/supabase/server";
 export const metadata: Metadata = {
   title: "Recommended for you",
   description: "Every salon on Tho, ordered by distance, reviews, availability and your history.",
+  alternates: { canonical: "/recommended" },
+  /*
+    **`noindex, follow`, and it is a consolidation rather than a demotion.**
+
+    This page is the same set of salons as `/salons` in a different order, and the order is
+    computed **in the browser** from a GPS fix and the reader's own booking history. So the
+    server HTML a crawler receives is `/salons` with a different heading — a near-duplicate
+    competing with the page that should win — and the one thing that would make it distinct
+    is the one thing a crawler can never have, because it is personal to the visitor.
+
+    `follow` keeps the salon links live, so this page still passes authority to every salon
+    it lists. It is a real, useful page for a signed-in customer; it is just not a page
+    that should be *indexed*.
+  */
+  robots: { index: false, follow: true },
 };
 
 /**

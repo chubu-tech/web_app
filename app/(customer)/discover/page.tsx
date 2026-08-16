@@ -66,8 +66,31 @@ import { createClient } from "@/lib/supabase/server";
  * different document, and invited them to drop the one page meant to rank for
  * "book a salon in Bhutan" in favour of it.
  */
+/**
+ * **The title and description were missing entirely**, and on this page that is a bigger
+ * loss than it looks. Without them the route inherited the root layout's defaults, so
+ * `/` and `/discover` — a marketing landing page and a live salon directory, two wholly
+ * different documents — went to the index with byte-identical titles and descriptions.
+ * A crawler deciding which of two same-titled pages answers "book a salon in Bhutan"
+ * has no reason to pick this one, which is the page that actually can.
+ *
+ * The description is written to be *used*: search engines rewrite a description that does
+ * not match the query, so this one states what the page is (every salon and barber),
+ * where (Bhutan), and the two things a reader can do next (book, join a queue) rather
+ * than repeating the title in longer words.
+ */
 export const metadata: Metadata = {
+  title: "Find & Book Salons and Barbers in Bhutan",
+  description:
+    "Browse every salon and barbershop on THO across Bhutan. Compare services, prices and reviews, book an appointment, or join a shop's walk-in queue from your phone. Free for customers.",
   alternates: { canonical: CUSTOMER_HOME },
+  openGraph: {
+    type: "website",
+    url: CUSTOMER_HOME,
+    title: "Find & Book Salons and Barbers in Bhutan",
+    description:
+      "Browse every salon and barbershop on THO across Bhutan. Compare services, prices and reviews, then book or join the walk-in queue.",
+  },
 };
 export default async function DiscoverPage({
   searchParams,
@@ -92,6 +115,11 @@ export default async function DiscoverPage({
   };
 
   const tab = one("tab") === "products" ? "products" : "salons";
+
+  // Trimmed and length-capped before it reaches a query. 80 characters is far more than
+  // any salon name on the platform and short enough that a pathological URL cannot turn
+  // into a pathological `ilike`.
+  const searchTerm = (one("q") ?? "").trim().slice(0, 80) || null;
 
   const filters = fromParams({
     gender: one("gender"),
@@ -125,6 +153,25 @@ export default async function DiscoverPage({
         serviceGenders: serviceGenders(filters),
         minPrice: hasPrice(filters) ? filters.price.start : null,
         maxPrice: hasPrice(filters) ? filters.price.end : null,
+        /*
+          **`?q=` narrows on the server now, which is what makes it a real URL.**
+
+          It was browser state and nothing else: typing filtered the rendered list and the
+          address bar never changed, so a search could not be shared, bookmarked or
+          crawled. The canonical block above already listed `?q=` among the variants it
+          collapses, which quietly assumed a parameter that did not exist.
+
+          Two things this unlocks, beyond a shareable link. The `SearchAction` in the
+          homepage's structured data can name an endpoint that honours its own parameter
+          rather than describing one that ignores it. And a crawler following
+          `/discover?q=barber` gets barbers in the HTML, with no session and no JavaScript
+          — which is the only form of a fact an answer engine can use.
+
+          The client still filters the list it is given, so typing stays instant; because
+          the server has already applied the same term, that pass is a no-op on arrival
+          rather than a second, different filter.
+        */
+        q: searchTerm,
       }),
       fetchCategories(supabase),
       // The recommender scores availability for the whole list, so hours are
@@ -206,6 +253,7 @@ export default async function DiscoverPage({
         products={products}
         productFilter={productFilter}
         tab={tab}
+        searchTerm={searchTerm ?? ""}
       />
     </>
   );

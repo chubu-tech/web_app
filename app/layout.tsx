@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
+import { brand } from "@/lib/marketing/content";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -45,9 +46,22 @@ const inter = Inter({
   display: "swap",
 });
 
-const title = "Tho — book a salon in Bhutan";
+/*
+  **The brand's own name, from the one constant that holds it.**
+
+  These were the literal string "Tho" in five places here, while `lib/marketing/content.ts`
+  declares `brand.name = "THO"` and every marketing surface renders that. So the tab title,
+  the share card's `og:site_name` and the title template said "Tho" while the page said
+  "THO" — three names for one product on one page, which is precisely the entity confusion
+  the `alternateName` work in the homepage graph exists to undo. Reading the constant makes
+  them agree, and makes a future rename one edit.
+
+  `brand.appName` is still "Tho" and is still correct where it is used: it is the store
+  listing's name, a casing distinction rather than a different product.
+*/
+const title = `${brand.name} — Book a Salon or Barber in Bhutan`;
 const description =
-  "Book your chair or join the walk-in queue at salons and barbers across Bhutan.";
+  "Book a salon or barber appointment anywhere in Bhutan, or join a shop's walk-in queue from your phone. Compare services, prices and reviews. Free for customers.";
 
 /**
  * **`metadataBase` is the one that unlocks the rest.** Without it Next resolves every
@@ -63,13 +77,13 @@ const description =
  */
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: title, template: "%s · Tho" },
+  title: { default: title, template: `%s · ${brand.name}` },
   description,
-  applicationName: "Tho",
+  applicationName: brand.name,
   formatDetection: { telephone: false },
   openGraph: {
     type: "website",
-    siteName: "Tho",
+    siteName: brand.name,
     locale: "en_BT",
     title,
     description,
@@ -91,7 +105,15 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
-      lang="en"
+      /*
+        `en-BT`, matching `openGraph.locale: "en_BT"` below rather than contradicting it.
+
+        The document declared `en` while its own share metadata declared `en_BT` — a
+        disagreement about the same page. `en-BT` is a valid BCP-47 tag (English as
+        written in Bhutan) and it is a regional signal for a product that serves exactly
+        one country.
+      */
+      lang="en-BT"
       className={`${inter.variable} h-full antialiased`}
     >
       <body className="bg-canvas text-ink flex min-h-full flex-col overflow-x-hidden">

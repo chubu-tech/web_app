@@ -66,7 +66,36 @@ export type BusinessQuery = {
   serviceGenders?: string[] | null;
   minPrice?: number | null;
   maxPrice?: number | null;
+  /** Free-text search over name and address. See `searchFilter`. */
+  q?: string | null;
 };
+
+/**
+ * A PostgREST `or` filter matching a salon's name or address, case-insensitively.
+ *
+ * **This exists so that `?q=` is a real URL rather than a claim about one.** Discover's
+ * search box was `useState` and nothing else — typing narrowed the list in the browser
+ * and the URL never changed, so a search could not be shared, bookmarked, linked to, or
+ * crawled, and the `SearchAction` node in the homepage's structured data would have been
+ * describing an endpoint that ignored its own parameter. Moving the filter to the server
+ * makes the URL mean what it says with no JavaScript and no session.
+ *
+ * Two details are load-bearing:
+ *
+ * - **`%` and `,` are stripped, not escaped.** PostgREST parses the `or` argument as a
+ *   comma-separated list, so an unescaped comma in a search term ends the pattern early
+ *   and the rest is read as another filter — a syntax error at best and an unintended
+ *   filter at worst. `%` is the `ilike` wildcard, and a bare `%` from a visitor would
+ *   match everything while looking like a failed search. Neither carries meaning in a
+ *   salon's name, so dropping them costs nothing and removes the whole class of problem.
+ * - **The term is matched anywhere in the field**, not as a prefix. "lam" should find
+ *   "Norzin Lam", which a prefix match on the address would miss.
+ */
+export function searchFilter(q: string): string | null {
+  const cleaned = q.trim().replace(/[%,()]/g, " ").replace(/\s+/g, " ").trim();
+  if (cleaned.length === 0) return null;
+  return `name.ilike.%${cleaned}%,address_text.ilike.%${cleaned}%`;
+}
 
 /**
  * Ratings for a set of salons, from the `business_rating_summary` view.
@@ -108,7 +137,7 @@ async function ratingsFor(
  */
 export async function fetchBusinesses(
   supabase: SupabaseClient,
-  { categoryId = null, sort = "name", serviceGenders = null, minPrice = null, maxPrice = null }: BusinessQuery = {},
+  { categoryId = null, sort = "name", serviceGenders = null, minPrice = null, maxPrice = null, q = null }: BusinessQuery = {},
 ): Promise<Business[]> {
   const byService = serviceGenders != null || minPrice != null || maxPrice != null;
 
@@ -126,6 +155,12 @@ export async function fetchBusinesses(
 
   if (categoryId != null) {
     query = query.eq("business_categories.category_id", categoryId);
+  }
+  if (q != null) {
+    // Unfiltered when the term reduces to nothing, which is what an all-punctuation
+    // query does. An empty result there would read as "no salons" rather than "no search".
+    const filter = searchFilter(q);
+    if (filter) query = query.or(filter);
   }
   if (byService) {
     query = query.eq("services.is_active", true);

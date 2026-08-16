@@ -98,7 +98,10 @@ export function SalonGallery({
       >
         <Tile
           url={hero}
-          alt={`${name}, photo 1 of ${urls.length}`}
+          // Names the business and says what kind of photo it is. A bare positional
+          // index ("photo 1 of 7") describes the gallery rather than the subject, which
+          // is no use to a reader who cannot see it or to image search.
+          alt={`${name} salon — photo 1 of ${urls.length}`}
           onOpen={() => setOpenAt(0)}
           priority
           sizes="(min-width: 744px) 66vw, 100vw"
@@ -112,7 +115,7 @@ export function SalonGallery({
           <Tile
             key={url + i}
             url={url}
-            alt={`${name}, photo ${i + 2} of ${urls.length}`}
+            alt={`${name} salon — photo ${i + 2} of ${urls.length}`}
             onOpen={() => setOpenAt(i + 1)}
             sizes="33vw"
             className={cn(
@@ -158,7 +161,9 @@ export function SalonGallery({
             >
               <Shot
                 url={photo.url}
-                alt=""
+                // The same photograph carried a description in the mosaic and an empty
+                // alt here, so opening the viewer lost it. `name` is in scope; use it.
+                alt={`${name} salon — photo ${i + 1} of ${photos.length}`}
                 sizes="(min-width: 744px) 45vw, 90vw"
                 priority={i === openAt}
               />

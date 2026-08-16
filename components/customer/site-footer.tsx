@@ -85,7 +85,34 @@ export function SiteFooter({
   // Three groups, each answering a different question, and each built from the live
   // destination list so a label can never drift from the header's.
   const groups: { label: string; items: { href: string; label: string }[] }[] = [
-    { label: "Browse", items: pick(["/", "/map", "/saved"], at) },
+    /*
+      **`/discover`, not `/` — the Discover link was silently missing from every page.**
+
+      `pick` resolves each href against `readyTabs()` + `readySecondary()` and drops
+      anything it cannot find. Discover is declared in `destinations.ts` as
+      `href: "/discover"`; `"/"` is not in either list, so `at("/")` returned undefined and
+      the filter removed it — leaving the Browse column as Map and Saved on every customer
+      page, with no complaint from the type checker and nothing visibly broken.
+
+      A leftover from the marketing merge, which moved Discover off `/`. Three other
+      call sites were corrected at the time and this one was missed, which is exactly the
+      failure mode of resolving links by string against a list that silently drops misses.
+
+      `/salons` and `/salons/thimphu` are appended **outside** `pick`, deliberately. They
+      are real indexable pages that every page on the site should link to — a footer link
+      is how a crawler reaches a list page from a leaf — but they are not nav
+      destinations, and adding them to `destinations.ts` to satisfy `pick` would put them
+      in the header and on `/profile` as a side effect. `pick` resolves *destinations*;
+      these are documents, like the four legal links below.
+    */
+    {
+      label: "Browse",
+      items: [
+        ...pick(["/discover", "/map", "/saved"], at),
+        { href: "/salons", label: "All salons" },
+        { href: "/salons/thimphu", label: "Salons in Thimphu" },
+      ],
+    },
     { label: "Your visits", items: pick(["/bookings", "/messages", "/notifications"], at) },
     { label: "Shop & rewards", items: pick(["/orders", "/rewards", "/profile"], at) },
     // Not from `destinations.ts`: these are documents, not places to go, so they are

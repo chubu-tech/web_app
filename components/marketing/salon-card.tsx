@@ -5,6 +5,7 @@ import { MapPin, Star } from "lucide-react";
 import { results as copy } from "@/lib/marketing/content";
 import { formatDistance, type Match } from "@/lib/marketing/search";
 import { cn } from "@/lib/marketing/utils";
+import { salonPath } from "@/lib/slug";
 import { MotifDiamond } from "./ui/bhutan";
 
 /**
@@ -60,18 +61,35 @@ function reviewLine(count: number): string | null {
  * given reader can read. Two lines is also what the reference does, ragged card
  * bottoms and all.
  *
- * ## The whole card is the tap target
+ * ## The whole card is the tap target, and it now leads to the salon
  *
- * The store links in `content.ts` are still empty strings, so the card hands off to
- * the download band rather than to a dead URL — and the link is stretched over the
- * card with `after:absolute after:inset-0` instead of being a 13px line of text at the
- * bottom that a thumb has to find. One anchor, one tab stop, whole-card target.
+ * **This card used to link to `#download`, and that was the single most costly line in
+ * the repo for search.** The reasoning was recorded and was sound when written: the store
+ * links in `content.ts` are empty strings, so the card handed off to the download band
+ * rather than to a dead URL. What it missed is that `/salon/<id>` is not a dead URL — it
+ * is a real, live, anonymously-readable, canonicalised route in this same application,
+ * and it has been since the merge put the marketing site and the product on one origin.
  *
- * Two consequences worth knowing. The `aria-label` names the salon, because four
- * links reading "Book in the app" in a row is a screen-reader listing that says
- * nothing. And a mouse drag across a rail ends in a `click` on whatever card is under
- * the cursor — `useCarousel` swallows exactly one click after a real drag, which is
- * why a stretched link is safe inside a draggable row.
+ * The consequence was structural rather than cosmetic. `/` is the highest-authority page
+ * on the domain and it **displays** the marketplace's entire live inventory, read from
+ * the database at build time — and it passed none of that authority to any of the pages
+ * that inventory is about. `app/sitemap.ts` states the same problem from the other end:
+ * *"a salon page is reachable only from Discover, which is a client-filtered list… Nothing
+ * links to them from outside."* After this change the homepage is exactly that missing
+ * outside link, for every salon at once.
+ *
+ * `salonPath` mints the slugged, keyword-bearing URL, so the anchor text is the salon's
+ * name and the href carries it too.
+ *
+ * The link is stretched over the card with `after:absolute after:inset-0` instead of being
+ * a 13px line of text at the bottom that a thumb has to find. One anchor, one tab stop,
+ * whole-card target.
+ *
+ * Two consequences worth knowing. The `aria-label` names the salon **and** what the link
+ * does, because a screen-reader listing of four links reading only a shop name does not
+ * say they are openable pages. And a mouse drag across a rail ends in a `click` on
+ * whatever card is under the cursor — `useCarousel` swallows exactly one click after a
+ * real drag, which is why a stretched link is safe inside a draggable row.
  *
  * The star stays gold. That is one place THO deliberately departs from the reference,
  * which renders ratings in ink — `--color-star` is the product's single rating colour
@@ -114,7 +132,20 @@ export function SalonCard({
         {salon.coverUrl ? (
           <Image
             src={salon.coverUrl}
-            alt={`${salon.name} interior`}
+            /*
+              Describes the salon, not the photograph's contents.
+
+              This was `"<name> interior"`, which asserts something the code cannot know:
+              the cover is owner-uploaded and is as often a storefront, a price list or a
+              stylist at work. Naming the business and its kind is true whatever the shot
+              shows, and it is what a reader of the alt actually wants — which salon this
+              is — rather than a guess at the framing.
+            */
+            alt={
+              salon.categories[0]
+                ? `${salon.name} — ${salon.categories[0].toLowerCase()} salon in ${salon.city ?? "Bhutan"}`
+                : `${salon.name} in ${salon.city ?? "Bhutan"}`
+            }
             fill
             sizes={sizes}
             className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.04]"
@@ -143,8 +174,8 @@ export function SalonCard({
         <div className="flex items-start justify-between gap-3">
           <h3 className="text-ink text-subheading min-w-0 font-semibold">
             <a
-              href="#download"
-              aria-label={`${copy.cta} — ${salon.name}`}
+              href={salonPath(salon)}
+              aria-label={`${salon.name} — see services, prices and book`}
               className={cn(
                 "line-clamp-2 after:absolute after:inset-0 after:content-['']",
                 "decoration-hairline decoration-2 underline-offset-4",

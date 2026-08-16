@@ -4,8 +4,16 @@ import { fetchBusinesses } from "@/lib/api/discovery";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Map",
-  description: "Find salons and barbers near you on the map.",
+  title: "Salon Map — Find Salons Near You in Bhutan",
+  description:
+    "See salons and barbershops across Bhutan on a map and find the ones nearest you. Open a shop to compare services and prices, then book online or join its walk-in queue.",
+  alternates: { canonical: "/map" },
+  openGraph: {
+    type: "website",
+    url: "/map",
+    title: "Salon Map — Find Salons Near You in Bhutan",
+    description: "Salons and barbershops across Bhutan on a map, with the nearest to you first.",
+  },
 };
 
 /**

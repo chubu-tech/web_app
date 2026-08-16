@@ -17,6 +17,26 @@ import { cn } from "@/lib/utils";
  * the safety net for an image host that isn't in `next.config.ts`'s
  * `remotePatterns`: `next/image` rejects the request, the browser fires `error`,
  * and the viewer gets the monogram instead of a broken-image glyph.
+ *
+ * ## The photograph takes an `alt`, and it used to be hard-coded empty
+ *
+ * `alt=""` was applied to the **real photograph** as well as to the monogram, on a
+ * justification that only ever covered the monogram: *"the salon's name is always in the
+ * text beside this."* That is true for accessibility — a card whose heading is the salon
+ * name does not need its thumbnail read out as well — and it is the wrong trade for the
+ * one thing this product has a lot of and search has a surface for.
+ *
+ * This component draws the cover on **every** indexable page: every card on `/discover`,
+ * `/salons`, `/top-rated`, a place page and the map rail, every stylist in a salon's Team
+ * grid, and the hero of `/stylist/[id]`. So the entire photographic inventory of the
+ * marketplace shipped with no alt text, and Google Images had nothing to file any of it
+ * under. The marketing site's own `SalonCard` alts its covers; the two halves of one site
+ * disagreed.
+ *
+ * `alt` is therefore a prop with an empty **default**, which keeps every existing
+ * decorative call site correct and lets the pages that show a real business photograph
+ * describe it. The monogram branch stays `aria-hidden` regardless: a generated initial is
+ * decoration by construction, whatever the caller passes.
  */
 
 export type CoverImageProps = {
@@ -26,6 +46,18 @@ export type CoverImageProps = {
   sizes?: string;
   /** Load this one eagerly — the hero above the fold, never a card in a row. */
   priority?: boolean;
+  /**
+   * Describes the **photograph**, for a reader who cannot see it and for image search.
+   *
+   * Empty by default, which is the correct value wherever the cover sits beside the same
+   * name in text — a card, a thumbnail, a list row. Pass a description on the surfaces
+   * where the image is the subject rather than an illustration of an adjacent heading.
+   *
+   * Say what can be known: the business and where it is. **Not** what the photograph
+   * contains — the file is owner-uploaded and is as often a storefront or a price list as
+   * an interior, so "interior" is an assertion this code cannot make.
+   */
+  alt?: string;
   /**
    * Applies to the wrapper, which is `relative` and **must be given a size here** — not
    * on an element around it.
@@ -50,6 +82,7 @@ export function CoverImage({
   sizes = "100vw",
   priority = false,
   className,
+  alt = "",
 }: CoverImageProps) {
   const [failed, setFailed] = useState(false);
   const showFallback = !imageUrl || failed;
@@ -74,7 +107,7 @@ export function CoverImage({
       ) : (
         <Image
           src={imageUrl}
-          alt=""
+          alt={alt}
           fill
           sizes={sizes}
           priority={priority}

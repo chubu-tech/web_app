@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { placeOf } from "../places";
 
 /**
  * The salon index, read once at build time and prerendered into the page.
@@ -28,7 +29,29 @@ export type SalonHours = {
 export type Salon = {
   id: string;
   name: string;
+  /**
+   * The town this salon is really in — **derived, not the `city` column.**
+   *
+   * `businesses.city` disagrees with `address_text` on seven of the ten live salons, and
+   * the coordinates side with the address every time: `Norzin Salon & Spa` on Norzin Lam
+   * is filed under Paro, `Lotus Spa & Wellness` on Doebum Lam under Phuentsholing, and
+   * `Paro Glow Beauty Lounge` — whose pin is in the Paro valley — under Thimphu.
+   *
+   * That column fed two things a visitor sees: this field, which the search band's
+   * "Where" dropdown filters on by exact string equality, and the location line on every
+   * salon card. So the homepage was **offering Paro as a filter and returning Thimphu
+   * salons under it**, and telling every reader and every crawler that six shops were in
+   * towns they are not in.
+   *
+   * `placeOf` resolves from coordinates first and the owner-typed address second and
+   * returns null rather than guessing — rendered as "Bhutan", which is the honest answer
+   * for a salon nobody can place. `lib/api/mappers.ts` reached the same conclusion for
+   * the product side and omits `city` from `Business` entirely; this is that decision
+   * applied to the one surface that still needs a town name.
+   */
   city: string | null;
+  /** As the owner typed it. The input `placeOf` reads, and the card's second line. */
+  addressText: string | null;
   lat: number | null;
   lng: number | null;
   coverUrl: string | null;
@@ -114,7 +137,7 @@ export async function getSalonIndex(): Promise<SalonIndex> {
       supabase
         .from("businesses")
         .select(
-          "id, name, city, lat, lng, cover_url, plan, gender_focus, is_active, status",
+          "id, name, city, address_text, lat, lng, cover_url, plan, gender_focus, is_active, status",
         )
         .eq("status", "approved")
         .eq("is_active", true)
@@ -186,12 +209,18 @@ export async function getSalonIndex(): Promise<SalonIndex> {
 
     const salons: Salon[] = rows.map((b) => {
       const summary = ratingBy.get(b.id as string);
+      const lat = b.lat == null ? null : Number(b.lat);
+      const lng = b.lng == null ? null : Number(b.lng);
+      const addressText = (b.address_text as string | null)?.trim() || null;
+      // Derived, never `b.city` — see the note on `Salon.city`.
+      const { town } = placeOf({ addressText, lat, lng });
       return {
         id: b.id as string,
         name: (b.name as string).trim(),
-        city: (b.city as string | null)?.trim() || null,
-        lat: b.lat == null ? null : Number(b.lat),
-        lng: b.lng == null ? null : Number(b.lng),
+        city: town?.name ?? null,
+        addressText,
+        lat,
+        lng,
         coverUrl: (b.cover_url as string | null) || null,
         plan: ((b.plan as string) || "basic") as Salon["plan"],
         genderFocus: (b.gender_focus as string | null) || null,

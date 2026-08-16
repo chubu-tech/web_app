@@ -9,6 +9,7 @@ import { Icons, IconSize } from "@/components/ui/icons";
 import { RatingPill } from "@/components/ui/rating";
 import { formatKm, kmTo, type Coords } from "@/lib/discover-logic";
 import { mapCenter, nearestTo, resolveLocation, THIMPHU_CENTER } from "@/lib/geo";
+import { salonPath } from "@/lib/slug";
 import { cardMetaLine, hasLocation, type Business } from "@/lib/types/salon";
 import { cn } from "@/lib/utils";
 
@@ -254,7 +255,7 @@ function RailRow({
         </span>
       </button>
       <Link
-        href={`/salon/${business.id}`}
+        href={salonPath(business)}
         aria-label={`Open ${business.name}`}
         className="text-muted hover:text-ink flex size-10 shrink-0 items-center justify-center"
       >

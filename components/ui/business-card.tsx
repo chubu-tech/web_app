@@ -3,6 +3,7 @@ import { CardMedia } from "./card-media";
 import { Icons, IconSize } from "./icons";
 import { RatingPill } from "./rating";
 import { cn } from "@/lib/utils";
+import { salonPath } from "@/lib/slug";
 
 /**
  * The photo-forward salon card, ported from
@@ -141,6 +142,16 @@ export function BusinessCard({
         imageUrl={imageUrl}
         sizes={sizes}
         priority={priority}
+        /*
+          The salon's own name and where it is — the two things a reader of the alt, or an
+          image-search result, actually needs. Not a description of the photograph: the
+          file is owner-uploaded and may be a shopfront, a chair or a price list, so
+          anything about its contents would be a guess.
+
+          `subtitle` is the address on every caller that passes one, which is what makes
+          this specific rather than a repetition of the heading beside it.
+        */
+        alt={subtitle ? `${name} — ${subtitle}` : name}
         className={cn(
           // The radius lives on the media now rather than on a frame clipping it. 14px,
           // not the 20px `rounded-lg` the frame had: a corner that big reads as a rounded
@@ -175,7 +186,10 @@ export function BusinessCard({
               name
             ) : (
               <Link
-                href={href ?? `/salon/${id}`}
+                // `salonPath`, not a bare id: every internal link should point at the
+                // URL the page canonicalises to, or each one costs a redirect and hands a
+                // crawler a non-canonical target to follow.
+                href={href ?? salonPath({ id, name })}
                 className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
               >
                 {name}

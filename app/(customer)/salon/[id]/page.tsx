@@ -1,5 +1,6 @@
 import { cache } from "react";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { FavouriteButton } from "@/components/customer/favourite-button";
 import { MessageSalonButton } from "@/components/customer/message-salon-button";
@@ -41,14 +42,16 @@ import {
 import { fetchLoyaltyBalance } from "@/lib/api/owner-back-office";
 import { fetchPublicLoyaltyProgram, fetchPublicRewards } from "@/lib/api/shop";
 import { fetchActiveLine } from "@/lib/api/queue";
+import { placeOf, townOf } from "@/lib/places";
 import { coverageLine, dayName, hhmm, todayHoursLine } from "@/lib/salon-copy";
-import { jsonLdScript, salonSchema } from "@/lib/seo";
+import { breadcrumbSchema, jsonLdScript, salonSchema } from "@/lib/seo";
+import { isCanonicalParam, parseEntityId, salonPath, stylistPath } from "@/lib/slug";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import type { LoyaltyBalance, LoyaltyReward } from "@/lib/types/back-office";
 import type { QueueEntry } from "@/lib/types/queue";
 import { hasLocation, offerEndsLabel, runsQueue, travels } from "@/lib/types/salon";
-import type { Review } from "@/lib/types/salon";
+import type { Business, Review } from "@/lib/types/salon";
 import { whatsappUrl } from "@/lib/whatsapp";
 
 /**
@@ -103,22 +106,68 @@ const loadBusiness = cache(async (id: string) => {
   return fetchBusinessById(supabase, id);
 });
 
+/**
+ * The description a search result actually shows, composed from the salon's own row.
+ *
+ * The owner's `description` is used when there is one, and it is first because it is the
+ * only sentence on the page written by somebody who has been in the shop. When there is
+ * none — and there is none often — the fallback is **composed rather than templated**: it
+ * names the salon, what it is, where it is, and what a reader can do next, because a
+ * description is the one piece of copy whose entire job is to earn a click from a list of
+ * ten alternatives.
+ *
+ * `placeOf` supplies the town, never `businesses.city` — see `lib/places.ts` for why that
+ * column would put seven of the ten live salons in the wrong place.
+ */
+function salonDescription(
+  business: Business,
+  services: { name: string; price: number }[],
+): string {
+  if (business.description) return business.description;
+
+  const { town, area } = placeOf(business);
+  const where = area ? `${area.name}, ${town?.name ?? "Bhutan"}` : (town?.name ?? "Bhutan");
+  const priced = services.map((s) => s.price).filter((p) => p > 0);
+  const from = priced.length > 0 ? ` Services from Nu ${Math.min(...priced).toLocaleString("en-US")}.` : "";
+
+  return `Book an appointment at ${business.name} in ${where}. See services, prices, opening hours and reviews, then book online or join the walk-in queue.${from}`;
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
+  const { id: param } = await params;
+  const id = parseEntityId(param);
+  if (!id) return { title: "Salon" };
+
   const business = await loadBusiness(id).catch(() => null);
   if (!business) return { title: "Salon" };
 
-  const description =
-    business.description ??
-    `Book a chair at ${business.name}${business.addressText ? ` — ${business.addressText}` : ""}.`;
-  const path = `/salon/${business.id}`;
+  const supabase = await createClient();
+  const services = await fetchServices(supabase, id).catch(() => []);
+
+  const description = salonDescription(business, services);
+  const path = salonPath(business);
+  const { town } = placeOf(business);
+
+  /*
+    **The title names the town, and that is most of the value on this page.**
+
+    It was the bare salon name. A salon's own name is a query almost nobody types — the
+    queries that exist are "salon in Thimphu", "barber near Norzin Lam", "hair salon
+    Bhutan" — and a title carrying only a proper noun competes for none of them. Naming
+    the town turns every one of these pages into a candidate for the geographic query that
+    is the whole reason a local marketplace ranks at all.
+
+    The template in the root layout appends " · Tho", so this stays inside the ~60
+    characters a result renders.
+  */
+  const title = town ? `${business.name} — Salon in ${town.name}` : business.name;
 
   return {
-    title: business.name,
+    title,
     description,
     /*
       **The canonical, and the reason this page needs one more than any other.** It is
@@ -131,7 +180,7 @@ export async function generateMetadata({
     alternates: { canonical: path },
     openGraph: {
       type: "website",
-      title: business.name,
+      title,
       description,
       url: path,
       // The salon's own cover, so a link pasted into WhatsApp — which is how this
@@ -149,7 +198,22 @@ export default async function SalonPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ service?: string | string[]; gender?: string | string[] }>;
 }) {
-  const { id } = await params;
+  const { id: param } = await params;
+  /*
+    **The URL carries a name now, and the id is still what the database is asked for.**
+
+    `/salon/<uuid>` is what this route used to be, and a UUID is a URL that tells a reader
+    and a crawler nothing at all — on the most-linked and most-shared page in the product.
+    `parseEntityId` reads the id off the end of either shape, so `/salon/norzin-salon-and-spa-<uuid>`
+    and the bare `/salon/<uuid>` both resolve, and every link already printed, pasted into
+    WhatsApp or saved as a bookmark keeps working.
+
+    A string with no id in it never reaches the database: `notFound()` here rather than a
+    round trip to prove that "not-a-salon" is not a salon.
+  */
+  const id = parseEntityId(param);
+  if (!id) notFound();
+
   const { service: serviceParam, gender: genderParam } = await searchParams;
   /*
     Discover's gender filter, in transit. Not validated here beyond taking the first value:
@@ -230,6 +294,60 @@ export default async function SalonPage({
   ]);
 
   if (!business) notFound();
+
+  /*
+    Collapse every other spelling of this page onto the canonical one.
+
+    A bare id, a slug left over from before the salon was renamed, or a hand-typed
+    variation all resolve to the same row — three URLs serving one document, which is the
+    duplicate-content shape the canonical tag exists to fix.
+
+    **This does not reach the wire as a 308, and that is worth knowing rather than
+    assuming.** `app/(customer)/loading.tsx` puts a Suspense boundary above this route, so
+    the shell is flushed with a 200 before the page body decides anything — a status
+    cannot be changed once the response has begun. Measured: `curl` on the bare-id URL
+    answers **200**, and the redirect arrives inside the RSC payload, which React performs
+    as a client navigation after hydration. It is the same trade `notFound()` already makes
+    here, recorded in AGENTS.md under *"It also turned every `notFound()` into a soft 404"*.
+
+    So the division of labour is:
+
+    - **The canonical tag does the consolidation.** `generateMetadata` emits
+      `<link rel="canonical">` pointing at the slugged URL on every spelling of this page,
+      and that is a signal Google acts on for exactly this case. It is in the static HTML,
+      so it works for a crawler that runs no JavaScript.
+    - **The redirect fixes the address bar** for a person who followed an old link, so what
+      they copy and share afterwards is the good URL.
+
+    A real 308 would be strictly better and the cost of getting one is stated in AGENTS.md:
+    move the boundary down to the list segments and `/salon/[id]` loses its skeleton — the
+    first paint of the most-travelled navigation in the product. That trade was made
+    deliberately and is not reopened here.
+
+    **Below `notFound()`, deliberately.** Redirecting first would send a visitor from a
+    deleted salon's bare-id URL to a slugged URL that then 404s, which turns one clear
+    answer into two hops and a worse one.
+  */
+  const canonical = salonPath(business);
+  if (!isCanonicalParam(param, canonical)) permanentRedirect(canonical);
+
+  /*
+    The breadcrumb trail, shared by the visible `<nav>` and the `BreadcrumbList` markup so
+    the two cannot describe different ancestries.
+
+    The place crumb is included only when `placeOf` is confident. A salon nobody can place
+    gets `Salons › <name>`, which is true, rather than a guessed town — the same rule the
+    schema's `addressLocality` follows and for the same reason.
+  */
+  const { town: salonTown, area: salonArea } = placeOf(business);
+  const trail = [
+    { name: "Salons", path: "/salons" },
+    ...(salonTown ? [{ name: salonTown.name, path: `/salons/${salonTown.slug}` }] : []),
+    ...(salonTown && salonArea
+      ? [{ name: salonArea.name, path: `/salons/${townOf(salonArea).slug}/${salonArea.slug}` }]
+      : []),
+    { name: business.name, path: canonical },
+  ];
 
   /**
    * Wave two — the reads that genuinely could not go above.
@@ -346,6 +464,21 @@ export default async function SalonPage({
       />
 
       {/*
+        Where this page sits, for a crawler.
+
+        `BreadcrumbList` answers no question by itself — what it does is turn a bare URL in
+        a result into a described one, and tell an engine that this page is a leaf under a
+        place rather than a page about the whole site. The trail is built from `placeOf`,
+        so it names the town the salon is actually in rather than the one
+        `businesses.city` claims, and it degrades to two crumbs for a salon nobody can
+        place rather than inventing a third.
+      */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(breadcrumbSchema(trail)) }}
+      />
+
+      {/*
         The title block and the mosaic, in one 1280px column.
 
         1280 rather than the 1440 this page used: at 1440 the two-column body ran to 1360px
@@ -362,6 +495,32 @@ export default async function SalonPage({
           <HeroCircleButton icon={Icons.back} label="Back to Discover" href="/discover" />
 
           <div className="min-w-0 flex-1">
+            {/*
+              A visible breadcrumb, and it is the first crawlable link out of this page.
+
+              Every route back up was an **icon** whose label lived in `aria-label` — good
+              for a screen reader, invisible to a crawler, which reads anchor text. So the
+              most-linked page in the product had no textual link to the list it belongs
+              to, and `/salons/thimphu` had nothing pointing at it from the pages it is
+              about. This is that link, and it doubles as the orientation a visitor
+              arriving from a QR code or a shared link has none of.
+            */}
+            <nav aria-label="Breadcrumb" className="mb-xs">
+              <ol className="text-body-sm text-muted gap-xxs flex flex-wrap items-center">
+                {trail.slice(0, -1).map((crumb) => (
+                  <li key={crumb.path} className="gap-xxs flex items-center">
+                    <Link href={crumb.path} className="hover:text-ink underline-offset-2 hover:underline">
+                      {crumb.name}
+                    </Link>
+                    <span aria-hidden>/</span>
+                  </li>
+                ))}
+                <li aria-current="page" className="text-ink">
+                  {business.name}
+                </li>
+              </ol>
+            </nav>
+
             <h1 className="text-display-xl text-ink font-semibold tracking-tight">
               {business.name}
             </h1>
@@ -711,7 +870,7 @@ function Specialists({
             name={s.displayName}
             role={s.role}
             photoUrl={s.photoUrl}
-            href={`/stylist/${s.id}`}
+            href={stylistPath(s)}
           />
         </li>
       ))}

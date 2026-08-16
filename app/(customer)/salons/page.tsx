@@ -8,8 +8,23 @@ import { SALON_SORTS, type SalonSort } from "@/lib/recommendations";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "All salons",
-  description: "Every salon and barbershop on Tho in Bhutan — sort by distance or rating.",
+  /*
+    "All salons" named the page and not the query. This route is the country-level list
+    that `/salons/thimphu` and its siblings hang off, so its title claims the country-level
+    search — and the canonical is what keeps `?sort=nearest` and `?sort=topRated` from
+    competing with it as two more copies of one document.
+  */
+  title: "Salons & Barbershops in Bhutan — Book Online",
+  description:
+    "Every salon and barbershop on THO across Bhutan. Compare services, prices, ratings and opening hours, then book an appointment online or join a walk-in queue. Free for customers.",
+  alternates: { canonical: "/salons" },
+  openGraph: {
+    type: "website",
+    url: "/salons",
+    title: "Salons & Barbershops in Bhutan — Book Online",
+    description:
+      "Every salon and barbershop on THO across Bhutan. Compare prices and ratings, then book online or join a walk-in queue.",
+  },
 };
 
 /**
@@ -63,13 +78,27 @@ export default async function AllSalonsPage({
           <Icons.back style={{ width: IconSize.xxs, height: IconSize.xxs }} aria-hidden />
           Discover
         </Link>
-        <h1 className="text-display-xl text-ink font-semibold">All salons</h1>
-        <p className="text-body-md text-body mt-xs">
+        <h1 className="text-display-xl text-ink font-semibold">
+          Salons and barbers in Bhutan
+        </h1>
+        <p className="text-body-md text-body mt-xs max-w-[52rem]">
           {businesses.length === 1
-            ? "One salon on Tho."
-            : `Every salon on Tho — ${businesses.length} of them.`}
+            ? "One salon is listed on THO in Bhutan. Open it to see its services, prices, opening hours and reviews, then book online or join its walk-in queue."
+            : `${businesses.length} salons and barbershops are listed on THO across Bhutan. Compare services, prices and ratings, then book an appointment online or join a shop's walk-in queue. Booking is free — you pay the salon in the shop.`}
         </p>
       </div>
+
+      {/*
+        An `h2` between the page title and the cards.
+
+        Every card's name is an `h3` (`BusinessCard`), so with only an `h1` above them the
+        outline jumped `h1` straight to `h3` — a level skipped on four list pages at once.
+        This is not a filler heading: it states the count, which is the one fact a list
+        page owes a reader before they start scrolling it.
+      */}
+      <h2 className="text-display-md text-ink mb-md font-semibold">
+        {businesses.length === 1 ? "1 salon" : `All ${businesses.length} salons`}
+      </h2>
 
       <AllSalonsList
         businesses={businesses}

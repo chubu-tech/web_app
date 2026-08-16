@@ -2,10 +2,20 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { CUSTOMER_HOME } from "@/lib/auth";
+import { breadcrumbSchema, faqSchema, jsonLdScript } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Help",
-  description: "How booking, the walk-in queue, orders and rewards work on Tho.",
+  title: "Help — Booking, Queues, Payment & Rewards",
+  description:
+    "How to change or cancel a booking, join a salon's walk-in queue, pay, earn and spend loyalty points, report something, and delete your account on THO.",
+  alternates: { canonical: "/help" },
+  openGraph: {
+    type: "website",
+    url: "/help",
+    title: "Help — Booking, Queues, Payment & Rewards on THO",
+    description:
+      "How booking changes, the walk-in queue, payment, loyalty points and account deletion work on THO.",
+  },
 };
 
 /**
@@ -37,9 +47,59 @@ export const metadata: Metadata = {
  * render is worth more here than a gesture.
  */
 export default function HelpPage() {
+  const trail = [
+    { name: "Home", path: "/" },
+    { name: "Help", path: "/help" },
+  ];
+
   return (
     <article className="scroll-mt-[calc(var(--site-header-height)+1.5rem)]">
-      <h1 className="text-editorial-lg font-semibold">Help</h1>
+      {/*
+        **Six real questions with real answers, and they carried no markup at all.**
+
+        This is the most rigorously fact-checked prose in the repo — its own doc comment
+        says every fact below is one this repo enforces — and it is exactly the shape an
+        answer engine wants: a question as a heading, a self-contained answer under it,
+        nothing hedged. It was invisible as such, because nothing told a crawler these
+        were question-and-answer pairs rather than eight paragraphs.
+
+        `faqSchema` is fed the **same array the page renders**, so the marked-up answer and
+        the visible answer cannot drift apart — which Google's structured-data policy
+        requires, and which is also the only way this stays true when the copy changes.
+      */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLdScript(
+            faqSchema(
+              TOPICS.map(({ q, a }) => ({ q, a })),
+              "/help",
+            ),
+          ),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(breadcrumbSchema(trail)) }}
+      />
+
+      <nav aria-label="Breadcrumb" className="mb-4">
+        <ol className="text-muted flex items-center gap-1.5 text-caption font-medium">
+          <li>
+            <Link href="/" className="hover:text-ink">
+              Home
+            </Link>
+          </li>
+          <li aria-hidden>/</li>
+          <li aria-current="page" className="text-ink">
+            Help
+          </li>
+        </ol>
+      </nav>
+
+      <h1 className="text-editorial-lg font-semibold">
+        Help — booking, queues, payment and rewards
+      </h1>
 
       <p className="text-body mt-6 text-body-lg leading-relaxed">
         The things people ask most. Each one ends where you can go and do it.

@@ -9,6 +9,7 @@ import {
 export const metadata: Metadata = {
   title: "Content policy",
   description: "What can't be posted on Tho, and what happens when you report something.",
+  alternates: { canonical: "/legal/content-policy" },
 };
 
 /**

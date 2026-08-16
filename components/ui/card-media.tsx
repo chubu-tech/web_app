@@ -53,11 +53,14 @@ export function CardMedia({
   chip,
   action,
   className,
+  alt,
 }: {
   label: string;
   imageUrl?: string | null;
   sizes?: string;
   priority?: boolean;
+  /** Passed through to `CoverImage`. Empty (decorative) unless the caller describes it. */
+  alt?: string;
   /** Top-left. Bring your own background. */
   chip?: React.ReactNode;
   /** Top-right, above the card's own link overlay. */
@@ -72,6 +75,7 @@ export function CardMedia({
         imageUrl={imageUrl}
         sizes={sizes}
         priority={priority}
+        alt={alt}
         className={cn(
           "h-full w-full",
           // Transform only, so the zoom stays on the compositor and costs no layout.

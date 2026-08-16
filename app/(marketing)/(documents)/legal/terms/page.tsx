@@ -5,6 +5,7 @@ import { TERMS_VERSION } from "@/lib/api/moderation";
 export const metadata: Metadata = {
   title: "Terms of Service",
   description: "The terms you agree to when you use Tho.",
+  alternates: { canonical: "/legal/terms" },
 };
 
 /**

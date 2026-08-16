@@ -18,6 +18,7 @@ import { resolveLocation, type Fix } from "@/lib/geo";
 import { rebookable, resolveRebook } from "@/lib/rebook";
 import { rank, topRated } from "@/lib/recommendations";
 import { createClient } from "@/lib/supabase/client";
+import { salonPath } from "@/lib/slug";
 import {
   EMPTY_FILTERS,
   hasDistance,
@@ -81,6 +82,7 @@ export function Discover({
   tab,
   availability,
   pastBookings,
+  searchTerm,
 }: {
   businesses: Business[];
   categories: Category[];
@@ -102,10 +104,21 @@ export function Discover({
   productFilter: ProductFilter;
   /** From `?tab=`. Anything but `products` is the salon list. */
   tab: "salons" | "products";
+  /** From `?q=`, already applied to `businesses` by the server. */
+  searchTerm: string;
 }) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
+  /*
+    Seeded from the URL rather than from empty.
+
+    The server has already narrowed `businesses` by this term, so starting the box blank
+    would show a filtered list above an empty search field — the page would look broken
+    to anyone arriving on a shared `/discover?q=barber` link, and to every crawler.
+  */
+  const [query, setQuery] = useState(searchTerm);
+  // Open when the URL carries a term, or a shared `/discover?q=barber` link would show a
+  // narrowed list with the search box collapsed and no visible reason for it.
+  const [searchOpen, setSearchOpen] = useState(searchTerm.length > 0);
   const [filterOpen, setFilterOpen] = useState(false);
   const [productFilterOpen, setProductFilterOpen] = useState(false);
   /**
@@ -156,8 +169,29 @@ export function Discover({
    */
   function apply(next: SalonFilters) {
     const params = new URLSearchParams(toParams(next));
+    // The search term survives a filter change: narrowing by price should not silently
+    // discard what somebody typed.
+    if (query.trim()) params.set("q", query.trim());
     const qs = params.toString();
     router.push(qs ? `${CUSTOMER_HOME}?${qs}` : CUSTOMER_HOME, { scroll: false });
+  }
+
+  /**
+   * Commit the search term to the URL, which is what re-runs the query on the server.
+   *
+   * **`replace`, not `push`.** Typing "barber" one letter at a time would otherwise leave
+   * seven history entries, and the back button would walk back through them a character
+   * at a time instead of returning to wherever the visitor came from. Committing on
+   * submit rather than on every keystroke is the other half of that: the client filters
+   * the loaded list as you type, so the page stays responsive without a round trip, and
+   * the URL is updated once when the search is actually meant.
+   */
+  function applySearch(term: string) {
+    const params = new URLSearchParams(toParams(filters));
+    const trimmed = term.trim();
+    if (trimmed) params.set("q", trimmed);
+    const qs = params.toString();
+    router.replace(qs ? `${CUSTOMER_HOME}?${qs}` : CUSTOMER_HOME, { scroll: false });
   }
 
   /**
@@ -350,7 +384,7 @@ export function Discover({
           shown, which is the app's behaviour too (`initialGender` reaches the flow, not the
           detail screen).
         */
-        href={filters.gender !== "any" ? `/salon/${b.id}?gender=${filters.gender}` : undefined}
+        href={filters.gender !== "any" ? `${salonPath(b)}?gender=${filters.gender}` : undefined}
         subtitle={b.addressText ?? b.description}
         meta={cardMetaLine(b)}
         imageUrl={b.coverUrl}
@@ -391,8 +425,38 @@ export function Discover({
         shareable and the back button steps between them. The app's own IA: Products is a segment of
         home sharing this row's search and filter, not a destination of its own.
       */}
+      {/*
+        **The one heading on the page that a search engine reads, and it used to be the
+        invisible word "Salons".**
+
+        This page carries `alternates.canonical` and its own file comment calls it "the one
+        page that should rank for 'book a salon in Bhutan'" — and its `h1` was
+        `sr-only`, one word, with no place and no proposition in it. An `h1` is the
+        strongest on-page signal after the title, and a single generic noun spends it on
+        nothing.
+
+        Three things changed and each is deliberate:
+
+        - **It names the country.** An engine answering a geographic question cannot infer
+          Bhutan from context it did not retrieve.
+        - **It reflects the search**, so `/discover?q=barber` has a heading about barbers
+          rather than a heading that contradicts the list beneath it. That matters now
+          that `?q=` is a real, crawlable URL.
+        - **It stays `sr-only`.** The design has no room for a visible page title above the
+          segment tabs, and inventing one would be a redesign smuggled in under an SEO
+          change. `sr-only` text is styled, not hidden — it is in the HTML, it is in the
+          accessibility tree, and Google has been explicit for years that it indexes it
+          normally. What it must not be is *keyword-stuffed*, which is why this is one
+          plain descriptive sentence rather than a list of towns.
+      */}
       <div className="gap-sm mt-md flex items-center">
-        <h1 className="sr-only">{onProducts ? "Products" : "Salons"}</h1>
+        <h1 className="sr-only">
+          {onProducts
+            ? "Salon products to buy in Bhutan"
+            : searchTerm
+              ? `Salons and barbers in Bhutan matching “${searchTerm}”`
+              : "Find and book salons and barbers in Bhutan"}
+        </h1>
         <div
           className="bg-surface-soft p-xxs flex flex-1 rounded-full tablet:max-w-[280px]"
           role="tablist"
@@ -470,8 +534,24 @@ export function Discover({
         )}
       </div>
 
+      {/*
+        A real `<form>`, so Enter commits the search to the URL.
+
+        It was a bare input whose value never left the component. Wrapping it means the
+        keyboard's "Search" key and a press of Enter both do the obvious thing, and the
+        resulting `/discover?q=…` is a link somebody can send to a friend — or a crawler
+        can follow. `onSubmit` prevents the native GET navigation because the term has to
+        be merged with the filters already in the URL rather than replacing them.
+      */}
       {searchOpen ? (
-        <div className="border-hairline shadow-card mt-sm gap-sm px-base flex items-center rounded-full border">
+        <form
+          role="search"
+          onSubmit={(e) => {
+            e.preventDefault();
+            applySearch(query);
+          }}
+          className="border-hairline shadow-card mt-sm gap-sm px-base flex items-center rounded-full border"
+        >
           <Icons.search
             className="text-ink shrink-0"
             style={{ width: IconSize.sm, height: IconSize.sm }}
@@ -480,13 +560,21 @@ export function Discover({
           <input
             ref={searchInput}
             type="search"
+            name="q"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setQuery(next);
+              // Emptying the box drops `?q=` immediately, including via the native "×"
+              // — which fires `change`, not `submit`, so waiting for a submit would leave
+              // the URL claiming a term the visitor has just removed.
+              if (next === "" && searchTerm !== "") applySearch("");
+            }}
             placeholder="Search salons & barbers"
             aria-label="Search salons and barbers"
             className="text-body-md text-ink placeholder:text-muted min-h-12 flex-1 bg-transparent outline-none"
           />
-        </div>
+        </form>
       ) : null}
 
       {onProducts ? (

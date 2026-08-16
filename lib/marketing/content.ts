@@ -138,7 +138,9 @@ export const nav = [
   { label: "Find a salon", href: "/#find" },
   { label: "How it works", href: "/#how-it-works" },
   { label: "Live queue", href: "/#queue" },
-  { label: "For salons", href: "/#for-salons" },
+  // A real route since `/for-salons` shipped — an anchor cannot rank, and this is the
+  // entry point for every owner-side query.
+  { label: "For salons", href: "/for-salons" },
   { label: "Pricing", href: "/#pricing" },
 ] as const;
 
@@ -293,7 +295,18 @@ export const twoWays = {
       tag: "Walk in & scan",
       title: "Join the queue with one scan",
       body: "Scan the QR at the door and take your place in the virtual queue — then wait wherever you like.",
-      points: ["No app needed to join", "Pinged two turns ahead"],
+      /*
+        "Pinged two turns ahead" was the second point and it was **not true**. No
+        notification is delivered on any platform: every `queue_your_turn` row in the
+        outbox is `failed` with "no deliverable channel", `devices` has no rows, and Web
+        Push is deferred by decision. The same claim was in `faq` and is corrected there in
+        the same change — they had to move together, since a page that contradicts its own
+        FAQ is worse than either version on its own.
+
+        What replaced it is what the queue page actually does, and it is the thing the
+        product is genuinely better at than a paper list: the position updates itself.
+      */
+      points: ["No app needed to join", "Your place updates live"],
       image: u("photo-1556742049-0cfed4f6a45d", 900, 1100),
       alt: "Customer checking in at a salon counter with their phone",
     },
@@ -566,6 +579,49 @@ export const pricing = {
   ],
 } as const;
 
+/**
+ * The questions, and the answers a search engine or an assistant will quote.
+ *
+ * This list grew from four to twelve, and the shape of every entry changed. Both are
+ * deliberate and neither is padding.
+ *
+ * ## An answer is extracted without its page, so it has to stand up alone
+ *
+ * These strings are lifted into `FAQPage` markup by `app/(marketing)/page.tsx` and, from
+ * there, into an answer box or an assistant's reply with nothing around them. So each one
+ * is written to the rules that survive that trip:
+ *
+ * - **The first sentence answers the question.** A paragraph that builds to its point gets
+ *   truncated before the point.
+ * - **No pronoun subjects.** *"It's free"* is useless once extracted; *"Booking a salon on
+ *   THO is free"* is quotable. Every answer names THO or the salon rather than leaning on
+ *   the question for its subject.
+ * - **The place is named in the sentence, not inferred.** An engine answering *"how do I
+ *   book a salon in Bhutan"* cannot infer the country from a page it did not retrieve.
+ * - **Numbers, not adjectives.** "Nu 399 a month" is citable; "affordable" is not.
+ *
+ * ## Two answers were removed because they were not true
+ *
+ * This is the important part and it is not a style change.
+ *
+ * - ***"What if I miss my turn?"* claimed *"You get a message two turns ahead, and again
+ *   when you're next."*** Nothing sends that message on any platform. `AGENTS.md` is
+ *   explicit: every `queue_your_turn` row in the outbox is `failed` with "no deliverable
+ *   channel", `devices` has no rows, and Web Push is deferred by decision — so the promise
+ *   is kept by nothing. The replacement says what the product actually does, which is that
+ *   the page updates itself. The same false claim lives in `twoWays.options[1].points` as
+ *   *"Pinged two turns ahead"* and is corrected there in the same change, because a page
+ *   that contradicts its own FAQ is worse than either version alone.
+ * - ***"Create an owner account"*** described a flow that does not exist. Sign-up is
+ *   customer-only by design — an owner is onboarded by an operator who creates the account
+ *   and the salon together, and `businesses.status` defaults to `pending` review, so a
+ *   self-served owner would land on a console with no salon in it. The answer now
+ *   describes the real path.
+ *
+ * The rule both corrections come from is this repo's own: **say only what the row can
+ * support.** It was written about notification copy and it binds harder here, because an
+ * FAQ answer is a claim attributed to us and repeated by machines that will not check it.
+ */
 export const faq = [
   {
     q: "Does it cost anything to book a haircut?",
@@ -580,19 +636,69 @@ export const faq = [
       `AGENTS.md` requires: the hero chip, this answer, the pricing lead panel and the
       download band.
     */
-    a: "No — never. Searching salons, booking a time and joining the walk-in queue are all free for customers. There is no booking fee and nothing extra to pay at the salon. Salons are the ones who pay, from Nu 399 a month.",
+    a: "No — never. Searching salons, booking a time and joining the walk-in queue are all free for customers on THO. There is no booking fee and nothing extra to pay at the salon. Salons are the ones who pay, from Nu 399 a month.",
+  },
+  {
+    q: "What is THO?",
+    a: "THO is a salon and barber booking service for Bhutan. You can find a salon near you, see its services and prices, book an appointment for a specific time, or join a salon's walk-in queue from your phone and watch your place in line. THO is free for customers; salons pay a monthly subscription to be listed and to run their bookings.",
+  },
+  {
+    q: "How do I book a salon appointment in Bhutan?",
+    a: "Open THO at bhutansalons.com, search for a salon or barber near you, and open its page to see its services and prices. Choose the services you want, pick a stylist or leave it to the salon, then choose a date and time from what is actually free. The booking is confirmed straight away and you can reschedule or cancel it from your bookings.",
+  },
+  {
+    q: "How do I find salons in Bhutan?",
+    a: "Browse every salon and barber on THO at bhutansalons.com. You can search by name or area, filter by service, price, rating and distance, sort by nearest or best rated, or open the map to see which salons are close to you. Most listed salons are in Thimphu, with more in Paro and Phuentsholing.",
+  },
+  {
+    q: "How can I join a salon queue without waiting?",
+    a: "Scan the QR code at the salon's door, or open the salon's page on THO and join from there. THO puts you in the salon's live walk-in line and shows your position and the rough wait, so you can go and do something else instead of sitting in the shop. The page updates itself as each chair frees up — there is nothing to refresh.",
   },
   {
     q: "Do I need the app to join a queue?",
-    a: "No — scanning the salon's QR code puts you in line straight away. The app is worth it if you book often, since it keeps your history and sends live updates on your turn.",
+    a: "No — scanning the salon's QR code puts you in line straight away in your phone's browser. Nothing needs to be installed to search salons, book an appointment or join a walk-in queue on THO.",
   },
   {
     q: "What if I miss my turn?",
-    a: "You get a message two turns ahead, and again when you're next. If you're not back, the salon can hold your place briefly or pass it on — and you'll see that happen live.",
+    /*
+      Rewritten. The old answer promised a message two turns ahead and again when you are
+      next; nothing on any platform sends it — see this block's own header. What follows is
+      what the product genuinely does: a self-updating page, and a salon that can pass a
+      place on. Both are observable in `queue_active_line` and `set_queue_status`.
+    */
+    a: "Keep the queue page open and it updates itself, so you can see when you are getting close and walk back. If you are not there when your turn comes, the salon can hold your place or pass it to the next person, and you will see that on the page. THO does not send you a text or a push notification about your turn.",
+  },
+  {
+    q: "Is there a salon booking app in Bhutan?",
+    /*
+      Answered for the launch state the user confirmed on 2026-08-16: the web product is
+      live and complete, the store listings are not. `brand.stores` is still empty, so this
+      must not tell anyone to look for Tho on either store — a promise neither store can
+      currently keep, and the reason `download.body` is written the way it is.
+    */
+    a: "Yes. THO works in any web browser at bhutansalons.com — you can search salons, book an appointment and join a walk-in queue without installing anything. Mobile apps for iOS and Android are in development; join the waitlist and we will email you the day they land.",
+  },
+  {
+    q: "Which salons in Thimphu can I book on THO?",
+    a: "Most of the salons and barbers on THO are in Thimphu, on and around Norzin Lam, Chang Lam, Doebum Lam and the Clock Tower. Each has its own page with its services, prices, team, opening hours and reviews, and you can see them all together at bhutansalons.com/salons/thimphu.",
   },
   {
     q: "I run a salon. How do I get started?",
-    a: "Create an owner account, add your services, prices and stylists, then print the QR code we make for your door. Most shops are taking bookings the same afternoon.",
+    /*
+      Rewritten: sign-up is customer-only. `AGENTS.md` — "an owner is onboarded by an
+      operator who creates the account *and* the salon together, and `businesses.status`
+      defaults to `pending` review. A self-served owner would land on a console with no
+      salon in it." The old answer sent owners to a form that cannot serve them.
+    */
+    a: "Get in touch and we will set your salon up with you — email thobhutansalons@gmail.com or message +975 17 71 65 23 on WhatsApp. We create your salon, then you add your services, prices and stylists and print the QR code for your door. Plans start at Nu 399 a month and most shops are taking bookings the same afternoon.",
+  },
+  {
+    q: "How do salons manage their appointments and queues on THO?",
+    a: "A salon on THO gets a console it opens on a laptop or a phone. It shows the day's bookings hour by hour, the live walk-in line with a button to call the next customer, and the salon's services, prices, stylists and working hours. Salons on Growth and Pro also get a client book, product orders, loyalty rewards and reporting on bookings, takings and busy hours.",
+  },
+  {
+    q: "What does THO cost for a salon?",
+    a: "Salon plans on THO are Nu 399, Nu 699 or Nu 1,499 a month, billed in Ngultrum. Basic gets you listed and takes online bookings with one stylist. Growth adds unlimited stylists, the walk-in queue, automatic reminders, a client book, products, loyalty and reporting. Pro adds payroll, a Bhutan income-tax estimate and deposits recorded against a booking. There is no free salon tier, and customers never pay anything.",
   },
 ] as const;
 
@@ -679,10 +785,29 @@ export const footer = {
    */
   quickLinks: {
     title: "Quick links",
+    /*
+      **Three of these are real pages now, and that is the point of the change.**
+
+      Every link in this footer was an on-page hash — `/#how-it-works`, `/#queue`,
+      `/#pricing` — so the footer of every marketing page linked only back to the page it
+      was on. Combined with the salon cards linking to `#download`, the result was that
+      **the homepage passed no authority to anything**, and `app/sitemap.ts` was the only
+      route a crawler had into the product at all.
+
+      `/salons`, `/salons/thimphu` and `/for-salons` are indexable pages that this site
+      should link to from every one of its own pages: the country list, the page for the
+      town where most of the inventory is, and the owner-side landing page that the
+      `/#for-salons` anchor could never rank as.
+
+      The anchors that remain are the ones with no page behind them, which is correct —
+      "How it works" and "Live queue" are sections of the homepage and are not documents.
+    */
     links: [
+      { label: "Find a salon", href: "/salons" },
+      { label: "Salons in Thimphu", href: "/salons/thimphu" },
       { label: "How it works", href: "/#how-it-works" },
       { label: "Live queue", href: "/#queue" },
-      { label: "For salon owners", href: "/#for-salons" },
+      { label: "For salon owners", href: "/for-salons" },
       { label: "Pricing", href: "/#pricing" },
       { label: "Questions", href: "/#faq" },
     ],

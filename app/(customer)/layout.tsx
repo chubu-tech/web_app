@@ -52,7 +52,16 @@ export default async function CustomerLayout({
       {/* Below the nav rather than above it, so the shop's chrome stays where it is
           and the bar reads as a notice about *this* session, not part of the site. */}
       <InLineBar />
-      <main className="flex-1">{children}</main>
+      {/*
+          `id="main"` is the skip link's target, and it was missing here.
+
+          `app/layout.tsx` renders "Skip to content" on **every** route with
+          `href="#main"`, and its comment says it "now serves every route rather than
+          three". It did not: only the three marketing surfaces declared the id, so on the
+          entire product half the first thing a keyboard or screen-reader user reached was
+          a link that went nowhere.
+        */}
+        <main id="main" className="flex-1">{children}</main>
       {/*
         `main` is `flex-1` inside a `min-h-full` column, so on a short page — an empty
         `/saved`, a 404 — the footer is pushed to the bottom of the viewport rather than
