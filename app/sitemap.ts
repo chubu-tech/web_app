@@ -26,7 +26,7 @@ import { absoluteUrl } from "@/lib/site";
  *
  * ## What is in it, and what is deliberately not
  *
- * The public shapes are the marketing home, the four documents, the four list pages, a
+ * The public shapes are the marketing home, the five documents, the four list pages, a
  * place page, a salon and a stylist. Everything else is somebody's account or a role
  * shell — see `DISALLOWED_PATHS`, which `robots.ts` and the per-route `noindex` share.
  *
@@ -67,6 +67,10 @@ const FIXED: MetadataRoute.Sitemap = [
   { url: absoluteUrl("/legal/terms"), changeFrequency: "yearly", priority: 0.2 },
   { url: absoluteUrl("/privacy"), changeFrequency: "yearly", priority: 0.2 },
   { url: absoluteUrl("/legal/content-policy"), changeFrequency: "yearly", priority: 0.2 },
+  // Indexed deliberately, unlike most low-priority pages: Google Play has this URL on
+  // file for data deletion, and somebody who has already uninstalled the app has only
+  // search to find it again.
+  { url: absoluteUrl("/delete-account"), changeFrequency: "yearly", priority: 0.2 },
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
