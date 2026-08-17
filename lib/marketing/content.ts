@@ -876,6 +876,12 @@ export const footer = {
       { label: "Terms of Service", href: "/legal/terms" },
       { label: "Privacy Policy", href: "/privacy" },
       { label: "Content policy", href: "/legal/content-policy" },
+      // Fifth link, and the only one here that exists because a store *form* asks
+      // for a URL rather than because a reader needs it: Google Play's data-deletion
+      // field wants a page reachable WITHOUT the app, so an in-app path alone does
+      // not satisfy it. Top-level like /privacy and /help, not nested under /legal/,
+      // because it is a URL we file with Play and then should not move.
+      { label: "Delete your account", href: "/delete-account" },
     ],
   },
   rights: "All rights reserved.",
@@ -1006,7 +1012,9 @@ export const privacy = {
         },
         {
           lead: "Account and data deletion",
-          body: `email ${legal.contactEmail} and we will delete your account and personal data within ${legal.deletionDays} days. Records a salon must keep for its own accounts — for example that a booking took place and what it cost — are kept in a form that no longer identifies you.`,
+          // Points at /delete-account rather than restating the promise: two copies
+          // of a deletion commitment is two things to keep true of the shipped RPC.
+          body: `delete your account yourself in the app — Settings, then Delete account — or email ${legal.contactEmail} if you can no longer sign in, and we will do it within ${legal.deletionDays} days. See /delete-account for exactly what is removed and what a salon keeps without your name on it.`,
         },
       ],
     },
@@ -1019,6 +1027,96 @@ export const privacy = {
       body: 'We may update this policy. Material changes will be posted here with a new "Last updated" date.',
     },
   ],
+} as const;
+
+/**
+ * `/delete-account` — the deletion URL Google Play's Data safety form asks for.
+ *
+ * Play wants a page a user can reach **without the app installed**, which is why an
+ * in-app path alone does not satisfy it, and wants that page to say what is removed
+ * and what is retained. Apple's requirement is the in-app path (guideline 5.1.1(v)),
+ * which the app has. This is the web half, and the one a reviewer clicks.
+ *
+ * ## Every claim here is read off the shipped function, not written from intent
+ *
+ * `public.delete_account()` in the tho repo
+ * (`supabase/migrations/20260806000003_delete_account.sql`) is the source of truth,
+ * and the split below mirrors its two halves exactly: a `delete` list of rows that
+ * are destroyed, and an `update` list of rows that survive with their PII nulled.
+ *
+ * **The distinction is load-bearing, not pedantry.** Play states that "temporary
+ * account deactivation, disabling, or 'freezing' the app account does not qualify as
+ * account deletion" — so the page has to be able to say the account is genuinely
+ * gone. It is: the `auth.users` row is deleted, sessions and identities cascade with
+ * it, and the email is freed for reuse. What remains is a PII-free tombstone in
+ * `profiles` that a salon's bookings and reviews still resolve through, which is what
+ * makes them read as "Deleted user" instead of breaking.
+ *
+ * Do not soften either list. Understating what is kept misleads the user; overstating
+ * it misleads the reviewer.
+ */
+export const deletion = {
+  title: "Delete your account",
+  description:
+    "How to delete your Tho account and personal data — in the app, or by email if you cannot sign in.",
+  lead: "You can delete your Tho account yourself, from inside the app. If you can no longer sign in, email us and we will do it for you.",
+
+  inApp: {
+    title: "In the app",
+    steps: [
+      "Open Tho and sign in.",
+      "Open the menu, then Settings.",
+      "Tap Delete account, and confirm.",
+    ],
+    // Both facts are behaviours of delete_account(), not reassurances: the auth row
+    // goes immediately, and the function refuses outright for an owner with a live
+    // salon rather than orphaning that salon's staff and bookings.
+    footnote:
+      "Your sign-in is removed straight away and the email address becomes free to use again. If you run a salon on Tho, close or transfer it first — the app will stop you, because deleting an owner would leave their staff and bookings with nobody attached.",
+  },
+
+  byEmail: {
+    title: "By email, if you cannot sign in",
+    body: `Email ${legal.contactEmail} from the address on the account, with "Delete my account" as the subject. We will delete it within ${legal.deletionDays} days and reply to confirm.`,
+  },
+
+  removed: {
+    title: "What is deleted",
+    items: [
+      {
+        lead: "Your sign-in",
+        body: "email, password and every active session. The email address is freed for reuse.",
+      },
+      { lead: "Your name, phone number and photo", body: "removed from your profile." },
+      { lead: "Saved salons, and the stylists you follow", body: "deleted." },
+      {
+        lead: "Your messages to salons",
+        body: "deleted, and the salon's chat list stops showing your name.",
+      },
+      {
+        lead: "Notifications and reminders",
+        body: "deleted, along with the record of the device they were sent to.",
+      },
+    ],
+  },
+
+  kept: {
+    title: "What a salon keeps, without your name on it",
+    body: "A salon has to account for its own trading — what work it did, when, and what it charged. Those records stay, with everything that identifies you taken off them, so they read as “Deleted user”:",
+    items: [
+      {
+        lead: "Appointments that took place",
+        body: "the service, the time and the price, which a salon needs for its takings, its staff pay and its tax figures.",
+      },
+      { lead: "Reviews you left", body: "these form part of a salon's public rating." },
+      {
+        lead: "Loyalty points a salon issued you",
+        body: "their own record of what they had promised.",
+      },
+    ],
+    footnote:
+      "None of these carry your name, phone number, email address or photo once your account is deleted, and none of them can be traced back to you through Tho.",
+  },
 } as const;
 
 /**
