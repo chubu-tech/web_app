@@ -26,6 +26,7 @@ keep them in step.
 """
 
 import pathlib
+import re
 import sys
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
@@ -48,7 +49,7 @@ CUSTOMER_TARGETS = {
     "01-discover": "[document.querySelector('[role=tablist]'), document.querySelector('a[href=\"/scan\"]')]",
     "02-salon": "[document.querySelector('a[href=\"#services\"]'), document.querySelector('a[href=\"#about\"]')]",
     "03-services": "[document.querySelector('#services h2'), [...document.querySelectorAll('#services button')].find(b => /^Book$/.test((b.textContent ?? '').trim()))]",
-    "04-book-service": "[...document.querySelectorAll('button')].filter(b => ['Services','Professional','Time','Confirm'].includes((b.textContent ?? '').trim()))",
+    "04-book-service": "[[...document.querySelectorAll('nav, ol, div')].filter(e => /^Services.?Professional.?Time.?Confirm$/.test((e.textContent ?? '').replace(/\s+/g, ' ').trim())).pop()]",
     "05-book-professional": "[document.querySelector('button[aria-pressed]')]",
     "06-book-time": "[document.querySelector('ul[aria-label=\"Choose a date\"]')]",
     "07-book-confirm": "[[...document.querySelectorAll('button')].find(b => /^Book\b/.test((b.textContent ?? '').trim()))]",
@@ -258,16 +259,19 @@ def run_customer(browser, mode):
     page.get_by_role("button", name="Continue").first.click()
     page.wait_for_timeout(3000)
     dates = page.locator("ul[aria-label='Choose a date'] button")
-    slots = page.locator("button[aria-pressed]")
+    # The same filter the capture script uses. Plain `button[aria-pressed]` also matches the
+    # date buttons, so `.last` was as likely to be a date as a time — which left the flow on
+    # the time step with Continue still disabled, and the confirm frame unmeasured.
+    slots = page.locator("button[aria-pressed]").filter(has_text=re.compile(r"\d{1,2}:\d{2}"))
     for i in range(min(dates.count(), 7)):
         dates.nth(i).click()
         page.wait_for_timeout(2400)
-        if slots.count() > 3:
+        if slots.count() > 0:
             break
     settle(page)
     measure(page, key_for("customer", mode, "06-book-time"), "06-book-time", CUSTOMER_TARGETS["06-book-time"])
 
-    page.locator("button[aria-pressed]").last.click()
+    slots.first.click()
     page.wait_for_timeout(800)
     page.get_by_role("button", name="Continue").first.click()
     page.wait_for_timeout(2500)
@@ -321,9 +325,12 @@ def run_owner(browser, mode):
 
     page.goto(f"{BASE}/business/insights", wait_until="domcontentloaded")
     settle(page)
-    page.locator("h2:has-text('Trends')").first.scroll_into_view_if_needed()
-    page.evaluate("() => window.scrollBy(0, -96)")
-    page.wait_for_timeout(600)
+    try:
+        page.locator("h2:has-text('Trends')").first.scroll_into_view_if_needed(timeout=8000)
+        page.evaluate("() => window.scrollBy(0, -96)")
+        page.wait_for_timeout(600)
+    except Exception as exc:
+        print(f"    (could not reach Trends: {str(exc)[:60]})")
     measure(page, key_for("owner", mode, "06-insights-charts"), "06-insights-charts", OWNER_TARGETS["06-insights-charts"])
 
 
@@ -334,10 +341,15 @@ def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         for mode in modes:
-            if "customer" in audiences:
-                run_customer(browser, mode)
-            if "owner" in audiences:
-                run_owner(browser, mode)
+            for audience, run in (("customer", run_customer), ("owner", run_owner)):
+                if audience not in audiences:
+                    continue
+                try:
+                    run(browser, mode)
+                except Exception as exc:
+                    # Everything measured before the throw is still worth keeping: the first
+                    # phone pass lost thirty boxes to one timed-out scroll on the last step.
+                    print(f"  !! {audience}/{mode} stopped early: {str(exc)[:100]}")
         browser.close()
 
     write_module()
