@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
 import { fetchBookingById } from "@/lib/api/booking";
 import { fetchBusinessById } from "@/lib/api/discovery";
-import { cancellationWindow } from "@/lib/booking-guards";
+import { cancellationWindow, changeWindowNotice } from "@/lib/booking-guards";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { isActive, serviceIds, servicesSummary } from "@/lib/types/booking";
@@ -108,7 +108,10 @@ export default async function ReschedulePage({
           title={windowClosed ? "Changes have closed" : "This booking can't be moved"}
           message={
             windowClosed
-              ? `${business!.name} takes changes up to ${business!.cancellationWindowHours} hours before an appointment. Call the salon and they can still move it for you.`
+              ? /* The window is quoted by a helper, not interpolated: this sentence and the
+                   wizard's are read by the same customer about the same salon, and a raw column
+                   made them say "24 hours" and "1 day" — and "1 hours" on the value below that. */
+                `${changeWindowNotice(business!.name, business!.cancellationWindowHours)} Call the salon and they can still move it for you.`
               : isActive(booking)
                 ? "It has no stylist or services on record, so there are no times to offer. Call the salon to change it."
                 : "Only upcoming bookings can be rescheduled."

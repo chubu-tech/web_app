@@ -46,8 +46,15 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
   ]);
   if (!business) notFound();
 
+  /*
+    The bottom padding clears `BookingSummary`'s fixed phone bar, and it is that bar's own
+    measurement of itself rather than a constant, with `--cta-clearance` as the fallback for the
+    server render. The bar's height stopped being predictable when the confirm step began putting
+    a block warning and the cancellation term in it at once — see the note in
+    `components/customer/booking-summary.tsx`.
+  */
   return (
-    <div className="px-base py-lg mx-auto w-full max-w-[1240px] pb-[calc(var(--cta-clearance)+env(safe-area-inset-bottom))] tablet:px-lg desktop:pb-lg">
+    <div className="px-base py-lg mx-auto w-full max-w-[1240px] pb-[calc(var(--booking-cta-clearance,var(--cta-clearance))+env(safe-area-inset-bottom))] tablet:px-lg desktop:pb-lg">
       {/*
         `useSearchParams` suspends on the first client render. This route is dynamic, so
         Next does not *require* the boundary — but without one a slow hydration shows an

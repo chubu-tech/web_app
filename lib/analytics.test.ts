@@ -19,8 +19,12 @@ import {
   offerHiddenReason,
   opsReading,
   orderCode,
+  orderFulfilment,
   orderItemCount,
+  orderSegmentCoverage,
   orderSegmentFor,
+  orderStatusLabel,
+  ORDER_STATUS_LABEL,
   progressToNext,
   retentionReading,
   revenuePace,
@@ -31,6 +35,7 @@ import {
   type ClientSort,
 } from "./analytics";
 import type { DashboardData } from "./types/analytics";
+import { ORDER_STATUSES, orderStatusFromWire } from "./types/back-office";
 import type { ClientSummary, LoyaltyProgram, LoyaltyReward } from "./types/back-office";
 
 /**
@@ -473,33 +478,91 @@ it("daysSinceVisit never reports a negative", () => {
 
 // ==================================================================== orders ===
 
+/*
+  **Every `OrderStatus`, derived — not a list written beside the tests that walk it.**
+
+  This was a hand-written literal, and the coverage test below claimed in its own comment to
+  "walk the union rather than a list written beside it" while doing exactly the latter: adding a
+  value to `OrderStatus` and forgetting both `ORDER_SEGMENTS` and this array left every assertion
+  green, which is the same silent pass that let `out_for_delivery` go uncovered for four days.
+
+  `ORDER_STATUS_LABEL` is typed `Record<OrderStatus, string>`, so the union is what forces its
+  keys — a new status is a type error *there* before it is anything here. Reading the keys back
+  makes that the single point the whole chain hangs from: the union forces a label, the label
+  fills this list, and this list is what the segment-coverage test measures `ORDER_SEGMENTS`
+  against. Forget the segment and the test fails; forget the label and it does not compile.
+*/
+const ALL_ORDER_STATUSES = Object.keys(ORDER_STATUS_LABEL) as (keyof typeof ORDER_STATUS_LABEL)[];
+
 describe("canOwnerTransition", () => {
-  it("allows exactly what set_order_status allows", () => {
-    expect(canOwnerTransition("new", "ready")).toBe(true);
-    expect(canOwnerTransition("new", "declined")).toBe(true);
-    expect(canOwnerTransition("ready", "collected")).toBe(true);
-    expect(canOwnerTransition("ready", "declined")).toBe(true);
+  it("allows exactly what set_order_status allows on a pickup order", () => {
+    expect(canOwnerTransition("new", "ready", "pickup")).toBe(true);
+    expect(canOwnerTransition("new", "declined", "pickup")).toBe(true);
+    expect(canOwnerTransition("ready", "collected", "pickup")).toBe(true);
+    expect(canOwnerTransition("ready", "declined", "pickup")).toBe(true);
+  });
+
+  it("allows exactly what it allows on a delivery order", () => {
+    expect(canOwnerTransition("new", "ready", "delivery")).toBe(true);
+    expect(canOwnerTransition("ready", "out_for_delivery", "delivery")).toBe(true);
+    expect(canOwnerTransition("out_for_delivery", "delivered", "delivery")).toBe(true);
+    expect(canOwnerTransition("ready", "declined", "delivery")).toBe(true);
+  });
+
+  /*
+    The gate, from both sides. `20260814000006` refuses each lifecycle's move on the other's
+    order — "so a pickup order can never reach out_for_delivery and a delivery order can never be
+    marked collected" — and offering either would be a button that always raises. This is the pair
+    of assertions the console was failing before the fulfilment argument existed.
+  */
+  it("refuses each lifecycle's moves on the other's order", () => {
+    expect(canOwnerTransition("ready", "out_for_delivery", "pickup")).toBe(false);
+    expect(canOwnerTransition("ready", "collected", "delivery")).toBe(false);
+    expect(canOwnerTransition("out_for_delivery", "delivered", "pickup")).toBe(false);
   });
 
   it("refuses skipping ready, and every terminal state", () => {
-    expect(canOwnerTransition("new", "collected")).toBe(false);
-    for (const from of ["collected", "cancelled", "declined"] as const) {
-      for (const to of ["new", "ready", "collected", "cancelled", "declined"] as const) {
-        expect(canOwnerTransition(from, to)).toBe(false);
+    expect(canOwnerTransition("new", "collected", "pickup")).toBe(false);
+    expect(canOwnerTransition("new", "out_for_delivery", "delivery")).toBe(false);
+    expect(canOwnerTransition("new", "delivered", "delivery")).toBe(false);
+    for (const from of ["collected", "delivered", "cancelled", "declined"] as const) {
+      for (const to of ALL_ORDER_STATUSES) {
+        expect(canOwnerTransition(from, to, "pickup")).toBe(false);
+        expect(canOwnerTransition(from, to, "delivery")).toBe(false);
       }
     }
   });
 
   it("never allows the reverse of a legal move — which is why there is no Undo", () => {
-    expect(canOwnerTransition("ready", "new")).toBe(false);
-    expect(canOwnerTransition("collected", "ready")).toBe(false);
-    expect(canOwnerTransition("declined", "new")).toBe(false);
+    expect(canOwnerTransition("ready", "new", "pickup")).toBe(false);
+    expect(canOwnerTransition("collected", "ready", "pickup")).toBe(false);
+    expect(canOwnerTransition("declined", "new", "pickup")).toBe(false);
+    expect(canOwnerTransition("out_for_delivery", "ready", "delivery")).toBe(false);
+    expect(canOwnerTransition("delivered", "out_for_delivery", "delivery")).toBe(false);
+  });
+
+  /*
+    Declining is legal from `new` and `ready` only. Once the goods are with the driver the server
+    refuses it, and the console renders no Decline button — this pins the rule the button reads.
+  */
+  it("refuses a decline once the order is out for delivery", () => {
+    expect(canOwnerTransition("out_for_delivery", "declined", "delivery")).toBe(false);
   });
 
   it("lets a customer cancel only while the order is new", () => {
     expect(canCustomerCancel("new")).toBe(true);
     expect(canCustomerCancel("ready")).toBe(false);
     expect(canCustomerCancel("collected")).toBe(false);
+    expect(canCustomerCancel("out_for_delivery")).toBe(false);
+    expect(canCustomerCancel("delivered")).toBe(false);
+  });
+});
+
+describe("orderFulfilment", () => {
+  it("treats a null column as pickup, exactly as the server's coalesce does", () => {
+    expect(orderFulfilment({ fulfilment: null })).toBe("pickup");
+    expect(orderFulfilment({ fulfilment: "pickup" })).toBe("pickup");
+    expect(orderFulfilment({ fulfilment: "delivery" })).toBe("delivery");
   });
 });
 
@@ -515,9 +578,104 @@ it("counts units, not lines", () => {
 
 it("falls back to the New segment for an unknown status param", () => {
   expect(orderSegmentFor("ready").statuses).toEqual(["ready"]);
-  expect(orderSegmentFor("done").statuses).toEqual(["collected", "cancelled", "declined"]);
+  expect(orderSegmentFor("delivering").statuses).toEqual(["out_for_delivery"]);
+  expect(orderSegmentFor("done").statuses).toEqual([
+    "collected",
+    "delivered",
+    "cancelled",
+    "declined",
+  ]);
   expect(orderSegmentFor("nonsense").value).toBe("new");
   expect(orderSegmentFor(null).value).toBe("new");
+});
+
+/*
+  **The regression test for the bug this suite could not have caught before.**
+
+  `order_status` grew by two values in `20260814000001` and the segments did not follow, so an
+  `out_for_delivery` order was in no segment — and because the inbox filters `.in("status", …)`, a
+  live order appeared in none of the owner's lists at all. Nothing failed: every existing assertion
+  was about the statuses the segments *did* cover.
+
+  What makes this test work is that it walks a list derived from the union rather than one written
+  beside it — see `ALL_ORDER_STATUSES` above, which reads `ORDER_STATUS_LABEL`'s keys. Add a value
+  to `OrderStatus` and forget the segment, and this fails.
+*/
+it("covers every order status in exactly one segment", () => {
+  const covered = orderSegmentCoverage();
+  expect([...covered].sort()).toEqual([...ALL_ORDER_STATUSES].sort());
+  expect(new Set(covered).size).toBe(covered.length);
+});
+
+it("names its own empty state rather than deriving one from the tab label", () => {
+  // "No delivering orders" is what deriving it produced.
+  expect(orderSegmentFor("delivering").empty).toBe("Nothing out for delivery");
+  expect(orderSegmentFor("new").empty).toBe("No new orders");
+});
+
+describe("ORDER_STATUS_LABEL", () => {
+  it("gives every status words a person would say", () => {
+    expect(ORDER_STATUS_LABEL.out_for_delivery).toBe("Out for delivery");
+    expect(ORDER_STATUS_LABEL.delivered).toBe("Delivered");
+  });
+
+  /*
+    Completeness is the type's job, not this test's: `Record<OrderStatus, string>` refuses to
+    compile with a member missing, which is stronger than any assertion here could be. What is
+    left to check is that each entry is *words* — the pill title-cases the wire value when a label
+    is missing or empty, which is how `out_for_delivery` reached a customer as "Out_for_delivery".
+  */
+  it("gives every entry words rather than a wire value", () => {
+    for (const status of ALL_ORDER_STATUSES) {
+      expect(ORDER_STATUS_LABEL[status]).toBeTruthy();
+      expect(ORDER_STATUS_LABEL[status]).not.toContain("_");
+    }
+  });
+});
+
+describe("orderStatusFromWire", () => {
+  it("round-trips every wire value and fails safe to new", () => {
+    for (const status of ALL_ORDER_STATUSES) {
+      expect(orderStatusFromWire(status)).toBe(status);
+    }
+    // Deliberately `new`, not a terminal value: a finished order is one nobody looks at
+    // again, and an unrecognised status must land somewhere a person still works through.
+    expect(orderStatusFromWire("nonsense")).toBe("new");
+    expect(orderStatusFromWire(null)).toBe("new");
+    expect(orderStatusFromWire(undefined)).toBe("new");
+  });
+
+  /*
+    The guard and the label table must know the same seven values. They are declared in two
+    files — the union in `types/back-office.ts`, the words in `analytics.ts` — and it was
+    exactly that kind of split that let the enum grow by two without either following.
+  */
+  it("accepts precisely the statuses that have a label", () => {
+    expect([...ORDER_STATUSES].sort()).toEqual([...ALL_ORDER_STATUSES].sort());
+  });
+});
+
+describe("orderStatusLabel", () => {
+  it("relabels `new` for the customer and leaves it alone for the salon", () => {
+    expect(orderStatusLabel("new", "customer")).toBe("Placed");
+    expect(orderStatusLabel("new", "owner")).toBe("New");
+  });
+
+  /*
+    The property that matters more than the one exception: the two audiences must not silently
+    drift apart on any status nobody deliberately split. This is what a fifth copy of
+    `status === "new" ? … : …` could not have given, and it walks the derived list, so a new
+    status is covered the day it is added.
+  */
+  it("agrees with the base table on every status it does not deliberately relabel", () => {
+    for (const status of ALL_ORDER_STATUSES) {
+      expect(orderStatusLabel(status, "owner")).toBe(ORDER_STATUS_LABEL[status]);
+      if (status !== "new") {
+        expect(orderStatusLabel(status, "customer")).toBe(ORDER_STATUS_LABEL[status]);
+      }
+      expect(orderStatusLabel(status, "customer")).toBeTruthy();
+    }
+  });
 });
 
 // ==================================================================== offers ===

@@ -26,21 +26,28 @@ import { breadcrumbSchema, faqSchema, jsonLdScript } from "@/lib/seo";
  * the in-console paywall read, which is why they cannot quote different features or
  * different prices at the same owner.
  *
- * **Two of that file's Pro bullets are deliberately not repeated in the prose here**, and
- * this is the important note on the page. `lib/marketing/content.ts` records both, from the
- * app's own pre-launch audit:
+ * **Two of that file's Pro bullets used to be excluded from the prose here while the tier
+ * list underneath printed them anyway, and that is the defect this note now records.** The
+ * page's prose was careful and its rendered `<ul>` was not — so the two claims the site had
+ * decided not to make were being published on it regardless, on the one owner-side page
+ * built to rank.
  *
- * - *"Priority placement" / "Shown higher in search"* — `Feature.priorityPlacement` is read
- *   by **no code in either client**. There is no plan term in `lib/recommendations.ts` and
- *   no ranking code in `supabase/`, so a Pro salon ranks exactly like a Basic one.
- * - *"No-show cover"* — `businesses.late_fee_amount` defaults to 0, is not in the
- *   owner-updatable column grant, and is referenced by no function in the schema. Nothing
- *   charges anybody for a no-show. The **deposit** half is real (`record_payment`,
- *   Pro-gated) and is what the prose claims instead.
+ * Both are fixed at the source, in `lib/plans.ts`, which is the only way to fix them once:
+ *
+ * - *"Priority placement" / "Shown higher in search"* — **deleted.** `Feature.priorityPlacement`
+ *   was read by no code in either client; there is no plan term in `lib/recommendations.ts`
+ *   and no ranking code in `supabase/`, so a Pro salon ranks exactly like a Basic one.
+ *   Upstream removed the flag in `fb9791c` (audit A3-04); this repo carried it four days
+ *   longer.
+ * - *"No-show cover"* — **relabelled** to "Deposits & payments on a booking".
+ *   `businesses.late_fee_amount` defaults to 0, is not in the owner-updatable column grant,
+ *   and is referenced by no function in the schema. Nothing charges anybody for a no-show.
+ *   The deposit half is real (`record_payment`, Pro-gated) and is all the label now claims.
  *
  * A price list is the one place on this site where a wrong claim becomes a refund
  * conversation, and the plan is flipped by an operator out of band, so there is no refund
- * path. Do not restore either bullet to the prose without the feature behind it.
+ * path. **The lesson is structural: prose that omits a claim does not suppress it if a list
+ * on the same page renders the claim from data.** Fix the data.
  *
  * ## It lives in `(documents)`
  *
@@ -65,6 +72,24 @@ const HOW_IT_WORKS = [
   {
     title: "You see how the shop is doing",
     body: "Bookings, takings, average ticket, how full your chairs are, which services sell, which stylist is busiest, and the hours you are actually busy. On Growth and Pro, with a monthly goal to measure against.",
+  },
+  /*
+    Added 2026-08-18, and it is the only new *section* this sync added to the site.
+
+    The upstream shop rework (slices 1–4) and prepaid packs gave an owner four genuinely new
+    levers — sell, deliver, discount, sell ahead — and none of them had a sentence anywhere on
+    this domain. This page is the right and only home for them: it is prose, so it does not
+    fight an index-aligned icon array the way the homepage's four-panel band does, and its
+    audience is somebody deciding what to pay for.
+
+    Every clause is gated where it is claimed. Products, delivery, discount codes and recorded
+    order payments are Growth+ (`products_select_public`'s plan check, `upsert_promo_code`,
+    `record_order_payment`). Prepaid packs are Pro (`create_service_pack` re-derives the plan
+    server-side). The pack sentence names the counter, because money never moves in-app.
+  */
+  {
+    title: "You can sell more than time",
+    body: "On Growth you can sell products from your salon page for collection or delivery, with your own discount codes, and record the cash when you take it. On Pro you can also sell ahead — a pack of ten cuts, paid at your counter, that the customer spends one visit at a time. THO does not take card payments or hold anyone's money: it records what was agreed and what is still owed.",
   },
 ] as const;
 
@@ -99,7 +124,30 @@ const FAQ = [
   },
   {
     q: "Can I take payments through THO?",
-    a: "No. Money changes hands between you and the customer in the shop. THO records what was booked or ordered and what it costs; on Pro you can also record a deposit or a payment against a booking so the balance is on the receipt. THO does not process card payments.",
+    /*
+      Extended for `record_order_payment` (Growth+, shop slice 3) — the order-side twin of
+      `record_payment`. The "no card payments" sentence is the load-bearing one and stays
+      first: it is the answer to the question actually being asked, and it is also why the
+      pack and loyalty handshakes are shaped the way they are.
+    */
+    a: "No. Money changes hands between you and the customer in the shop. THO records what was booked or ordered and what it costs; on Growth you can record what a product order was paid, and on Pro a deposit or a payment against a booking, so the balance is on the receipt. THO does not process card payments and never holds your money.",
+  },
+  {
+    q: "Can I sell packages, like ten haircuts up front?",
+    /*
+      New. `Feature.servicePacks`, Pro, and every clause is a rule in the seven pack RPCs:
+      the request → confirm handshake (`request_pack_purchase` / `confirm_pack_purchase`), the
+      snapshot at confirm time, credits derived rather than counted, expiry enforced at
+      redemption, and one credit per booking. The no-refunds sentence is the one the app's own
+      request sheet carries verbatim, and it belongs in the answer a salon owner reads before
+      they start taking money for something.
+
+      **The example's numbers are upstream's own** — "twelve credits, valid for Haircut or
+      Beard trim, Nu 4,000, expires 12 months after purchase" is the pack the design spec
+      describes, and twelve months is the edit sheet's default validity. Nothing here is a
+      figure this site made up, which matters in an answer an engine may quote as a price.
+    */
+    a: "Yes, on Pro. You set up a pack — say twelve haircuts for Nu 4,000, valid twelve months — and a customer requests it in the app. You collect the money at your counter and confirm the request, and their credits go live. They spend one credit per visit, and the booking shows both of you what is left. Editing a pack later never changes what somebody already bought. THO does not hold the money or issue refunds: a pack is an agreement you honour in your shop.",
   },
 ] as const;
 

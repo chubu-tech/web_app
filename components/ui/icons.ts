@@ -55,10 +55,14 @@ import {
   MapPin,
   Map as MapIcon,
   MessageCircle,
+  MonitorPlay,
   Navigation,
   Package,
+  Pause,
   Phone,
+  Play,
   QrCode,
+  RotateCcw,
   Scissors,
   Search,
   SearchX,
@@ -80,6 +84,8 @@ import {
   User,
   UserPlus,
   Users,
+  Volume2,
+  VolumeX,
   Wallet,
   WifiOff,
   X,
@@ -330,6 +336,32 @@ export const Icons = {
   map: MapIcon,
   nearMe: Navigation,
   discover: Compass,
+
+  // ------------------------------------------------------------- the guide --
+  /**
+   * The in-product walkthrough — the floating "How it works" button and nothing else.
+   * A screen with a play badge, because that is literally what the guide is: real
+   * screenshots of this app, played in order. Deliberately not `info` (a fact about the
+   * thing you are looking at) and not `help` (there is no help glyph and no help centre
+   * to send anyone to).
+   */
+  guide: MonitorPlay,
+  /**
+   * Transport for that walkthrough. Paired, one concept in two states, the same way
+   * `visible`/`hidden` and `notification`/`notificationActive` are — the button shows the
+   * action it will *take*, so a running guide wears `pause`.
+   */
+  play: Play,
+  pause: Pause,
+  /** Back to the first frame once the guide has run out. Never a generic "refresh". */
+  restart: RotateCcw,
+  /**
+   * The guide's narration, on and off. Paired like `visible`/`hidden`, and the button shows
+   * the state it is *in* rather than the action it takes — a speaker with a line through it
+   * is the one thing everybody already reads as "muted".
+   */
+  sound: Volume2,
+  soundOff: VolumeX,
 
   // ------------------------------------------------------- carries a state --
   // lucide is stroke-only too, so these pair with colour and `fill-current`:

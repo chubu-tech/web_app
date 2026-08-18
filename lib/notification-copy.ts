@@ -227,10 +227,38 @@ export function notificationText(
         title: "Reward confirmed",
         body: `Enjoy your ${stringOf(payload.reward) ?? "reward"}!`,
       };
+    /*
+      `order_ready` carries a `fulfilment` since `20260814000008_order_notification_copy.sql`,
+      because the same status means two different things to do: come and get it, or wait in.
+      Reading it here keeps the fallback in step with the server's own branch — and defaulting to
+      pickup is what the server does (`coalesce(v_o.fulfilment, 'pickup')`), so a row from before
+      the column existed still reads correctly.
+    */
     case "order_ready":
+      // The title is the same either way — the state is the same one. Only what to do next
+      // differs, which is the whole reason the server sends the fulfilment along.
       return {
         title: "Your order is ready",
-        body: "Your order is ready for pickup — pay cash on collection.",
+        body:
+          stringOf(payload.fulfilment) === "delivery"
+            ? "Packed and waiting to go out — pay cash when it arrives."
+            : "Your order is ready for pickup — pay cash on collection.",
+      };
+    /*
+      New event type, added by the delivery half of `set_order_status`. Without a case it fell to
+      the default branch, which produces the loose chain's generic title and an **empty body** —
+      a row that says "Product order" and nothing else, on the one order update that is genuinely
+      time-critical.
+
+      Worth knowing why this is a fallback at all: since `20260807000020` every `notifications`
+      row carries server-composed `title` and `body`, so this table is what renders when those are
+      null. It still has to be complete — "unreachable" and "wrong" are one schema change apart,
+      which is exactly what happened here.
+    */
+    case "order_out_for_delivery":
+      return {
+        title: "Your order is on its way",
+        body: "It's out for delivery — pay cash when it arrives.",
       };
     case "order_declined": {
       const reason = stringOf(payload.reason);

@@ -149,11 +149,32 @@ const TOPICS: { q: string; a: string; href?: string; cta?: string }[] = [
   },
   {
     q: "How do I pay?",
+    /*
+      **Left as "in the shop" deliberately, and this is the note that says when to change it.**
+      Shop slice 3 added a delivery path, so an order can in principle be paid for at your door
+      rather than at the salon — but `businesses.delivery_enabled` is false on all 17 rows
+      (checked 2026-08-18), so no customer can reach that path and describing it would advertise
+      something no salon offers. The same reasoning keeps every other customer-facing shop claim
+      off this site; see `pricing` in `lib/marketing/content.ts`.
+
+      When the first salon switches delivery on, this answer gains "or at your door, if the
+      salon delivers" — and `pricing.customer` is the other sentence to re-read that day.
+    */
     a: "In the shop, at the salon. Tho records what you booked or ordered and what it costs; the money changes hands between you and the salon. There is no card payment here.",
   },
   {
     q: "How do points work?",
-    a: "Salons that run a loyalty programme award points when a booking is completed — not when it is made. When you have enough for a reward you claim it here and show the code at the till.",
+    /*
+      **Extended 2026-08-18: points are no longer awarded by bookings alone.** Shop slice 3
+      added a loyalty earn to `set_order_status`, on handover — the `collected` and `delivered`
+      branches — mirroring `handle_booking_status_event`'s completed branch down to the nudges.
+      So "when a booking is completed" had become half the answer.
+
+      "When the salon hands it over" is the precise wording, and it is the same shape as the
+      booking rule for the same reason: neither placing an order nor making a booking earns
+      anything, because neither has happened yet.
+    */
+    a: "Salons that run a loyalty programme award points when a booking is completed, or when they hand over a product order — not when either is made. When you have enough for a reward you claim it here and show the code at the till.",
     href: "/rewards",
     cta: "My rewards",
   },

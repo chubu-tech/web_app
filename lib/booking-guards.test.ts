@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   blockForSlot,
   bookingBlockMessage,
+  cancellationNotice,
   cancellationWindow,
+  changeWindowNotice,
   distanceKm,
   distanceLabel,
   isSlotReachable,
@@ -448,6 +450,90 @@ describe("cancellationWindow", () => {
     expect(
       cancellationWindow({ startTs: start, windowHours: 48, now: plusHours(start, -24) })?.closed,
     ).toBe(true);
+  });
+});
+
+/**
+ * `cancellationNotice` — the ported cases of `cancellationNotice` in
+ * `../tho/app/lib/customer/booking_guards.dart`, which closed audit A1-08 upstream on 2026-08-12.
+ */
+describe("cancellationNotice", () => {
+  it("reads a zero window as the migration does, not as '0 hours before'", () => {
+    expect(cancellationNotice(0)).toBe("Free cancellation any time before your appointment.");
+    // Defensive: a negative can only come from bad data, and it means the same thing.
+    expect(cancellationNotice(-3)).toBe("Free cancellation any time before your appointment.");
+  });
+
+  it("says hours in hours, singular included", () => {
+    expect(cancellationNotice(1)).toBe("Free cancellation up to 1 hour before.");
+    expect(cancellationNotice(2)).toBe("Free cancellation up to 2 hours before.");
+    expect(cancellationNotice(12)).toBe("Free cancellation up to 12 hours before.");
+  });
+
+  it("says whole days in days — the two values an owner actually picks", () => {
+    expect(cancellationNotice(24)).toBe("Free cancellation up to 1 day before.");
+    expect(cancellationNotice(48)).toBe("Free cancellation up to 2 days before.");
+  });
+
+  it("does not round a part-day into days", () => {
+    expect(cancellationNotice(36)).toBe("Free cancellation up to 36 hours before.");
+  });
+
+  /*
+    The pinning test the Dart suite has, and the reason both functions read the same column: the
+    sentence shown *before* the booking and the cutoff enforced *after* it must be the same rule.
+    A notice quoting 12 hours over a window computing 24 is worse than no notice, because it is the
+    kind of wrong a customer only discovers when they are being refused.
+  */
+  it("quotes the same window the cutoff is computed from", () => {
+    const start = utc(2026, 8, 14, 6);
+    const hours = 12;
+    expect(cancellationNotice(hours)).toContain(String(hours));
+    const state = cancellationWindow({ startTs: start, windowHours: hours, now: start });
+    expect(state?.freeUntil.getTime()).toBe(start.getTime() - hours * 3_600_000);
+  });
+});
+
+/**
+ * `changeWindowNotice` — the reschedule page's half of the same rule.
+ *
+ * Its own cases matter less than the last test here: the two sentences are shown to one customer
+ * about one salon, minutes apart, and the bug being pinned is them disagreeing about the number.
+ */
+describe("changeWindowNotice", () => {
+  it("says hours in hours and whole days in days, exactly as the notice does", () => {
+    expect(changeWindowNotice("Norzin", 1)).toBe(
+      "Norzin takes changes up to 1 hour before an appointment.",
+    );
+    expect(changeWindowNotice("Norzin", 12)).toBe(
+      "Norzin takes changes up to 12 hours before an appointment.",
+    );
+    expect(changeWindowNotice("Norzin", 24)).toBe(
+      "Norzin takes changes up to 1 day before an appointment.",
+    );
+    expect(changeWindowNotice("Norzin", 36)).toBe(
+      "Norzin takes changes up to 36 hours before an appointment.",
+    );
+  });
+
+  it("has its own words for a window with no cutoff, rather than '0 hours'", () => {
+    expect(changeWindowNotice("Norzin", 0)).toBe("Norzin takes changes right up to the appointment.");
+  });
+
+  /*
+    The one that would have caught the bug. Every value an owner can set has to produce the same
+    duration in both sentences — a wizard saying "1 day" beside a page saying "24 hours" is one
+    salon appearing to have two different rules.
+  */
+  it("names the same duration as cancellationNotice for every window", () => {
+    for (const hours of [1, 2, 6, 12, 23, 24, 36, 48, 72]) {
+      const duration = cancellationNotice(hours)
+        .replace("Free cancellation up to ", "")
+        .replace(" before.", "");
+      expect(changeWindowNotice("Norzin", hours)).toBe(
+        `Norzin takes changes up to ${duration} before an appointment.`,
+      );
+    }
   });
 });
 

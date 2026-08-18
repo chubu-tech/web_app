@@ -107,8 +107,9 @@ export const brand = {
   greeting: "Kuzuzangpo la",
   cities: ["Thimphu", "Paro", "Phuentsholing"],
   /**
-   * Store listings. TODO: paste the real URLs once the apps are published —
-   * until then the badges fall back to the on-page download section.
+   * Store listings, empty until the apps are published. Paste the real URLs here and the
+   * badges point at them; while both are blank they fall back to the on-page download
+   * section, which is a working destination rather than a dead link.
    */
   stores: { ios: "", android: "" },
   /**
@@ -296,15 +297,25 @@ export const twoWays = {
       title: "Join the queue with one scan",
       body: "Scan the QR at the door and take your place in the virtual queue — then wait wherever you like.",
       /*
-        "Pinged two turns ahead" was the second point and it was **not true**. No
-        notification is delivered on any platform: every `queue_your_turn` row in the
-        outbox is `failed` with "no deliverable channel", `devices` has no rows, and Web
-        Push is deferred by decision. The same claim was in `faq` and is corrected there in
-        the same change — they had to move together, since a page that contradicts its own
-        FAQ is worse than either version on its own.
+        "Pinged two turns ahead" was the second point and it was **not true** when it was
+        removed: every `queue_your_turn` row in the outbox was `failed` with "no deliverable
+        channel" and `devices` had no rows. What replaced it is what the queue page actually
+        does, and it is the thing the product is genuinely better at than a paper list: the
+        position updates itself.
 
-        What replaced it is what the queue page actually does, and it is the thing the
-        product is genuinely better at than a paper list: the position updates itself.
+        **Push has since gone live upstream** (15 registered devices, a `queue_your_turn`
+        sent over the `push` channel — measured 2026-08-18), and `faq`'s answer now says so.
+        These two points are **deliberately unchanged**, for a reason that is about audience
+        rather than truth:
+
+        - This card sits under the heading "Walk in & scan", beside a QR code, and its first
+          point is *"No app needed to join"*. A notification claim two lines under that would
+          read as a promise to the browser reader — who is the person this card is for, and
+          who gets no push, because Web Push is deferred by decision here.
+        - The FAQ has room to name which client does what. Two four-word chips do not.
+
+        So the qualified version lives in the one place that can carry the qualification. If
+        Web Push is ever built, this is the point that changes.
       */
       points: ["No app needed to join", "Your place updates live"],
       image: u("photo-1556742049-0cfed4f6a45d", 900, 1100),
@@ -328,10 +339,19 @@ export const queueSection = {
   ],
 } as const;
 
+/**
+ * The owner band on the homepage.
+ *
+ * **`features` must stay four long.** `components/marketing/for-salons.tsx` holds
+ * `ICONS = [CalendarDays, UsersRound, Users, TrendingUp]` and reads `ICONS[i]` per panel, so
+ * a fifth entry here renders a panel with no icon. The shop and prepaid packs therefore
+ * arrived in the `body` line and in the fourth panel's wording rather than as a fifth panel;
+ * the full owner story lives on `/for-salons`, which is prose and has room for it.
+ */
 export const forSalons = {
   eyebrow: "For salon owners",
   title: "Run the whole shop from one screen",
-  body: "Today's bookings, the walk-in line, your stylists, your price list and how the week is going — all in one place you open on a laptop or a phone.",
+  body: "Today's bookings, the walk-in line, your stylists, your price list, the things you sell and how the week is going — all in one place you open on a laptop or a phone.",
   features: [
     {
       title: "Today's bookings",
@@ -347,7 +367,7 @@ export const forSalons = {
     },
     {
       title: "How the week went",
-      body: "Bookings, customers who came back, and your busiest hours — in plain numbers.",
+      body: "Bookings, customers who came back, your busiest hours and what sold — in plain numbers.",
     },
   ],
 } as const;
@@ -440,6 +460,25 @@ export const proof = {
  * booking (`set_booking_hairstyle` is Pro-gated in SQL and `time_step.dart` passes
  * `offerStyles: entitlements.has(Feature.stylePicker)`). The last one is a Pro perk the
  * app's own card omits.
+ *
+ * ## The 2026-08-18 sync — what the shop rework and packs added
+ *
+ * Growth's one product line became three, and Pro gained a sixth. Both follow the rule
+ * above rather than bending it: every added capability is gated at the tier it is listed
+ * under, and each is named at the call site in the tier's own comment.
+ *
+ * The judgement worth recording is what was **not** added. The shop now has product pages,
+ * verified reviews, a wishlist, five merchandising rails and a checkout with delivery,
+ * promo codes and points — and **none of that reached a customer-facing surface on this
+ * site.** Four products exist platform-wide, one salon lists them, and
+ * `businesses.delivery_enabled` is false on every row, so a customer sentence about buying
+ * or delivery would advertise something nobody can currently do. Upstream reached the same
+ * conclusion for the store listing and wrote it down: *"No mention of the Shop / product
+ * storefront. It exists in the app but has 4 products and an empty brand facet."*
+ *
+ * An owner card is a different audience, and that asymmetry is deliberate: it lists what a
+ * salon can switch on, which is true the day they subscribe. The customer copy waits for
+ * shelves with things on them.
  *
  * Two things are deliberately NOT claimed, and both are traps:
  *
@@ -536,9 +575,32 @@ export const pricing = {
         "Reminders sent for you",
         "Your customer list and visit history",
         "Nudges that bring back customers who drift",
-        "Sell products in the app",
-        "Rewards for regulars",
-        "How the week went — bookings, takings, monthly goal",
+        /*
+          These three lines replaced one — "Sell products in the app" — and every word of
+          them is a capability that shipped upstream in the shop rework (slices 1–4,
+          2026-08-10 to 2026-08-15), gated at Growth like the storefront itself:
+
+          - pickup **or delivery**: `businesses.delivery_enabled` / `delivery_fee_nu` /
+            `delivery_radius_km` / `delivery_free_over_nu`, and the `out_for_delivery` →
+            `delivered` half of `set_order_status`.
+          - discount codes: `promo_codes` + `upsert_promo_code` / `expire_promo_code`,
+            owner-only and Growth+.
+          - money in: `record_order_payment`, the order-side twin of `record_payment`.
+          - what sells: `product_analytics`, Growth+, drawn as the Insights tab's Shop
+            section.
+
+          Written as three plain lines rather than four technical ones, per the "no
+          storefront, no analytics" writing rule. **No customer-facing shop claim was added
+          anywhere on this site** — 4 products exist platform-wide, one salon lists them and
+          `delivery_enabled` is false everywhere, so a customer promise would be a promise
+          nobody can keep yet. Upstream's own store listing takes the same line, in writing:
+          "No mention of the Shop / product storefront." An owner card is a different
+          audience — it lists what the salon *can switch on*.
+        */
+        "Sell products from your salon page, for pickup or delivery",
+        "Discount codes, and payment recorded when you collect it",
+        "Rewards for regulars — points from visits and from what they buy",
+        "How the week went — bookings, takings, monthly goal, and what sells",
       ],
       cta: "Choose Growth",
       featured: true,
@@ -572,6 +634,24 @@ export const pricing = {
         "Deposits and payments recorded on a booking",
         "Call or WhatsApp a customer from their booking",
         "Customers pick the exact style they want",
+        /*
+          **Prepaid packs — new on 2026-08-16 upstream, and the one Pro perk that arrived
+          with its whole implementation rather than ahead of it.** Five tables, seven RPCs,
+          `Feature.servicePacks` in `_proAdds`, and a `create_booking` argument that spends a
+          credit inside the booking's own transaction.
+
+          It is worth knowing why that matters on this page. Pro carried four perks at
+          Nu 1,499, one of which ("Priority placement") did not exist — which is exactly the
+          finding that got it deleted. This line is the opposite case, and the upstream
+          entitlements file says so at the point of adding it: "This one ships WITH its
+          implementation."
+
+          The wording states the handshake because the handshake is the product: money never
+          moves in-app, so a pack is an agreement the salon honours at the counter. Saying
+          "sell 10 cuts up front" without "paid at the counter" would imply this site takes
+          the payment.
+        */
+        "Sell prepaid packs — ten cuts up front, paid at your counter",
       ],
       cta: "Choose Pro",
       featured: false,
@@ -605,13 +685,19 @@ export const pricing = {
  * This is the important part and it is not a style change.
  *
  * - ***"What if I miss my turn?"* claimed *"You get a message two turns ahead, and again
- *   when you're next."*** Nothing sends that message on any platform. `AGENTS.md` is
- *   explicit: every `queue_your_turn` row in the outbox is `failed` with "no deliverable
- *   channel", `devices` has no rows, and Web Push is deferred by decision — so the promise
- *   is kept by nothing. The replacement says what the product actually does, which is that
- *   the page updates itself. The same false claim lives in `twoWays.options[1].points` as
- *   *"Pinged two turns ahead"* and is corrected there in the same change, because a page
- *   that contradicts its own FAQ is worse than either version alone.
+ *   when you're next."*** Nothing sent that message on any platform when it was written:
+ *   every `queue_your_turn` row in the outbox was `failed` with "no deliverable channel"
+ *   and `devices` had no rows, so the promise was kept by nothing. The same false claim
+ *   lived in `twoWays.options[1].points` as *"Pinged two turns ahead"* and was corrected
+ *   there in the same change, because a page that contradicts its own FAQ is worse than
+ *   either version alone.
+ *
+ *   **Both halves of that have since moved, and this is the live example of why a "removed
+ *   as untrue" note has to be re-checked rather than trusted.** Push now delivers — the FCM
+ *   credential is set, 15 devices are registered and a `queue_your_turn` has been sent over
+ *   the `push` channel. The replacement answer was itself a denial, so it went stale in the
+ *   opposite direction and is rewritten again; see the note at the answer. The point stands:
+ *   claims here are checked against the database, not against the last version of this file.
  * - ***"Create an owner account"*** described a flow that does not exist. Sign-up is
  *   customer-only by design — an owner is onboarded by an operator who creates the account
  *   and the salon together, and `businesses.status` defaults to `pending` review, so a
@@ -661,12 +747,36 @@ export const faq = [
   {
     q: "What if I miss my turn?",
     /*
-      Rewritten. The old answer promised a message two turns ahead and again when you are
-      next; nothing on any platform sends it — see this block's own header. What follows is
-      what the product genuinely does: a self-updating page, and a salon that can pass a
-      place on. Both are observable in `queue_active_line` and `set_queue_status`.
+      **Rewritten twice, and the second rewrite is a correction of the first.**
+
+      The original answer promised a message two turns ahead and again when you are next.
+      Nothing sent it, so it was replaced with a flat denial: *"THO does not send you a text
+      or a push notification about your turn."* That was true when written and is **not true
+      any more.**
+
+      Push went live upstream. Measured on the live database on 2026-08-18: the
+      `FCM_SERVICE_ACCOUNT` credential is set, `devices` holds **15** tokens (12 android, 3
+      ios), and `notifications` has **6 rows `sent` over the `push` channel** — one of them a
+      `queue_your_turn`. `20260730000005_queue_status.sql` enqueues that event when the salon
+      calls the next customer, and the outbox now delivers it.
+
+      So the answer has to separate the two clients, because they genuinely differ:
+
+      - **The app** receives a push, if the person allowed notifications.
+      - **A browser gets nothing pushed.** Web Push is deferred by decision here — the
+        self-updating page is the channel — and `pushPlatformFor` returning `'web'` upstream
+        does not change that, because no web token is ever registered.
+
+      A flat "we notify you" would over-promise to the browser reader, who is most of this
+      site's audience; a flat denial now under-states what the app does. Naming which is
+      which is the only honest form, and it is the same discipline as the reminder hedge on
+      `pricing.customer`.
+
+      Deliberately *not* said: anything about the App Store. `brand.stores` is empty and the
+      app is not published yet, so this describes what the app does without telling anybody
+      to go and get it — `download.body` owns that.
     */
-    a: "Keep the queue page open and it updates itself, so you can see when you are getting close and walk back. If you are not there when your turn comes, the salon can hold your place or pass it to the next person, and you will see that on the page. THO does not send you a text or a push notification about your turn.",
+    a: "Keep the queue page open and it updates itself, so you can see when you are getting close and walk back. In the Tho mobile app, THO also sends a notification when it is your turn if you allow notifications; in a web browser there is no notification and the page itself is what tells you. If you are not there when your turn comes, the salon can hold your place or pass it to the next person, and you will see that on the page.",
   },
   {
     q: "Is there a salon booking app in Bhutan?",
@@ -694,11 +804,18 @@ export const faq = [
   },
   {
     q: "How do salons manage their appointments and queues on THO?",
-    a: "A salon on THO gets a console it opens on a laptop or a phone. It shows the day's bookings hour by hour, the live walk-in line with a button to call the next customer, and the salon's services, prices, stylists and working hours. Salons on Growth and Pro also get a client book, product orders, loyalty rewards and reporting on bookings, takings and busy hours.",
+    a: "A salon on THO gets a console it opens on a laptop or a phone. It shows the day's bookings hour by hour, the live walk-in line with a button to call the next customer, and the salon's services, prices, stylists and working hours. Salons on Growth and Pro also get a client book, loyalty rewards, products to sell for pickup or delivery with their own discount codes, and reporting on bookings, takings, busy hours and what sells.",
   },
   {
     q: "What does THO cost for a salon?",
-    a: "Salon plans on THO are Nu 399, Nu 699 or Nu 1,499 a month, billed in Ngultrum. Basic gets you listed and takes online bookings with one stylist. Growth adds unlimited stylists, the walk-in queue, automatic reminders, a client book, products, loyalty and reporting. Pro adds payroll, a Bhutan income-tax estimate and deposits recorded against a booking. There is no free salon tier, and customers never pay anything.",
+    /*
+      Pro's clause gained prepaid packs, which shipped upstream on 2026-08-16 with its
+      implementation. Growth's gained delivery and discount codes from the shop rework. Both
+      are owner capabilities gated at the tier named, which is the only claim this answer
+      makes about them — an engine quoting this sentence must not end up telling a customer
+      that any particular salon delivers.
+    */
+    a: "Salon plans on THO are Nu 399, Nu 699 or Nu 1,499 a month, billed in Ngultrum. Basic gets you listed and takes online bookings with one stylist. Growth adds unlimited stylists, the walk-in queue, automatic reminders, a client book, loyalty, products with pickup or delivery and discount codes, and reporting. Pro adds payroll, a Bhutan income-tax estimate, deposits recorded against a booking, and prepaid packs you sell up front — ten cuts paid at your counter. There is no free salon tier, and customers never pay anything.",
   },
 ] as const;
 
@@ -899,8 +1016,16 @@ export const legal = {
   operator: "Chojay Wangchuk",
   jurisdiction: "Bhutan",
   contactEmail: "chemsbhai@gmail.com",
-  /** Update whenever the policy text below changes materially. */
-  lastUpdated: "4 August 2026",
+  /**
+   * Update whenever the policy text below changes materially.
+   *
+   * Moved to 18 August 2026 for the sync against the app's 2026-08-12→16 batch: Firebase
+   * named as a processor, crash diagnostics disclosed, the owner-location carve-out, delivery
+   * details, prepaid packs, and self-service deletion named rather than only a mailbox. Six
+   * material changes, so the date moves — a policy whose text changes while its date does not
+   * is the one thing a reader cannot check.
+   */
+  lastUpdated: "18 August 2026",
   /** Days to honour a deletion request. A promise — keep it achievable. */
   deletionDays: 30,
 } as const;
@@ -912,10 +1037,18 @@ export const legal = {
  * rest of the copy does: one place to edit. Each list item is split into a
  * bolded `lead` and its `body` so the page needs no markdown renderer.
  *
- * Every claim here must stay true of the shipped app. The specifics — location
- * never leaving the device, QR frames never being uploaded, instruction photos
- * behind signed links — are real properties of the build, and a policy that
- * overstates them is worse than one that says less.
+ * Every claim here must stay true of the shipped app. The specifics — a *customer's*
+ * location never leaving the device, QR frames never being uploaded, instruction photos
+ * behind signed links — are real properties of the build, and a policy that overstates them
+ * is worse than one that says less.
+ *
+ * **Check it against `../tho/docs/deployment/DATA_DISCLOSURE.md`, not against itself.** That
+ * file is the store forms' source, verified row by row against the code, and it is where the
+ * 2026-08-18 sync came from: this policy had gone three collected categories out of date
+ * (crash diagnostics, the owner's stored precise location, delivery details) and named one
+ * processor where the forms declare two. The forms are binding declarations that link *here*,
+ * so a gap between the two documents is not a documentation problem — it is a contradiction
+ * of something already filed with Apple and Google.
  */
 export const privacy = {
   title: "Privacy Policy",
@@ -937,35 +1070,88 @@ export const privacy = {
           body: "bookings, reviews, messages to salons, and photos you upload (profile picture, salon gallery, service images, review photos, and instruction photos attached to a booking).",
         },
         {
-          lead: "Approximate location",
-          body: "with your permission, your device's location is used on your device to show salons near you and sort them by distance. We do not store your location on our servers.",
+          lead: "Approximate location, as a customer",
+          body: "with your permission, your device's location is used on your device to show salons near you and sort them by distance. As a customer, your location is never sent to us and never stored.",
+        },
+        {
+          /*
+            **The owner carve-out, added 2026-08-18.** The single "we do not store your
+            location" sentence above was true of a customer and false of an owner, which is
+            the worst shape for a policy claim: correct for most readers and wrong for the
+            one whose data actually leaves the device.
+
+            `DATA_DISCLOSURE.md` (verified against the code on 2026-08-14) is explicit —
+            `business_settings_tab.dart:161` captures at `LocationAccuracy.high` and `:221`
+            sends it, stored as `businesses.lat/lng`, and both stores are told this is
+            **precise** location, collected and linked. It is also *published*: those
+            coordinates are the pin on the public map. A salon's address being public is
+            the point of the product, but a policy has to say that it is.
+          */
+          lead: "Your salon's location, if you run one",
+          body: "when a salon owner pins their shop on the map, the precise coordinates are stored with the salon and shown publicly, alongside the address, so customers can find it. This applies to the salon's own location only.",
         },
         {
           lead: "Camera",
           body: "used only to scan a salon's walk-in-queue QR code. The image is decoded on your device and is never uploaded or stored.",
         },
         {
+          /*
+            Firebase is named because it is a processor, and a processor a reader cannot
+            name is one they cannot reason about. Push genuinely delivers now (measured
+            2026-08-18: 15 registered devices, messages sent over the `push` channel), so
+            this item stopped describing a token that was only ever stored and started
+            describing one that is used.
+          */
           lead: "Notification token",
-          body: "if you allow notifications, your device's push token is stored so we can send booking reminders and queue updates. It is tied to your account and removed when another account signs in on that device.",
+          body: "if you allow notifications in the mobile app, your device's push token is stored so we can send booking reminders and queue updates through Google Firebase Cloud Messaging. It is tied to your account and removed when another account signs in on that device. The website does not send push notifications.",
+        },
+        {
+          /*
+            Delivery capture is new upstream (shop slice 3, `20260814000003`): an order
+            placed for delivery writes `orders.delivery_address`, `delivery_phone` and
+            `delivery_note`. It is a home address handed to a business — the most sensitive
+            field the shop added — and it was not disclosed anywhere.
+          */
+          lead: "Delivery details",
+          body: "if you order a product for delivery, the address, phone number and any note you enter are stored with that order and shared with the salon delivering it. Choosing collection in the shop stores none of it.",
         },
         {
           lead: "Service activity",
-          body: "the bookings, orders, queue entries and loyalty points needed to operate the service.",
+          body: "the bookings, orders, queue entries, prepaid packs and loyalty points needed to operate the service.",
+        },
+        {
+          /*
+            **Crashlytics, added 2026-08-18 and previously undisclosed.** `firebase_crashlytics`
+            is wired at `main.dart:76` upstream, which makes crash and performance diagnostics
+            a collected category on both stores' forms — and this page is the policy those
+            forms link to, so an undisclosed SDK here is a contradiction of a binding
+            declaration.
+
+            "Not linked to your account" is the precise claim and it is worth stating: the app
+            never calls `setUserIdentifier`, so we attach no account identity to a crash.
+            Firebase still generates its own installation id, which is why the sentence says
+            what *we* do rather than promising anonymity outright.
+          */
+          lead: "Crash and diagnostic reports",
+          body: "when the mobile app crashes or misbehaves, a report is sent to Google Firebase Crashlytics so we can fix it. We do not attach your name, email or account to those reports.",
         },
       ],
       footnote:
-        "We do not knowingly collect data from children, sell your data, or use third-party advertising SDKs.",
+        "We do not knowingly collect data from children, sell your data, or use third-party advertising SDKs. There is no advertising identifier and no cross-app tracking.",
     },
     {
       title: "How we use it",
       items: [
         { body: "To create and secure your account and sign you in." },
         {
-          body: "To provide the service: discovery, booking, rescheduling and cancellation, walk-in queues, messaging, reviews, loyalty, product orders, and — for salon staff — calendar, client and business management.",
+          body: "To provide the service: discovery, booking, rescheduling and cancellation, walk-in queues, messaging, reviews, loyalty, prepaid packs, product orders and their delivery, and — for salon staff — calendar, client and business management.",
         },
-        { body: "To show salons near you (location stays on your device)." },
+        { body: "To show salons near you (your location stays on your device)." },
         {
-          body: "To notify you about your bookings, your place in a queue, and rewards.",
+          body: "To notify you about your bookings, your place in a queue, your orders, and rewards.",
+        },
+        {
+          body: "To find and fix crashes, so the app keeps working.",
         },
       ],
     },
@@ -974,6 +1160,15 @@ export const privacy = {
       items: [
         {
           body: "Data is stored with our backend provider, Supabase, and transmitted over encrypted connections (HTTPS).",
+        },
+        {
+          /*
+            Both stores ask which third parties receive data, and both were being told
+            "Supabase and Google Firebase" while this page named only the first. Naming them
+            as service providers is also the declaration `DATA_DISCLOSURE.md` requires:
+            "Declare both as service providers, not as data sales."
+          */
+          body: "Two service providers process data on our behalf and for no purpose of their own: Supabase (the database, sign-in and file storage) and Google Firebase (delivering notifications, and crash reporting).",
         },
         {
           body: "Access is enforced by row-level security in the database: you see your own data; a salon's owner and staff see the data for that salon's bookings, orders and queue.",
@@ -985,7 +1180,7 @@ export const privacy = {
           body: "Instruction photos you attach to a booking are held in a private store and are readable only through short-lived signed links, by you and the salon you booked.",
         },
         {
-          body: "A salon you book with, join the queue at, or order from can see your name, profile photo and contact details, and the history of your visits with that salon.",
+          body: "A salon you book with, join the queue at, buy a pack from, or order from can see your name, profile photo and contact details, and the history of your visits with that salon. If you order for delivery, that salon also sees the delivery address and phone number you gave.",
         },
         {
           body: "We share data only as needed to operate the service or where the law requires it. We do not sell personal data.",
@@ -1001,12 +1196,38 @@ export const privacy = {
           body: "deny or withdraw the permission in your device settings at any time; the map falls back to a default city view.",
         },
         {
+          /*
+            **Corrected 2026-08-18: the app has no notification switch.** This said "turn
+            them off in the app's Settings", and the app's own Settings screen documents
+            deleting exactly that control (audit A4-07) because the two switches it had wrote
+            to `SharedPreferences` and nothing read them — "a customer could switch reminders
+            off here and still be reminded by every booking they had".
+
+            What is real is the per-booking "Remind me" switch (`bookings.reminders_muted`,
+            honoured by the enqueue trigger) and the operating system's own permission. So the
+            policy points at the two controls that work rather than at one that was removed
+            for not working.
+          */
           lead: "Notifications",
-          body: "turn them off in the app's Settings or in your device settings.",
+          body: "turn them off for the whole app in your device settings. Each booking also has its own \"Remind me\" switch, which only appears at salons that send reminders.",
         },
         {
+          /*
+            **Self-service deletion is named first, because it exists and is what both stores
+            require.** `delete_account` removes the `auth.users` row — Google Play is explicit
+            that freezing an account is not deletion — and it is reachable in the app at
+            Settings → Delete account and on this site from your profile. Naming only a
+            mailbox understated what the product does and read as a manual, discretionary
+            process.
+
+            The retained-records sentence stays, and is load-bearing rather than decorative:
+            `20260806000003_delete_account.sql` keeps a PII-free tombstone so a salon's
+            bookings and reviews still resolve, and records in its own comment that Play
+            permits that retention **only where the privacy policy discloses it** — this
+            sentence is that disclosure. Do not trim it.
+          */
           lead: "Account and data deletion",
-          body: `email ${legal.contactEmail} and we will delete your account and personal data within ${legal.deletionDays} days. Records a salon must keep for its own accounts — for example that a booking took place and what it cost — are kept in a form that no longer identifies you.`,
+          body: `delete your account yourself — in the app under Settings, or on this site from your profile. Your sign-in is removed, your personal details go, and the email address is freed for reuse. You can also email ${legal.contactEmail} and we will do it within ${legal.deletionDays} days. Records a salon must keep for its own accounts — for example that a booking took place and what it cost, and reviews you left — are kept in a form that no longer identifies you.`,
         },
       ],
     },

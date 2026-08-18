@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { StatusPill } from "@/components/ui/status-pill";
 import { fetchMyOrders } from "@/lib/api/shop";
-import { orderCode, orderItemCount } from "@/lib/analytics";
+import { orderCode, orderItemCount, orderStatusLabel } from "@/lib/analytics";
 import { relativeAge } from "@/lib/chat-logic";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -102,7 +102,13 @@ export default async function MyOrdersPage() {
                     <span className="text-title text-ink truncate font-medium">
                       {orderCode(order.id)}
                     </span>
-                    <StatusPill status={order.status === "new" ? "Placed" : order.status} />
+                    {/* Same split as the detail page: the value picks the tone, the label the
+                        words. Passing the label as `status` is what rendered a delivery order
+                        as "Out_for_delivery" here. */}
+                    <StatusPill
+                      status={order.status}
+                      label={orderStatusLabel(order.status, "customer")}
+                    />
                   </span>
                   {order.businessName ? (
                     <span className="text-body-sm text-muted block truncate">

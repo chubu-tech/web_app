@@ -46,11 +46,11 @@ import type {
   LoyaltyRewardType,
   Order,
   OrderItem,
-  OrderStatus,
   PayrollRow,
   PlanChangeRequest,
   TaxEstimate,
 } from "../types/back-office";
+import { orderStatusFromWire } from "../types/back-office";
 
 /**
  * Row → model mappers, one per table, ported from the `fromMap` factories in
@@ -649,8 +649,34 @@ export function toOrder(m: Row): Order {
     id: m.id as string,
     businessId: m.business_id as string,
     customerProfileId: m.customer_profile_id as string,
-    status: (str(m.status) ?? "new") as OrderStatus,
+    /*
+      **Narrowed, not cast.** `str(m.status) as OrderStatus` is what let the enum and the union
+      go four days out of step in silence: a value the union does not model became an
+      `OrderStatus` every consumer then trusted, and `ORDER_STATUS_LABEL` handed back
+      `undefined`. `orderStatusFromWire` is the same boundary check `queueStatusFromWire` is,
+      and the rule is the one the delivery statuses cost: normalise at the edge, so nothing
+      inside has to wonder whether the union is honest.
+    */
+    status: orderStatusFromWire(str(m.status)),
     totalNu: num(m.total_nu),
+    /*
+      The checkout columns (`20260814000003`). **`num`, not `numOrNull`**: the migration adds all
+      three as `not null default 0` and backfills `subtotal_nu` from `total_nu`, so a pre-checkout
+      row is a complete row rather than an unknown one. Do not reintroduce the nullable form — see
+      `Order`.
+
+      `fulfilment` is normalised for the same reason `status` is. The column is `not null` with a
+      CHECK admitting exactly two values, so the only null that can reach this line comes from a
+      projection that does not select it, and `set_order_status`'s own `coalesce(…, 'pickup')` is
+      the default to mirror.
+    */
+    subtotalNu: num(m.subtotal_nu),
+    discountNu: num(m.discount_nu),
+    deliveryFeeNu: num(m.delivery_fee_nu),
+    fulfilment: str(m.fulfilment) === "delivery" ? "delivery" : "pickup",
+    deliveryAddress: str(m.delivery_address),
+    deliveryPhone: str(m.delivery_phone),
+    deliveryNote: str(m.delivery_note),
     note: str(m.note),
     declineReason: str(m.decline_reason),
     placedAt: new Date(m.placed_at as string),

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { CoverImage } from "@/components/ui/cover-image";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { RatingPill } from "@/components/ui/rating";
@@ -50,6 +51,50 @@ export function BookingSummary({
 }) {
   const total = basketTotal(services);
 
+  /*
+    **The page's clearance under this bar is measured, not assumed.**
+
+    `--cta-clearance` is 96px and `app/globals.css` says what that is: "p-base twice + min-h-12 +
+    a note line. A floor rather than a measurement." One note line was the true worst case while
+    `note` held at most one element — and it stopped being true when the confirm step started
+    passing a `Notice` **and** the cancellation term together, deliberately. On a 390px phone a
+    multi-line block warning plus that paragraph plus the total row plus the button clears 200px,
+    and the page went on reserving 96, so the bar covered the bottom of the very step it belongs
+    to.
+
+    A `ResizeObserver` on the bar publishes its real height, and the booking page pads by that
+    with the constant as the fallback — so server-rendered and pre-hydration output is exactly
+    what it is today, and anything added to this bar in future is accounted for without another
+    constant being re-derived by hand. Its own name, not `--cta-clearance`: the shared token is
+    read by other fixed bars, and one component must not redefine the floor for all of them.
+
+    No state, so this never re-renders — it writes a custom property and cleans it up.
+  */
+  const barRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    // Only write when the number actually moved. The property is resolved by the page
+    // container's bottom padding, so every `setProperty` on `body` invalidates style for the
+    // whole page — and the observer fires on ticks where the height is unchanged, which on iOS
+    // is every address-bar collapse, because the bar's height includes `env(safe-area-inset-
+    // bottom)`. The height itself only changes when this bar gains or loses a line.
+    let published = -1;
+    const publish = () => {
+      const height = bar.offsetHeight;
+      if (height === published) return;
+      published = height;
+      document.body.style.setProperty("--booking-cta-clearance", `${height}px`);
+    };
+    const observer = new ResizeObserver(publish);
+    observer.observe(bar);
+    return () => {
+      observer.disconnect();
+      document.body.style.removeProperty("--booking-cta-clearance");
+    };
+  }, []);
+
   return (
     <>
       {/* The desktop card. `sticky` with the header's own height as the offset, so it
@@ -80,7 +125,10 @@ export function BookingSummary({
         clears the iOS home indicator — the same shape every other fixed bar in this app
         uses, and the reason none of them float above a gap on an iPhone.
       */}
-      <div className="border-hairline bg-paper p-base pb-[calc(var(--spacing-base)+env(safe-area-inset-bottom))] fixed inset-x-0 bottom-0 z-30 border-t desktop:hidden">
+      <div
+        ref={barRef}
+        className="border-hairline bg-paper p-base pb-[calc(var(--spacing-base)+env(safe-area-inset-bottom))] fixed inset-x-0 bottom-0 z-30 border-t desktop:hidden"
+      >
         <div className="mx-auto w-full max-w-[720px]">
           {note ? <div className="mb-sm">{note}</div> : null}
           <div className="gap-base flex items-center">

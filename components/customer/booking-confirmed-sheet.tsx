@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ConfettiBurst } from "@/components/ui/confetti-burst";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/sheet";
+import { cancellationNotice } from "@/lib/booking-guards";
 import { thimphuMinutesOfDay, formatMinutesOfDay } from "@/lib/time";
 import type { Business, ServiceItem, StaffMember } from "@/lib/types/salon";
 
@@ -97,9 +98,17 @@ export function BookingConfirmedSheet({
           ) : null}
         </dl>
 
+        {/*
+          `cancellationNotice`, not the raw column — this was
+          `up to {business.cancellationWindowHours} hours before`, which said "up to 1 hours
+          before" on a one-hour window, "up to 0 hours before" on a salon with no cutoff at all,
+          and "up to 24 hours before" on the booking the wizard had described as "up to 1 day
+          before" one press earlier. Where to do it is the half the helper does not know, so the
+          sentence keeps its own second half.
+        */}
         <p className="text-body-sm text-muted mt-md">
-          Free to reschedule or cancel from My bookings up to{" "}
-          {business.cancellationWindowHours} hours before.
+          {cancellationNotice(business.cancellationWindowHours)} Reschedule or cancel from My
+          bookings.
         </p>
 
         <div className="gap-sm mt-lg flex flex-col">

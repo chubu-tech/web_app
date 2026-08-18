@@ -1,31 +1,7 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-
-/**
- * `prefers-reduced-motion`, read the way React 19 wants an external source read.
- *
- * Not `useState` + `useEffect`: that is setting state in an effect, which the
- * `react-hooks/set-state-in-effect` rule refuses — and rightly, since it renders once with a
- * guessed value and then again with the real one. `useSyncExternalStore` has a server snapshot
- * (**true** — assume reduced, so nothing can flash before the query is known) and subscribes,
- * so a customer who changes the preference mid-session is honoured without a reload.
- */
-const REDUCED_QUERY = "(prefers-reduced-motion: reduce)";
-
-function subscribeToReducedMotion(onChange: () => void) {
-  const query = window.matchMedia(REDUCED_QUERY);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-function usePrefersReducedMotion(): boolean {
-  return useSyncExternalStore(
-    subscribeToReducedMotion,
-    () => window.matchMedia(REDUCED_QUERY).matches,
-    () => true,
-  );
-}
+import { useEffect, useState } from "react";
+import { usePrefersReducedMotion } from "./use-prefers-reduced-motion";
 
 /**
  * A one-shot confetti burst — a port of `confetti_burst.dart` / `Celebration.play`.

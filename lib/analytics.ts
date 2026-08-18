@@ -9,9 +9,10 @@ import type {
   ClientSummary,
   LoyaltyProgram,
   LoyaltyReward,
+  OrderFulfilment,
   OrderStatus,
 } from "./types/back-office";
-import { thimphuToday } from "./time";
+import { THIMPHU_TZ, thimphuToday } from "./time";
 import type { Offer } from "./types/salon";
 import { formatNu } from "./utils";
 
@@ -422,20 +423,66 @@ export function clientBookStats(
 // ==================================================================== orders ===
 
 /**
+ * Which lifecycle an order is on — the one question every screen has to ask the same way.
+ *
+ * `coalesce(v_o.fulfilment, 'pickup')` is what `set_order_status` does, and this mirrors it so
+ * that "null" and "pickup" can never be two different answers on two screens. **What it no longer
+ * claims is that the null case is a pre-checkout row.** The column is `not null default 'pickup'`
+ * and no order carries a null (measured 2026-08-18), and `toOrder` now applies the same default
+ * at the boundary — so the null branch survives for the one case a client can still create, a
+ * projection that does not select the column, and for callers that hold a partial row.
+ *
+ * It stays a function rather than a field read because it is the *named* place that decides, and
+ * three components plus two pages ask it.
+ */
+export function orderFulfilment(order: {
+  fulfilment: OrderFulfilment | null;
+}): OrderFulfilment {
+  return order.fulfilment === "delivery" ? "delivery" : "pickup";
+}
+
+/**
  * Legal **owner** transitions — mirrors `set_order_status`'s server rules exactly.
  *
  * Every case is one-directional or terminal, which is why the order screen offers no Undo: a
  * reverse transition is never legal, so an Undo button could only be a button that always
  * fails. The Dart records the same reasoning at `order_detail_screen.dart:11`.
+ *
+ * ## There are two lifecycles now, and `fulfilment` is what picks between them
+ *
+ * `20260814000006_order_status_delivery.sql` split the tail of the lifecycle in two and gated
+ * each half on the order's own fulfilment:
+ *
+ * ```
+ * pickup:    new → ready → collected
+ * delivery:  new → ready → out_for_delivery → delivered
+ * either:    new|ready → declined      (owner, reason required)
+ *            new       → cancelled     (customer)
+ * ```
+ *
+ * The gate is not decoration: the server refuses `ready → collected` on a delivery order and
+ * `ready → out_for_delivery` on a pickup one. So `fulfilment` is a **required** argument
+ * rather than an optional hint — a signature that let a caller forget it would let the console
+ * offer "Mark collected" on a delivery order, which is a button that always raises, and the
+ * one thing this function exists to prevent.
  */
-export function canOwnerTransition(from: OrderStatus, to: OrderStatus): boolean {
+export function canOwnerTransition(
+  from: OrderStatus,
+  to: OrderStatus,
+  fulfilment: OrderFulfilment,
+): boolean {
+  const delivery = fulfilment === "delivery";
   switch (from) {
     case "new":
       return to === "ready" || to === "declined";
     case "ready":
-      return to === "collected" || to === "declined";
+      if (to === "declined") return true;
+      return delivery ? to === "out_for_delivery" : to === "collected";
+    case "out_for_delivery":
+      return delivery && to === "delivered";
     default:
-      return false; // collected / cancelled / declined are terminal
+      // collected / delivered / cancelled / declined are terminal.
+      return false;
   }
 }
 
@@ -449,20 +496,142 @@ export function orderCode(id: string): string {
   return `ORD-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 }
 
+/**
+ * The pill's words.
+ *
+ * `Record<OrderStatus, string>` rather than a lookup with a fallback, so adding a value to the
+ * enum is a **type error here** instead of a blank pill on a page — which is exactly how the
+ * two delivery statuses went unnoticed: the customer's list read the raw wire value and
+ * title-cased it, rendering "Out_for_delivery".
+ *
+ * "Ready" is deliberately the same word for both lifecycles. The server sends a fulfilment-aware
+ * notification (`order_ready` carries `{fulfilment}` since `20260814000008`), and that message is
+ * where "ready to collect" versus "ready to go out" belongs; the pill is a state, and the state
+ * is the same one.
+ */
+/**
+ * When an order was placed, in Thimphu time — "Monday, 18 Aug 2026, 14:05".
+ *
+ * Both order detail pages carried a byte-identical copy of this, each with `"Asia/Thimphu"`
+ * written out again. That is the same split `OrderLines` was created to end: the two pages
+ * render one order, so the words for it belong in one place, and the zone belongs to
+ * `lib/time.ts` — which is the file a zone change is supposed to land in.
+ */
+export function orderPlacedLabel(placedAt: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: THIMPHU_TZ,
+  }).format(placedAt);
+}
+
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   new: "New",
   ready: "Ready",
+  out_for_delivery: "Out for delivery",
+  delivered: "Delivered",
   collected: "Collected",
   cancelled: "Cancelled",
   declined: "Declined",
 };
 
-/** The three segments of the owner's inbox, and which statuses each covers. */
-export const ORDER_SEGMENTS: { value: string; label: string; statuses: OrderStatus[] }[] = [
-  { value: "new", label: "New", statuses: ["new"] },
-  { value: "ready", label: "Ready", statuses: ["ready"] },
-  { value: "done", label: "Done", statuses: ["collected", "cancelled", "declined"] },
+/** Who is reading the pill. The same row, two vocabularies — as with the notification copy. */
+export type OrderAudience = "customer" | "owner";
+
+/**
+ * Where the two audiences disagree about the words for one status.
+ *
+ * A `Map`, for the reason `StatusPill`'s tone table is one: a lookup keyed by a value that
+ * originates outside this file has no business resolving `Object.prototype`'s members.
+ */
+const CUSTOMER_ORDER_STATUS_LABEL: ReadonlyMap<OrderStatus, string> = new Map([
+  // The customer *placed* it; the salon *received* it. Same row, and "New" is the salon's word
+  // for it — on the customer's own list it reads like something the salon has done.
+  ["new", "Placed"],
+]);
+
+/**
+ * The words for a status, for the audience reading them.
+ *
+ * **This exists because the relabel was copied.** `status === "new" ? "Placed" : LABEL[status]`
+ * was written out at four order surfaces — both customer pages and, in its plain form, both
+ * owner pages — so the next relabel had to be applied in four places and would have been applied
+ * in three. `lib/notification-copy.ts` already solved this exact shape with two copy tables
+ * chosen by audience, and this is the same answer at the size the problem currently is: one
+ * table, one exception, and one function that knows about both.
+ *
+ * The owner's vocabulary is the base table rather than a second map, because the wire value is
+ * written from the salon's point of view — the divergence belongs to the customer.
+ */
+export function orderStatusLabel(status: OrderStatus, audience: OrderAudience): string {
+  if (audience === "customer") {
+    const relabelled = CUSTOMER_ORDER_STATUS_LABEL.get(status);
+    if (relabelled) return relabelled;
+  }
+  return ORDER_STATUS_LABEL[status];
+}
+
+/**
+ * The segments of the owner's inbox, and which statuses each covers.
+ *
+ * **Every status must appear in exactly one segment**, and that is not a tidiness rule. The
+ * page filters `.in("status", segment.statuses)`, so a status in no segment is an order in no
+ * list — which is what happened to `out_for_delivery` and `delivered` between 2026-08-14 and
+ * this fix: live orders, invisible in the console, with nothing on screen to suggest they
+ * existed. `orderSegmentCoverage()` below, and the test that walks it against
+ * `ORDER_STATUS_LABEL`'s keys, pin the invariant so the next enum value fails a test rather than
+ * a salon.
+ *
+ * `out_for_delivery` earns its own segment rather than joining Done: it is the one status where
+ * the salon still owes the customer something, and burying it with the finished orders would
+ * hide the only list that answers "what is out with the driver right now". `delivered` is a
+ * handover, so it sits with `collected` — the same event, through a different door.
+ */
+export const ORDER_SEGMENTS: {
+  value: string;
+  label: string;
+  /**
+   * The empty state's own title.
+   *
+   * It used to be derived — ``No ${segment.label.toLowerCase()} orders`` — which reads fine for
+   * three one-word tabs and produces *"No delivering orders"* for the fourth. A derived string is
+   * only as good as the words it is derived from, and a tab label has to be short where an empty
+   * state has to be a sentence. Two jobs, two fields.
+   */
+  empty: string;
+  statuses: OrderStatus[];
+}[] = [
+  { value: "new", label: "New", empty: "No new orders", statuses: ["new"] },
+  { value: "ready", label: "Ready", empty: "Nothing waiting to be collected", statuses: ["ready"] },
+  {
+    value: "delivering",
+    label: "Delivering",
+    empty: "Nothing out for delivery",
+    statuses: ["out_for_delivery"],
+  },
+  {
+    value: "done",
+    label: "Done",
+    empty: "No finished orders",
+    statuses: ["collected", "delivered", "cancelled", "declined"],
+  },
 ];
+
+/**
+ * Every `OrderStatus` covered by exactly one segment — the invariant the missing delivery
+ * statuses broke, expressed so a test can hold it.
+ *
+ * Exported rather than inlined in the test because the property is a claim about the *product*
+ * (no order is ever in no list), not about the shape of a literal.
+ */
+export function orderSegmentCoverage(): OrderStatus[] {
+  return ORDER_SEGMENTS.flatMap((s) => s.statuses);
+}
 
 export function orderSegmentFor(value: string | null | undefined) {
   return ORDER_SEGMENTS.find((s) => s.value === value) ?? ORDER_SEGMENTS[0];

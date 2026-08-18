@@ -597,33 +597,65 @@ every width.
    badges currently fall back to the on-page `#download` section. Paste the real
    App Store / Play listing URLs once the apps are published.
 2. **Replace the placeholder photography.** Every image is an Unsplash URL built
-   in `lib/content.ts`. Put real salon photos in `public/photos/`, point
+   in `lib/marketing/content.ts`. Put real salon photos in `public/photos/`, point
    `content.ts` at them, then delete `images.remotePatterns` from
    `next.config.ts`.
-3. **Re-check the plan prices.** The tiers here mirror
-   `app/lib/business/plans/plans_config.dart` in the tho repo, which flags its
-   own prices as placeholders. The launch plan
-   (`docs/launch/2026-07-27-production-launch-and-marketing-plan.md` §pricing)
-   proposes Nu 899 / Nu 1,999 instead. Whatever the business settles on, the app
-   is the source of truth and this page follows it.
-4. Fill in the real support email, WhatsApp number and domain in `brand`
-   (`content.ts`) — the domain drives `metadataBase`, the canonical URL, the
-   sitemap and every JSON-LD `@id`. The WhatsApp number is still the same
-   `+975 17 00 00 00` placeholder the app carries.
-5. **Swap the `assetlinks.json` fingerprint** — see "Deep links" below. This is
-   the one item on this list that fails *silently*. `/privacy`, `/q/<id>` and
-   both `.well-known` files now exist; `/terms` still does not.
+
+   **Real app screenshots now exist and were deliberately not used**, which is worth
+   recording so the decision is not re-made by accident. `../tho/docs/deployment/listing/`
+   holds five framed store shots (book-in-seconds, real-open-slots, walk-in-queue,
+   follow-your-stylist, run-your-salon) at 1290×2796, plus a carousel strip. They are
+   **store assets, not web assets**: each one bakes its own headline into the image
+   ("walk-in queue" in 100px type), which would collide with this site's own headings, and
+   they are portrait at a ratio nothing here has a slot for.
+
+   What they are genuinely useful for is **checking the mockups against the app**, and that
+   check was done on 2026-08-18: the queue shot shows *"YOU'D BE #3 · Wait ~35 min"* and
+   *"Leave the queue any time"*, which is the same shape `hero.liveCard`, `queueSection` and
+   `queueLanding.reassurance` already draw. **No mockup on this site misrepresents the app** —
+   none of them is a fake screenshot in the first place; they are DOM built from the real
+   product's vocabulary. If real screenshots ever do go on the page, crop the device out of
+   these and drop the baked captions, or take fresh ones from the running web product.
+3. ~~**Re-check the plan prices.**~~ **Settled.** `plans_config.dart` no longer
+   flags its figures as placeholders: **Nu 399 / 699 / 1,499** are the final
+   launch prices, set 2026-08-03, with no free tier. `lib/plans.ts` and
+   `pricing.tiers` both carry them. The Nu 899 / 1,999 proposal in the July
+   launch plan was not adopted. The app remains the source of truth.
+4. ~~Fill in the real support email, WhatsApp number and domain in `brand`.~~
+   **Done.** `supportEmail` is `thobhutansalons@gmail.com`, `whatsapp` is the
+   live `+975 17 71 65 23` (the footer's `tel:` and the WhatsApp icon both
+   derive from it), and `domain` is `bhutansalons.com`, which drives
+   `metadataBase`, the canonical, the sitemap and every JSON-LD `@id`. What is
+   still empty is `brand.social` — three profiles that do not exist yet — and
+   that is why the Organization node has no `sameAs`.
+5. **Swap the `assetlinks.json` fingerprint after the first Play upload** — see
+   "Deep links" below. This is the one item on this list that fails *silently*.
+   The `apple-app-site-association` half of it **is now done** (Team ID
+   `9BPV5PP9BU`, 2026-08-18), and `/privacy`, `/help`, `/legal/terms`,
+   `/legal/content-policy`, `/for-salons`, `/q/<id>` and both `.well-known`
+   files all exist. This item used to say `/terms` did not.
 6. Social proof was removed on purpose: the earlier testimonials and stat
    figures were invented. Add them back only with real, consented quotes and
    measured numbers. **`proof.tsx` does not discharge this** — it is four counts
    computed from `SalonIndex` at render, which is the honest half of the job. The
    quotes are still owed, and when they arrive they go beside that band rather than
    replacing it.
-7. **`/` has no canonical.** The root `app/layout.tsx` sets `metadataBase`, Open
-   Graph and Twitter for every route but no `alternates.canonical`, and the marketing
-   home page declares no metadata of its own — so `/privacy` and `/waitlist` carry a
-   canonical and the homepage does not. Pre-existing and untouched by the redesign;
-   one `export const metadata` in `app/(marketing)/page.tsx` closes it.
+7. ~~**`/` has no canonical.**~~ **Closed.** `app/(marketing)/page.tsx` now
+   exports its own `metadata` with `alternates: { canonical: "/" }`, an absolute
+   title (so the `%s · THO` template does not print the brand twice) and its own
+   Open Graph block. Every way of reaching the homepage — a trailing slash, a
+   `?utm_source=` from a WhatsApp campaign, an `?fbclid=` — now resolves to one
+   URL.
+
+8. **Re-audit against `../tho` from `git log`, not from this file's own date.**
+   `PARITY.md` records being a batch behind twice, both times because the audit
+   window was set from the previous audit rather than from the upstream history.
+   The 2026-08-18 sync found the same shape a third time on the *marketing* side:
+   the site was still selling "Priority placement" four days after the app
+   deleted it, and still denying push notifications after they had started
+   delivering. Two of those claims were in strings that had each been *carefully
+   fact-checked when written* — which is the point. A claim's provenance does not
+   keep it true.
 
 ## Deep links
 
@@ -656,7 +688,24 @@ curl -s https://bhutansalons.com/.well-known/assetlinks.json
 curl -sI https://bhutansalons.com/.well-known/apple-app-site-association
 ```
 
-`apple-app-site-association` still has a literal `TEAMID` placeholder — replace
-it with the real Apple Developer Team ID before any iOS build. It has no
-extension, so `next.config.ts` sets its `Content-Type` explicitly; iOS rejects
-it otherwise.
+**`apple-app-site-association` carries the real Team ID since 2026-08-18:**
+`9BPV5PP9BU.bt.tho.app`. It was the literal string `TEAMID.bt.tho.app`, which is
+well-formed JSON and a valid-looking app ID, so it failed the way this section
+warns about — silently, with `/q/<id>` opening a browser and nothing logged
+anywhere.
+
+The ID is not a guess: `DEVELOPMENT_TEAM = 9BPV5PP9BU` is set at all five
+configurations in `../tho/app/ios/Runner.xcodeproj/project.pbxproj`, which is
+the same value Apple resolves the app ID against. Upstream's submission runbook
+lists replacing it as an open action **against this file**, so this closes an
+item on somebody else's checklist — worth knowing if that list still shows it
+open.
+
+It has no extension, so `next.config.ts` sets its `Content-Type` explicitly; iOS
+rejects it otherwise.
+
+The Android half is **already correct and was not touched.** The four
+fingerprints in `assetlinks.json` include the upload key's, and it matches
+`../tho/docs/deployment/KEYSTORE_RECOVERY.md` byte for byte
+(`94:12:9D:30:…:C7:C0`). The Play app-signing swap described above is still
+owed, and still cannot be done from here — it needs the first upload.

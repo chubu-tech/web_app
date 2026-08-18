@@ -51,7 +51,7 @@ export function GET(): Response {
 - [Salons in Thimphu](${absoluteUrl("/salons/thimphu")}): every salon and barber in Thimphu.
 - [Top rated](${absoluteUrl("/top-rated")}): the rated salons, best first.
 - [Map](${absoluteUrl("/map")}): salons by location.
-- [For salon owners](${absoluteUrl("/for-salons")}): appointments, walk-in queue, staff, clients and reporting; plans and prices.
+- [For salon owners](${absoluteUrl("/for-salons")}): appointments, walk-in queue, staff, clients, products and prepaid packs, and reporting; plans and prices.
 - [Help](${absoluteUrl("/help")}): booking changes, the walk-in queue, payment, loyalty points, reporting and account deletion.
 - [Privacy](${absoluteUrl("/privacy")}): what is collected and why.
 - [Terms](${absoluteUrl("/legal/terms")}) · [Content policy](${absoluteUrl("/legal/content-policy")})
@@ -69,6 +69,8 @@ and location. Those pages are enumerated in [the sitemap](${absoluteUrl("/sitema
 - Times are Bhutan time (UTC+6, no daylight saving).
 - Two ways to get a chair: book a specific time in advance, or join a salon's walk-in queue and watch your position update live.
 - A salon's walk-in queue is joined by scanning the QR code at its door, or from the salon's page. No app is needed.
+- A queue page updates itself as each chair frees up. The mobile app can also send a notification when it is a customer's turn, if they allow notifications; the website sends no push notifications.
+- Reminders before an appointment are sent by salons on a paid plan, so not every salon sends one. Loyalty points are earned only at salons that run a loyalty programme.
 - ${brand.name} is usable in any web browser at ${site}. Mobile apps for iOS and Android are in development.
 
 ## Naming

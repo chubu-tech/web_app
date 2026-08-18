@@ -7,7 +7,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { StatusPill } from "@/components/ui/status-pill";
 import { fetchOwnerOrders } from "@/lib/api/owner-back-office";
-import { ORDER_SEGMENTS, orderCode, orderItemCount, orderSegmentFor } from "@/lib/analytics";
+import {
+  ORDER_SEGMENTS,
+  orderStatusLabel,
+  orderCode,
+  orderItemCount,
+  orderSegmentFor,
+} from "@/lib/analytics";
 import { hasFeature } from "@/lib/entitlements";
 import { getOwnerContext } from "@/lib/owner/context";
 import { createClient } from "@/lib/supabase/server";
@@ -18,13 +24,20 @@ export const metadata: Metadata = { title: "Orders" };
 /**
  * The product-order inbox — a port of `tho/app/lib/business/shop/orders_screen.dart`.
  *
- * Three segments over one query, each fetching **only** the statuses it covers, so the New tab
- * is a small read even for a salon with a year of history behind it. The segment lives in
+ * Four segments over one query, each fetching **only** the statuses it covers, so the New tab is
+ * a small read even for a salon with a year of history behind it. The segment lives in
  * `?status=`, like every other filter in this console.
  *
- * `Done` deliberately gathers three different endings — collected, cancelled by the customer,
- * declined by the salon. They are not the same event, and the rows say which; what they have in
- * common is that there is nothing left to do, which is the only thing a segment needs to mean.
+ * `Done` deliberately gathers four different endings — collected, delivered, cancelled by the
+ * customer, declined by the salon. They are not the same event, and the rows say which; what they
+ * have in common is that there is nothing left to do, which is the only thing a segment needs to
+ * mean.
+ *
+ * **"Out for delivery" is the fourth segment, and it exists because of a real disappearance.**
+ * Until this was added the segments covered five of the seven statuses, and the two the delivery
+ * lifecycle introduced were in none of them — so an order the salon sent out from the app was in
+ * New, Ready and Done alike: nowhere. It gets its own tab rather than joining Done because it is
+ * the one state where the salon still owes the customer something.
  */
 export default async function OwnerOrdersPage({
   searchParams,
@@ -66,7 +79,15 @@ export default async function OwnerOrdersPage({
                 <Link
                   href={`/business/orders?status=${s.value}`}
                   aria-current={on ? "true" : undefined}
-                  className={`text-title flex min-h-9 items-center justify-center rounded-full font-medium ${
+                  /*
+                    `text-caption`, not `text-title`, since the fourth segment landed: four labels
+                    at 390px leave about 90px each, and "Delivering" at the title step wrapped
+                    inside its own pill. 13px is also what the shared `SegmentedControl` uses for
+                    exactly this control, so this row now matches the kit rather than diverging
+                    from it. `whitespace-nowrap` is the guarantee — a pill that wraps changes the
+                    height of the whole row.
+                  */
+                  className={`text-caption px-xs flex min-h-9 items-center justify-center rounded-full font-medium whitespace-nowrap ${
                     on ? "bg-canvas text-ink shadow-sm" : "text-muted"
                   }`}
                 >
@@ -81,7 +102,7 @@ export default async function OwnerOrdersPage({
       {orders.length === 0 ? (
         <EmptyState
           icon={Icons.shopBag}
-          title={`No ${segment.label.toLowerCase()} orders`}
+          title={segment.empty}
           message={segment.value === "new" ? "New product orders show up here." : undefined}
         />
       ) : (
@@ -99,7 +120,7 @@ export default async function OwnerOrdersPage({
                       <span className="text-title text-ink truncate font-medium">
                         {orderCode(o.id)}
                       </span>
-                      <StatusPill status={o.status === "new" ? "New" : o.status} />
+                      <StatusPill status={o.status} label={orderStatusLabel(o.status, "owner")} />
                     </span>
                     <span className="text-body-sm text-muted block">
                       {count} {count === 1 ? "item" : "items"} · {formatNu(o.totalNu)}

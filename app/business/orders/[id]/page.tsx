@@ -4,13 +4,13 @@ import { notFound } from "next/navigation";
 import { NoSalonYet } from "@/components/owner/no-salon-yet";
 import { OrderActions } from "@/components/owner/order-actions";
 import { Icons, IconSize } from "@/components/ui/icons";
+import { OrderDeliveryBlock, OrderLines } from "@/components/ui/order-lines";
 import { SectionHeader } from "@/components/ui/section-header";
 import { StatusPill } from "@/components/ui/status-pill";
 import { fetchOrderById } from "@/lib/api/owner-back-office";
-import { orderCode } from "@/lib/analytics";
+import { orderCode, orderFulfilment, orderPlacedLabel, orderStatusLabel } from "@/lib/analytics";
 import { getOwnerContext } from "@/lib/owner/context";
 import { createClient } from "@/lib/supabase/server";
-import { formatNu } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Order" };
 
@@ -40,6 +40,13 @@ export default async function OwnerOrderDetailPage({
   const order = await fetchOrderById(supabase, id);
   if (!order || order.businessId !== active.id) notFound();
 
+  /*
+    Resolved once and passed down, rather than each consumer reading the column for itself: the
+    actions, the delivery block and the totals must all agree about which lifecycle this order is
+    on, and `orderFulfilment` is the one place that decides.
+  */
+  const fulfilment = orderFulfilment(order);
+
   return (
     <div className="px-base py-lg mx-auto w-full max-w-[720px] tablet:px-lg">
       <Link
@@ -52,9 +59,18 @@ export default async function OwnerOrderDetailPage({
 
       <div className="gap-sm mb-xs flex items-center">
         <h1 className="text-display-lg text-ink flex-1 font-medium">{orderCode(order.id)}</h1>
-        <StatusPill status={order.status === "new" ? "New" : order.status} />
+        {/*
+          The value decides the colour, `orderStatusLabel` decides the words. Passing the label
+          as `status` — which is what this did — title-cased the wire value, so the two delivery
+          statuses read "Out_for_delivery" and "Delivered" while `cancelled` lost its muted tone
+          the moment anybody "fixed" the words. The table behind it is
+          `Record<OrderStatus, string>`, so the next enum value is a type error there rather than
+          a blank pill; the audience argument is what keeps the customer's "Placed" out of the
+          salon's console without a second conditional written here.
+        */}
+        <StatusPill status={order.status} label={orderStatusLabel(order.status, "owner")} />
       </div>
-      <p className="text-body-sm text-muted mb-lg">{placedLabel(order.placedAt)}</p>
+      <p className="text-body-sm text-muted mb-lg">{orderPlacedLabel(order.placedAt)}</p>
 
       {order.note ? (
         <>
@@ -72,42 +88,18 @@ export default async function OwnerOrderDetailPage({
         </>
       ) : null}
 
-      <SectionHeader title="Items" />
-      <div className="border-hairline p-base mb-lg rounded-md border">
-        <ul className="gap-sm mb-sm flex flex-col">
-          {order.items.map((it) => (
-            <li key={it.id} className="gap-sm flex items-baseline">
-              <span className="text-body-md text-ink min-w-0 flex-1">
-                {it.nameSnapshot} × {it.qty}
-              </span>
-              <span className="text-body-md text-ink tabular-nums">
-                {formatNu(it.lineTotalNu)}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="border-hairline-soft pt-sm gap-sm flex items-baseline border-t">
-          <span className="text-title text-ink flex-1 font-medium">Total</span>
-          <span className="text-title text-ink font-medium tabular-nums">
-            {formatNu(order.totalNu)}
-          </span>
-        </div>
-      </div>
+      {/*
+        Delivery, before the items — an owner reading this page while the driver waits needs the
+        address above the prices, not under them. Heading included, and the whole thing renders
+        nothing on a pickup order or on a delivery order with no address recorded.
+      */}
+      <OrderDeliveryBlock order={order} title="Deliver to" />
 
-      <OrderActions orderId={order.id} status={order.status} />
+      <SectionHeader title="Items" />
+      <OrderLines order={order} totalLabel="Total" />
+
+      <OrderActions orderId={order.id} status={order.status} fulfilment={fulfilment} />
     </div>
   );
 }
 
-function placedLabel(d: Date): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: "Asia/Thimphu",
-  }).format(d);
-}

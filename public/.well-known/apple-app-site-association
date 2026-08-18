@@ -2,7 +2,7 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["TEAMID.bt.tho.app"],
+        "appIDs": ["9BPV5PP9BU.bt.tho.app"],
         "components": [
           { "/": "/q/*", "comment": "walk-in queue links" }
         ]

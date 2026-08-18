@@ -1,14 +1,24 @@
 # Feature parity — THO app (`../tho`) vs THO Web (`tho_web`)
 
-Audited **2026-08-11** against `../tho/app/lib` and `tho_web` (71 route entries, 639 tests
-across 30 files).
+Re-audited **2026-08-18** against `../tho` at `35cc1b4` and this repo (79 route entries, 776
+tests across 37 files). The previous audit was 2026-08-11.
 
-**Every client-facing RPC in the schema is now called.** The five the app calls and this does
-not are three `admin_*`, one retired and one deferred by decision — see below.
+**The app has moved a long way and this repo has not followed.** 29 migrations and about 40 app
+commits landed between 2026-08-12 and 2026-08-16, and the headline of the last audit — *"every
+client-facing RPC in the schema is now called"* — **is no longer true.** The app calls **73**
+distinct RPCs and this calls **51**; 18 of the difference are real gaps.
 
-## Twice a batch behind, and how
+The 2026-08-18 pass closed everything that was a **false or broken claim** and deliberately did
+not attempt the two new feature areas. In one sentence each:
 
-This document has now been wrong in the same way twice, which is worth stating before any of its
+| | |
+| --- | --- |
+| **Closed** | the "Priority placement" and "no-show cover" claims (§1 · Batch F), the push-notification denials, the privacy policy's three undisclosed collections, the delivery-status blind spot that made a live order invisible, the `TEAMID` placeholder, and A1-08 — the last item on the old §5 |
+| **Not attempted** | the shop rework (slices 1–4) and service packs, on both sides — §5, with the RPC list |
+
+## A batch behind, three times now
+
+This document has been wrong in the same way three times, which is worth stating before any of its
 claims are trusted again.
 
 The **2026-08-06** audit missed the 2026-08-07 batch: ~30 migrations introducing moderation,
@@ -22,6 +32,22 @@ with no web caller.
 Both times the miss had the same shape: the audit window was set from the *previous* audit's date
 rather than from `git log`. §7 lists every correction.
 
+**The third time is this one, and it is worse than the first two**, because it was not a missed
+audit — it was seven days with no audit at all while the app shipped its two largest feature areas
+since launch. What that cost was not only coverage:
+
+- The site went on **selling "Priority placement"** for four days after `fb9791c` deleted it as a
+  false claim, and on the one owner-side page built to rank.
+- Two carefully fact-checked FAQ strings became false by standing still. *"THO does not send you a
+  text or a push notification"* was true when written and was measured false on 2026-08-18.
+- `/privacy` — the URL both app stores link to — fell three collected categories behind the store
+  declarations filed from the same repo it was drifting from.
+
+**The lesson is narrower than "audit more often": a claim's provenance does not keep it true.**
+Every one of those three was verified when written. What none of them had was a re-check trigger,
+and the two that were checkable from a database (push delivery, the plan flag) are the two that
+went stale silently. §7 lists every correction.
+
 ## The measure that does the work
 
 Screen-by-screen matching is the weaker test — a web page can look equivalent and call nothing.
@@ -33,18 +59,40 @@ grep -rohE 'rpc\("[a-z_]+"' lib/ | sed 's/rpc("//;s/"//' | sort -u > /tmp/web
 comm -23 /tmp/app /tmp/web
 ```
 
-The app calls **55** distinct RPCs. `tho_web` calls **50**. All five of the rest are accounted
-for, and none is a gap:
+Counted 2026-08-18: the app calls **73** distinct RPCs, `tho_web` calls **51**. Five of the 23 are
+accounted for and are not gaps; **18 are the two new feature areas**, and they are listed as a work
+list in §5 rather than here.
 
 | RPC | Status |
 | --- | --- |
 | `link_staff_member` | **Retired, correctly.** `ee413c6` replaced it with the invite handshake; it has no caller in the app either. Calling it would let an owner convert a stranger's account into their stylist without asking — the defect that commit removed. |
-| `register_device` | Push notifications, deferred by decision — the in-app inbox is the channel. Delivery needs a Firebase web config and an `FCM_SERVICE_ACCOUNT` that exist for no platform. |
+| `register_device` | **Web Push, still deferred by decision** — the in-app inbox is the channel here. The old reason given for it is gone and should not be repeated: `FCM_SERVICE_ACCOUNT` **is** set now and push genuinely delivers to the mobile app. What is missing for a browser is a Firebase *web* config and a service worker, neither of which exists in any repo. See §7. |
 | `admin_content_reports`, `admin_resolve_report`, `admin_remove_reported_content` | The app ships an **in-app admin moderation queue** (`moderation/admin_reports_screen.dart`, reachable from `profile_screen.dart:192`). Not a gap here: this repo sends `admin` users to `../admin`. Worth knowing it exists, because the 2026-08-06 audit filed all `admin_*` RPCs as "belong to `../admin`" without noticing three of them have a Flutter screen. |
 
 **`record_payment` and `salons_available_today` moved off this list on 2026-08-11** — the first
 because Norzin going Pro made it exercisable, the second because it had never been noticed. Both
 are §1.
+
+### The RPC diff is necessary and it is not sufficient
+
+Worth saying plainly, because the 2026-08-18 pass found four defects the diff cannot see. Two RPCs
+the web already called had their *behaviour* changed underneath it:
+
+- **`set_order_status` grew a second lifecycle.** No new RPC name, so the diff was silent — and
+  `order_status` gaining two values put a live order in **none** of the console's three inbox
+  segments. See §1 · Batch F.
+- **`place_order` went from 4 arguments to 10** by drop-and-recreate. The web's 4-argument call
+  still resolves *only* because every added parameter has a default; had one not, every order on
+  this platform would have failed at once, with the diff still reporting parity.
+
+So the diff answers "is anything unreachable". **Signature and enum drift needs its own check**,
+and `pg_get_function_arguments` is the one that answers it:
+
+```sql
+select p.proname, pg_get_function_arguments(p.oid)
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname in ('place_order', 'create_booking', 'set_order_status');
+```
 
 ---
 
@@ -278,6 +326,33 @@ could not:
   and there is no trigger on `businesses`. **A write is only restorable if the inverse write is
   also legal.** Check that before making it, not after.
 
+### The false-claim and drift pass (Batch F, 2026-08-18)
+
+Everything in the 2026-08-12→16 upstream batch that was a **wrong statement or a broken surface**,
+as opposed to a feature not yet built. Nothing here was a new capability; every item was this repo
+saying or doing something the app had stopped saying or doing.
+
+| # | What was wrong | Fix |
+| --- | --- | --- |
+| F1 | **The site sold "Priority placement."** `Feature.priorityPlacement` is read by no code in either client — no plan term in `lib/recommendations.ts`, no ranking code in `supabase/` — so a Pro salon ranks exactly like a Basic one. Upstream deleted the flag in `fb9791c` (audit A3-04) as the only finding in its whole ledger that was a false claim to a paying customer. `lib/marketing/content.ts` had already dropped it from the homepage; **`lib/plans.ts` had not**, and `/for-salons` renders those bullets — so the claim stayed published on the one owner-side page built to rank. | Removed from `Feature`, `PRO_ADDS`, `PLAN_TIERS` and `FEATURE_COPY`. New `lib/entitlements.test.ts` asserts the union equals the app's, in both directions |
+| F2 | **"Deposits & no-show cover"** on the same rendered list. `businesses.late_fee_amount` defaults to 0, is not in the owner-updatable grant, and is referenced by no function in the schema. The page's own doc comment said it did not repeat the claim in prose — while the `<ul>` beneath printed it from data. | Relabelled "Deposits & payments on a booking". **The structural lesson is in that comment now: prose that omits a claim does not suppress it if a list on the same page renders the claim from data** |
+| F3 | **`Feature.servicePacks` was missing** — the one Pro perk that shipped *with* its implementation (5 tables, 7 RPCs). Pro was left carrying three real perks while its newest went unsold | Added at `pro`, with the app's own paywall copy and card label |
+| F4 | **Two push denials, both measured false.** `faq`'s *"THO does not send you a text or a push notification about your turn"* and the note in `twoWays` claiming every `queue_your_turn` row fails with "no deliverable channel". On 2026-08-18 the live database has **15 registered devices** and **6 rows `sent` over the `push` channel, one of them a `queue_your_turn`** | The FAQ answer now separates the two clients — the app notifies, the browser's self-updating page is its channel. The `twoWays` chips are deliberately unchanged and say why |
+| F5 | **`/privacy` was three collected categories behind the store declarations.** Crashlytics (wired at `main.dart:76`) undisclosed, Firebase unnamed as a processor, the owner's **precise and stored** location covered by a flat "we do not store your location", delivery address unmentioned, and self-service deletion described as a mailbox request | Six additions, `lastUpdated` moved. Checked against `../tho/docs/deployment/DATA_DISCLOSURE.md`, which is the store forms' source |
+| F6 | **A delivery order was invisible in the console.** `order_status` grew by `out_for_delivery` and `delivered`; the union, labels, segments and transition rules did not follow, so the inbox's `.in("status", …)` matched the row in **no** segment, and the customer's list rendered "Out_for_delivery" | The union, a fourth segment, `ORDER_STATUS_LABEL` as `Record<OrderStatus, string>`, `canOwnerTransition` taking fulfilment, the checkout columns read, and a shared `OrderLines` / `OrderDeliveryBlock`. `orderSegmentCoverage()` pins that every status is in exactly one segment |
+| F7 | **The total was not the sum of the lines and both order pages printed it as if it were.** `place_order` computes `subtotal − discount + delivery fee`, so a promo or a fee made the receipt unreconcilable with nothing on the page to explain it | The breakdown renders when it says something; a pre-checkout row (null columns) renders as it always did |
+| F8 | **`apple-app-site-association` shipped the literal `TEAMID`**, so iOS universal links from a printed door QR opened a browser — silently, which is how it survived. The real team is `9BPV5PP9BU`, set at all five configurations in the app's pbxproj since 2026-08-15 | Replaced. Verified served as `application/json`, which iOS also requires |
+| F9 | **A1-08, the last item on the old §5.** The salon's cancellation rule appeared on no screen in the booking flow — only on the confirmation sheet, i.e. after the commitment — while `20260807000032` made it enforceable. Upstream fixed this on 2026-08-12 | `cancellationNotice()` ported with its cases, rendered in the summary rail's `note` slot directly above Confirm, in both the desktop card and the phone bar |
+| F10 | **`order_out_for_delivery` had no copy case**, so the fallback produced a generic title and an **empty body** on the one order update that is time-critical; and `order_ready` ignored the `fulfilment` the server now sends with it | Both cases added to `lib/notification-copy.ts` |
+
+Verified by measurement, not by reading: a delivery order was created as a fixture on Norzin
+(`client_token = 'tho-web-verify-2026-08-18'`), driven through both roles' pages, and **deleted** —
+`orders` is back to 7 rows. What it proved, with scripts stripped from the HTML so the assertions
+could not pass on the RSC payload alone: the row appears in the new Delivering segment, the pill
+reads "Out for delivery", the address block and the `−Nu 100` discount line render, the only action
+offered is **Mark delivered** — no "Mark collected", no "Decline", matching the server exactly — and
+the customer's copy reads "On its way to you now" and "To pay on delivery".
+
 ---
 
 ## 2. Implemented and confirmed at parity
@@ -316,7 +391,14 @@ Nine places, each because upstream removed or never built something a browser ca
 
 1. **Five analytics cards.** `insights_tab.dart` comments out New vs returning, Top services,
    Staff leaderboard, Completion & no-shows and Peak hours (THO-55). `analytics_dashboard`
-   returns all of it on every call, so the app pays for the data and discards it.
+   returns all of it on every call, so the app pays for the data and discards it. **Re-checked
+   2026-08-18: still commented out**, THO-55 notes and all.
+
+   Insights is now the one surface where each client is ahead of the other in a different place.
+   The app grew a **Shop section** (`shop_insights_section.dart` over `product_analytics`,
+   2026-08-15) that this repo does not draw — §5.1. So "the web draws all nine cards" stays true
+   of the *booking* dashboard and is no longer true of the tab. Do not resolve that by dropping
+   either half.
 2. **The plan-upgrade request.** `bddb23f` deleted `Api.requestUpgrade` citing App Store
    Guideline 3.1.1. A website is bound by neither store's rules.
 3. **An owner notification feed, in an owner's voice.** `booking_created` means opposite things
@@ -383,13 +465,85 @@ Nine places, each because upstream removed or never built something a browser ca
 
 ## 5. What genuinely remains
 
-**A1-08 — the cancellation rule is shown on no screen in the booking flow.** Upstream's own
-argument for *blocking* a late cancellation rather than charging for one is that the customer is
-never shown the window before committing: it first appears **after** the booking exists. On
-`tho_web` that is still true — `booking-confirmed-sheet.tsx` states it at confirmation, which is
-after. It has never been in a batch, and now that the rule bites it is better founded than it
-was: `/salon/[id]/book`'s summary rail is where it belongs, beside the price the customer is
-about to commit to.
+**Two whole feature areas, 18 RPCs, and they are the honest answer to "is this at parity".** Both
+were built upstream between 2026-08-10 and 2026-08-17, both are specified in `../tho/openspec/`,
+and **neither was attempted on 2026-08-18** — this is a work list, not a discovery. Read the
+proposals before planning either: they are short, they name their own constraints, and each one
+records decisions that cost the app a rewrite to learn.
+
+### 5.1 The shop rework — slices 1–4 (9 RPCs)
+
+`openspec/changes/shop-slice-2-storefront`, `…-3-checkout-fulfilment`, `…-4-shop-analytics`, plus
+the merged `shop-browse-categories-and-signout-redirect`. Migrations `20260810000001` →
+`20260815000001`.
+
+| Uncalled here | What it is |
+| --- | --- |
+| `submit_product_review` | Verified-purchase reviews — the **only** door into `product_reviews`, requiring an order that is the caller's, reached `collected`/`delivered`, and contained that product |
+| `record_product_view` | The demand signal, once per product per session. Owner-read-only: public per-product view counts are competitive intel an owner never consented to publish |
+| `preview_promo`, `upsert_promo_code`, `expire_promo_code` | Promo codes — customer preview, owner CRUD, Growth+ |
+| `record_order_payment`, `order_payments` | The order-side twin of `record_payment` / `booking_payments`, Growth+ |
+| `product_analytics` | The Insights tab's Shop section, Growth+. **Two revenue figures that are not interchangeable** — gross for every breakdown, net in the KPI block only |
+| `set_product_order` | Owner-controlled shelf order |
+
+Plus, with no RPC of their own: `product_saves` (wishlist), `product_reviews`/`product_ratings`,
+`product_copurchases` ("also bought"), `product_trending_views`, the rebuilt `product_cards` view
+(`rating_avg`, `rating_count`, `trending_views`, `discount_pct`), `product_photos` galleries, the
+taxonomy (`product_categories`, `product_brands`), the seven new `products` columns
+(`compare_at_nu`, `hair_types`, `concerns`, `volume`, `ingredients`, `how_to_use`, `tags`), and the
+customer checkout itself — `place_order`'s six new arguments, of which this repo passes none.
+
+**Three things to carry into that work rather than rediscover:**
+
+- **`checkout_totals.dart` is a pure mirror, and the server is the authority.** The totals formula
+  is normative in one place; if a client and the SQL disagree, the client is wrong. A TypeScript
+  mirror belongs in `lib/` with the same tests pinning it.
+- **Browse must stay a view read, never an RPC.** `product_cards` is what keeps guest and `anon`
+  browsing working.
+- **This repo's `fetchProducts` is now the last unbounded catalogue read on any platform.**
+  `ec8b8ce` deleted `Api.products` upstream in favour of paginated `browseProducts`. Harmless at 4
+  products; it is the thing to replace first, not last.
+
+### 5.2 Service packs — B1 and B2 (9 RPCs)
+
+`openspec/changes/service-packs-backend-and-owner` and `…-customer-redemption`. Migrations
+`20260816000001` → `20260817000002`. Pro-only, and `Feature.servicePacks` is already wired here
+(§1 · F3) so the gate and the paywall copy exist — what does not exist is any surface behind them.
+
+`create_service_pack`, `update_service_pack`, `archive_service_pack`, `request_pack_purchase`,
+`confirm_pack_purchase`, `cancel_pack_purchase`, `adjust_pack_credits`, `my_packs`,
+`business_pack_purchases` — plus `create_booking`'s eleventh argument, `p_pack_purchase_id`, which
+spends a credit inside the booking's own transaction.
+
+**Four decisions the spec already made, all of which a port must honour:**
+
+- **Credits are derived, never counted.** `credits_total − count(pack_redemptions in
+  ('reserved','consumed'))`. A `credits_left` column drifts the first time a transaction
+  half-fails.
+- **Snapshots.** Name, price, credit count and the eligible-service set are copied onto the
+  purchase at confirm time, so editing a pack cannot rewrite what somebody already bought.
+- **Expiry is enforced at redemption**, not by a sweeper — correctness never depends on a job
+  having run.
+- **Money never moves in-app**, and the customer-facing sheet carries one sentence verbatim:
+  *"Packs are paid for and honoured at the salon. Tho doesn't hold your money or issue refunds."*
+
+**And one bug upstream has that a port must not copy.** `Api.requestRedemption`'s
+`clientToken ?? _uuid.v4()` pattern — a fresh token per attempt — is exactly what
+`request_pack_purchase`'s `client_token` idempotency exists to defeat. One token per request, held
+across retries, as `/cart` already does for `place_order`.
+
+### 5.3 Smaller, and each independent
+
+- **Web Push.** Still deferred by decision, but **the old reason is no longer the reason**:
+  `FCM_SERVICE_ACCOUNT` is set and delivery works for iOS and Android. A browser needs a Firebase
+  web config and a service worker, which exist nowhere. If it lands, register through
+  `register_device` — never a direct `devices` insert.
+- **The delivery *settings* editor.** F6 gave the console the delivery lifecycle; an owner still
+  cannot turn delivery on, set a fee, a radius or a free-over threshold from here. The columns are
+  in the owner-updatable grant. `delivery_enabled` is false on all 17 salons, which is also why no
+  customer-facing delivery copy was added — see the note in `/help`.
+- **`Order.fulfilment` is read but never written.** Nothing here can *place* a delivery order,
+  because that is `place_order`'s new arguments — i.e. 5.1.
 
 **`global-error.tsx` is unexercised.** It follows the documented shape and typechecks, but
 reaching it means throwing from the root layout and that was not attempted. Know before relying
@@ -416,12 +570,37 @@ Two more, found by the closing sweep and both narrower than they look:
 
 ---
 
-## 6. Live data, as of 2026-08-11
+## 6. Live data, as of 2026-08-18
 
 Verification depends on these, and several changed under this project.
 
-- **17 businesses, 14 approved.** Plans across all 17: **basic 13 / growth 3 / pro 1**;
-  across the approved 14: basic 10 / growth 3 / pro 1.
+**Re-count before trusting any figure here, and treat the counts as moving.** Two numbers below
+changed *during* the 2026-08-18 pass — `devices` went 15 → 17 and `sent` 6 → 7 in about an hour —
+because the app is now installed on real handsets and in use. That is new: for most of this
+project's life the database only moved when this project moved it.
+
+### The 2026-08-18 changes, which matter more than the totals
+
+- **Push delivers.** **17 registered devices** (14 android / 3 ios) and **7 `notifications` rows
+  `sent` over the `push` channel**, across `booking_created`, `booking_cancelled`,
+  `booking_rescheduled`, `booking_reminder` and **`queue_your_turn`**. Every claim in this repo that
+  push has never delivered is obsolete; two of them were still in the marketing copy and are §1 · F4.
+- **Only 10 of the 14 approved salons are actually visible.** The four `Test`-named rows are now
+  **soft-deleted** (`deleted_at` set, `is_active` false), one of them by `25aa9dcd` upstream
+  specifically so a store reviewer could not tap into an empty salon. The public index filters on
+  all three columns, so this changed nothing on the site — but a count of "approved" is no longer a
+  count of what a visitor sees, and `PLACEHOLDER_NAME` in `lib/marketing/salons.ts` is now a belt
+  to that braces rather than the only guard.
+- **`offers` has its first row.** It was 0 platform-wide through every previous audit, which is why
+  the offers surfaces were tests-only. There is a live example now.
+- **`product_photos` has 4 rows** — a table this repo does not read at all (§5.1).
+- **`loyalty_redemptions` is back to 0**, so `/rewards/[id]` is tests-only again. It had one during
+  2f's verification and that row was removed with the rest of the run's state.
+
+### Totals
+
+- **17 businesses, 14 approved, 10 approved *and* active *and* not deleted.** Plans across all 17:
+  **basic 13 / growth 3 / pro 1**.
 - **Norzin Salon & Spa is on `pro`.** It was `growth` for most of this project's life. That
   single row is the only live example on the far side of every Pro gate — `payroll_report`,
   `tax_estimate`, `set_staff_pay`, the hairstyle picker — all of which previously raised
@@ -432,18 +611,21 @@ Verification depends on these, and several changed under this project.
   a refund on Norzin's no-show booking, proved the owner ledger and the customer receipt agree
   (both read Nu 950 outstanding), and removed both. The writer is live; the table is empty. Do not
   assume a live example exists.
-- **All 93 `notifications` rows carry server-composed `title` and `body`**, branching on audience.
-  `lib/notification-copy.ts` is a fallback, not the source.
+- **All 111 `notifications` rows carry server-composed `title` and `body`**, branching on audience.
+  `lib/notification-copy.ts` is a fallback, not the source — and a fallback with a hole in it is
+  still a defect, which is what §1 · F10 was.
 - **`review_photos` has 1 row** (created 2026-08-05, by another client — the database has other
   people on it). The review photo strip is no longer without a live case.
-- Still zero: `offers`, `staff_time_off`, `loyalty_redemptions`, `content_reports`,
-  `user_blocks`, `staff_invites`. The whole Batch 1 moderation surface has **no live rows**, so
-  its empty states are the normal path and its populated states were proved by writing and
-  restoring.
-- 29 profiles, 34 services, 21 active stylists, 22 reviews, 84 bookings, 11 queue entries (all
-  terminal: done 9 / left 1 / no_show 1), 92 notifications, 16 `business_categories`, 74
-  `business_hours`, 108 `staff_working_hours`, 2 `staff_photos`, 3 `follows`.
-- `customer@bhutansalons.test`: **39 notifications, 7 unread, 3 conversations**, and four
+- Still zero: `staff_time_off`, `loyalty_redemptions`, `content_reports`, `user_blocks`,
+  `staff_invites`, `payments`, and every one of the shop rework's new tables — `promo_codes`,
+  `product_saves`, `product_reviews`, `service_packs`, `pack_purchases`. The whole Batch 1
+  moderation surface has **no live rows**, so its empty states are the normal path and its
+  populated states were proved by writing and restoring. (`offers` left this list on 2026-08-18.)
+- 41 profiles, 34 services, 21 active stylists, 22 reviews, 86 bookings, 19 queue entries, 7
+  orders, 4 products, 111 notifications, 8 `product_categories`, **0 `product_brands`** — which is
+  the empty brand facet upstream's runbook names as the reason the store listing says nothing about
+  the Shop.
+- `customer@bhutansalons.test`: **52 notifications, 5 unread, 3 conversations**, and four
   active bookings — three at Basic salons and one at Norzin. That split is what makes the
   reminder-toggle gate falsifiable on one page.
 - **Not one day in `staff_working_hours` holds more than a single segment**, so the touching-pair
@@ -502,6 +684,36 @@ rather than drift.
     member. Deliberately **not** matched: a stylist reading a salon's payment records and moving
     a customer's points balance is broader access than the role needs. A divergence, recorded
     here rather than a gap.
+
+### To the 2026-08-11 audit, corrected 2026-08-18
+
+Five of these were **statements that were true when written**, which is why they are the most
+useful entries in this list: they are the failure mode that has no author to blame.
+
+19. **"Every client-facing RPC in the schema is now called."** The headline of the whole document.
+    It survived seven days and 29 migrations; the figures on 2026-08-18 are 73 / 51 / **18**.
+20. **"Nothing promises a notification" / "every `queue_your_turn` row in the outbox is `failed`
+    with no deliverable channel" / "`devices` has no rows."** All three were measured true and are
+    now measured false: 17 devices, 7 push sends, one of them a `queue_your_turn`. The marketing
+    site had built two customer-facing claims on top of them (§1 · F4).
+21. **"Web Push needs an `FCM_SERVICE_ACCOUNT` that exists for no platform."** The secret is set
+    and mobile delivery works. **Web Push is still correctly deferred, for a different reason** —
+    no Firebase web config, no service worker. A right conclusion resting on a wrong fact is worth
+    correcting even when the conclusion holds, because the next person re-derives from the fact.
+22. **"`payments` and `offers` are still 0 rows."** `offers` has a row now, so the offers surfaces
+    have their first live example.
+23. **"`set_order_status` allows `new → ready`, `ready → collected`, and `declined` from either" /
+    "Orders are forward-only, so there is no Undo."** The first is half a lifecycle short since
+    `20260814000006`. The second is still true, and is *more* true: `out_for_delivery → delivered`
+    is one-directional too. Both were repeated in `AGENTS.md` and are corrected there.
+24. **`lib/plans.ts` and `lib/entitlements.ts` were four days behind the app's own gate**, in the
+    one direction that matters — selling a feature that does not exist. Nothing caught it because
+    no test asserted the *contents* of the tier sets. `lib/entitlements.test.ts` now does, in both
+    directions.
+25. **"71 route entries, 639 tests across 30 files"** → **79 route entries, 776 tests across 37
+    files** (`npm run build | sed -n '/^Route (app)/,/(Dynamic)/p'`, and `npm run test`). Counted,
+    not estimated: a loose grep over that build output has produced three different numbers for one
+    build before.
 
 ## 8. Known blocker, unrelated to this work
 

@@ -214,10 +214,12 @@ export async function countNewOrders(
 /**
  * Move an order along.
  *
- * The RPC owns the state machine (`new → ready → collected`, and `declined` from either of
- * the first two) and enqueues the customer's notification as a side effect, which is the
- * reason it cannot be a plain UPDATE even if the grant existed. `canOwnerTransition` in
- * `lib/analytics.ts` mirrors those rules so the UI offers only the moves that will succeed.
+ * The RPC owns the state machine — `new → ready`, then `→ collected` for a pickup order or
+ * `→ out_for_delivery → delivered` for a delivery one, with `declined` available from `new` and
+ * `ready` — and enqueues the customer's notification as a side effect, which is the reason it
+ * cannot be a plain UPDATE even if the grant existed. `canOwnerTransition` in `lib/analytics.ts`
+ * mirrors those rules, **including the fulfilment gate**, so the UI offers only the moves that
+ * will succeed: the server refuses `ready → collected` on a delivery order outright.
  *
  * **A decline needs a reason** — the RPC raises without one, and the customer's
  * `order_declined` notification carries it.

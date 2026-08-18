@@ -72,6 +72,12 @@ export type OwnerAction =
   | "saveClientNote"
   | "orderReady"
   | "orderCollected"
+  // The delivery half of the lifecycle (`20260814000006`). Separate keys rather than one
+  // "orderMove", because a fallback sentence has to name the thing that failed — "couldn't
+  // mark it collected" on a delivery order would be a second wrong statement on top of a
+  // failed write.
+  | "orderOutForDelivery"
+  | "orderDelivered"
   | "orderDecline"
   | "saveProduct"
   | "toggleProductStock"
@@ -120,6 +126,8 @@ const FALLBACK: Record<OwnerAction, string> = {
   saveClientNote: "Couldn't save that note.",
   orderReady: "Couldn't mark it ready.",
   orderCollected: "Couldn't mark it collected.",
+  orderOutForDelivery: "Couldn't send it out for delivery.",
+  orderDelivered: "Couldn't mark it delivered.",
   orderDecline: "Couldn't decline that order.",
   saveProduct: "Couldn't save. Please try again.",
   toggleProductStock: "Couldn't update availability.",
@@ -270,8 +278,14 @@ export function ownerErrorMessage(action: OwnerAction, error: unknown): string {
         return messageOf(error, fallback);
       case "orderReady":
       case "orderCollected":
+      case "orderOutForDelivery":
+      case "orderDelivered":
         // 'illegal order status transition' — somebody at another till moved it first. Same
         // shape as the queue's race, and the same answer: say so and reload.
+        //
+        // The two delivery moves join this case rather than getting `messageOf`: the server's
+        // sentence for a wrong-lifecycle move is the same 'illegal order status transition',
+        // which tells an owner nothing they can act on. This one at least says what to do.
         return "That order was already dealt with. Refreshing.";
       case "orderDecline":
         // 'a reason is required to decline an order' — the sheet requires one, so this is the

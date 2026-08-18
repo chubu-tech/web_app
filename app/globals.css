@@ -362,6 +362,85 @@
         resolve instantly and correctly either way — but an opening frame at
         opacity 0 behind a stagger delay is exactly the shape that made the nav
         render blank once, and not relying on it twice is cheap. */
+  /* --- The guide player -------------------------------------------------
+     Five fixed-duration animations for the walkthrough. The sixth — the frame's own
+     entrance and drift — is a plain keyframe at the foot of this file instead, because
+     its duration is the *step's* duration and has to be composed in an inline style.
+
+     All five end on the visible state (`opacity: 1`, `transform: none`), which is what
+     makes them safe under the reduced-motion block at the foot of this file: clamped to
+     0.01ms they simply arrive, with nothing to flash. That is the opposite of the
+     progress fill, whose end state is "finished" — see `guide-progress`. */
+
+  /* The dialog arriving. Small and quick: a modal that makes an entrance is a modal you
+     wait for. */
+  --animate-guide-panel: guide-panel-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-guide-scrim: guide-scrim-in 240ms linear both;
+
+  /* The highlight, landing *after* the frame has settled — the delay is the whole point.
+     A ring that appears with the screenshot is part of the picture; one that arrives a
+     beat later is somebody pointing at it. easeOutBack gives it the small overshoot that
+     reads as a point rather than a fade. */
+  --animate-guide-ring: guide-ring-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) 340ms both;
+  --animate-guide-label: guide-label-in 360ms cubic-bezier(0.16, 1, 0.3, 1) 520ms both;
+
+  /* The explanation. Staggered per line by an inline `--i`, the same pattern `NavRow`
+     uses — the delay is set at the call site because the shorthand here resets it. */
+  --animate-guide-copy: guide-copy-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes guide-panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes guide-scrim-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes guide-ring-in {
+    from {
+      opacity: 0;
+      transform: scale(1.14);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes guide-label-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes guide-copy-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
   --animate-card-in: card-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
 
   @keyframes card-in {
@@ -401,7 +480,11 @@
   --header-height: 76px;
 
   /* Clearance for a fixed CTA footer: p-base twice + min-h-12 + a note line.
-     A floor rather than a measurement, the same trade the map page states. */
+     A floor rather than a measurement, the same trade the map page states — and a floor is only
+     as good as the worst case it was derived from. The booking flow outgrew this one when its
+     bar started carrying a block warning and the cancellation term together, so that page pads
+     by `--booking-cta-clearance`, which `booking-summary.tsx` measures off the real bar and
+     which falls back to this. Prefer that shape for any bar whose contents can grow. */
   --cta-clearance: 96px;
 }
 
@@ -612,6 +695,58 @@ body:has([data-shell]) {
   100% {
     opacity: 0;
     transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--spin)) scale(0.4);
+  }
+}
+
+/* The guide frame's entrance and its drift, in one keyframe.
+
+   Two animations on one element would not work — both animate `transform`, so the second
+   would win outright — and they are one gesture anyway: the frame arrives a touch large,
+   settles in the first eighth of the step, then drifts almost imperceptibly for the rest of
+   it. That drift is what makes a still screenshot read as footage.
+
+   **It goes on the wrapper that holds the frame AND its highlight**, never on the image
+   alone. The hotspot is positioned in percentages of the box, so scaling the picture out
+   from under it would walk the ring off the thing it is pointing at.
+
+   Composed in an inline style rather than declared as an `--animate-*` token because the
+   duration is whatever this step holds for. `GuidePlayer` also declines to apply it at all
+   under reduced motion: clamped to 0.01ms this would land as a static 2.5% zoom, which is
+   not a smaller version of the effect, just a crop nobody asked for. */
+@keyframes guide-frame-in {
+  0% {
+    transform: scale(1.045);
+  }
+  12% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.025);
+  }
+}
+
+/* The guide player's progress fill — one segment of the rail, filling over however long
+   that frame holds.
+
+   Declared here rather than in `@theme` on purpose, and it is the `confetti-fly` case: the
+   duration is per-step, so the animation is composed in an inline style
+   (`guide-progress 11s linear both`) rather than by a utility class. A theme token whose
+   only reference is an inline string is a token the pruner cannot see, and `@theme` output
+   is usage-pruned.
+
+   `scaleX` rather than `width`: it composites, so a sixteen-segment rail costs nothing per
+   frame. `transform-origin` comes from `origin-left` at the call site.
+
+   Reduced motion does NOT get a clamped version of this — `ProgressRail` renders a static
+   tint instead. The app-wide rule at the foot of this file would take the duration to
+   0.01ms, which is a bar that reads "finished" for the whole nine seconds the frame is
+   still on screen. */
+@keyframes guide-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
   }
 }
 

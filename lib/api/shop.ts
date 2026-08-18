@@ -46,14 +46,20 @@ const PRODUCT_SELECT = "*, businesses(name)";
 /**
  * Every buyable product across every salon, newest first.
  *
- * **No search parameter, unlike `Api.products`.** The app sends the term as a server-side `ilike`;
- * here the whole catalogue is loaded once and the name match happens in the browser, alongside the
- * price range and the sort — because Discover already filters *salons* that way, and one search box
- * serving two segments has to behave the same in both. It also costs no round trip per keystroke.
+ * **No search parameter, and no pagination.** The whole catalogue is loaded once and the name match
+ * happens in the browser, alongside the price range and the sort — because Discover already filters
+ * *salons* that way, and one search box serving two segments has to behave the same in both. It also
+ * costs no round trip per keystroke.
  *
- * That trade holds while the catalogue is small: 4 products live, and every salon on growth or pro
- * would have to list hundreds before a server-side term earned its debounce. When that day comes the
- * `ilike` goes here and `lib/product-filter.ts`'s pipeline note changes with it.
+ * **This is now the last unbounded catalogue read on any platform, and the comparison it used to
+ * draw is gone.** It said "unlike `Api.products`", which sent the term as a server-side `ilike`;
+ * `ec8b8ce` **deleted** `Api.products` in favour of `browseProducts`, a paginated, sorted,
+ * searched read over the `product_cards` view with `.range()`. Do not go looking for the method
+ * this used to compare itself to.
+ *
+ * The trade still holds while the catalogue is small — 4 products live — but it is no longer a
+ * considered divergence, just the older design. When the shop is ported (`PARITY.md` §5.1) this is
+ * the first read to replace, and `lib/product-filter.ts`'s pipeline note changes with it.
  */
 export async function fetchProducts(supabase: SupabaseClient): Promise<Product[]> {
   const { data, error } = await supabase
@@ -85,9 +91,21 @@ const ORDER_SELECT = "*, order_items(*), businesses(name)";
  * repeat. A fresh token on the second press would miss that lookup and place a second order — which
  * is why the caller owns it and only `clearCart()` mints the next one.
  *
- * **The returned `total_nu` is authoritative.** The RPC computes it by joining `p_items` against
- * `products.price_nu`; the cart's subtotal never reaches the server. So the confirmation shows the
- * order's own figure, not the cart's.
+ * **The returned `total_nu` is authoritative.** The RPC computes it server-side; the cart's subtotal
+ * never reaches it. So the confirmation shows the order's own figure, not the cart's.
+ *
+ * That figure is **no longer the sum of the lines**, and this doc comment used to say it was.
+ * `20260814000005_place_order_checkout.sql` made it `subtotal − discount + delivery fee`, so an
+ * order carrying a promo code or a delivery fee has a total that no addition of `products.price_nu`
+ * reproduces. Nothing here breaks — this call places a pickup order at list price and gets a total
+ * equal to the subtotal — but the arithmetic is the server's, not ours, and `OrderLines` is what
+ * shows the breakdown when there is one.
+ *
+ * **Six of the RPC's ten arguments are not sent**, and that is the shape of the gap rather than a
+ * bug: `p_fulfilment` (so every order this app places is `pickup`), `p_promo_code`,
+ * `p_loyalty_redemption` and the three `p_delivery_*`. The 4-argument version was **dropped** when
+ * the 10-argument one was created, so this call resolves only because all six have defaults — had
+ * one not, every order on this platform would have failed at once. See `PARITY.md` §5.1.
  *
  * Raises `P0010` for a guest (`private.is_real_user()`), `P0001` when the salon is not on
  * growth/pro, and `P0002` when anything in the payload is no longer buyable.

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { GuideLauncher } from "@/components/guide/guide-launcher";
 import { OwnerHeader } from "@/components/owner/owner-nav";
 import { SalonSwitcher } from "@/components/owner/salon-switcher";
 import { IdleTimeout } from "@/components/ui/idle-timeout";
@@ -105,6 +106,19 @@ export default async function OwnerLayout({
         carries the full reasoning, including why `../tho` has no equivalent.
       */}
       <IdleTimeout />
+
+      {/*
+        The floating "How it works" button, carrying the **owner** walkthrough — sixteen
+        frames of this console rather than the customer app. Same component as the customer
+        shell, a different guide, which is the whole reason it takes an audience: an owner
+        who opens a guide about booking a haircut has been shown the wrong product.
+
+        It lifts itself clear of `/business/walk-in`'s sticky footer and a chat composer on
+        `/business/messages/<id>` — see `lib/guide/placement.ts`. `IdleTimeout`'s warning is
+        z-50 and this is z-30, so on the rare occasion both are up the warning wins, which is
+        the right order.
+      */}
+      <GuideLauncher audience="owner" />
     </div>
   );
 }

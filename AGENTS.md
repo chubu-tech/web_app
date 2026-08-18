@@ -10,10 +10,24 @@ The Bhutan Salons product in a browser: customers book chairs and join walk-in
 queues, owners run their salon, staff see their day. Next.js 16 (App Router),
 React 19, Tailwind 4, TypeScript.
 
-**Status: all three roles complete, and current with `../tho` as of 2026-08-11.** Every
-client-facing RPC in the schema now has a caller here — the five the app calls and this does not
-are three `admin_*`, the retired `link_staff_member` and the deferred `register_device`. The
-customer role works end to end — browse, sign in, book, reschedule, cancel, review, take a place in
+**Status: all three roles complete. Current with `../tho` as of 2026-08-11, plus a correctness
+pass on 2026-08-18 — and two feature areas behind.**
+
+That is a change of shape from what this line used to claim, and it is worth reading before
+anything below. Until 2026-08-11 every client-facing RPC in the schema had a caller here. It no
+longer does: the app shipped **the shop rework (slices 1–4)** and **service packs** between
+2026-08-10 and 2026-08-17, and **18 RPCs have no caller in this repo.** `PARITY.md` §5 is the work
+list, with the decisions each area already made; §1 · Batch F is what the 2026-08-18 pass *did*
+close, which was every place this repo was stating or doing something the app had stopped stating
+or doing — a plan feature that does not exist, two denials of push notifications that now deliver,
+three undisclosed collections in the privacy policy, and a delivery order that was invisible in
+the owner's console.
+
+**So: trust this document on how things work, and `PARITY.md` on what exists.** Several paragraphs
+below were measured true when written and have been corrected since; each carries its own note
+where that happened.
+
+The customer role works end to end — browse, sign in, book, reschedule, cancel, review, take a place in
 a walk-in line, read notifications, message a salon, find a shop on the map, read a stylist's
 profile, edit your own, and now **buy things**: a cross-salon products browse, a salon's Shop tab, a
 cart that survives a closed tab and re-prices itself against the shelf, a cash-on-collection order
@@ -553,22 +567,36 @@ Renaming it breaks every QR already on a counter.
   then the salon had to run its line in the Flutter app while the customer held their place
   here, which is the hole 3a closed.
 
-**Nothing promises a notification.** The app's card says "we'll notify you"; every
-`queue_your_turn` row in the outbox is `failed` with "no deliverable channel", and
-`devices` has no rows, so that promise is kept by nothing on any platform. The web card
-says the page updates itself instead — and 2d's inbox is now where those events actually
-reach someone.
+**The app notifies; the browser does not. This paragraph said "nothing promises a
+notification" and that stopped being true on 2026-08-06.**
 
-Web Push stays deferred **by decision** — the in-app inbox is the channel this app offers —
-and that decision is now the only thing keeping it out, because the mechanism upstream is
-done: the app carries `firebase_messaging`, registers tokens through `register_device`, and
-`pushPlatformFor` already returns `'web'` for a browser, which `devices.platform` accepts. So
-a web token would be accepted with **no change in `../tho`**; delivery needs a Firebase web
-config and an `FCM_SERVICE_ACCOUNT` secret that exist for **no** platform yet. If it lands,
-register through the **`register_device` RPC**, never a direct `devices` insert — it deletes
-another profile's claim on the same token, which the client cannot do and which is what stops
-a resold handset receiving the previous owner's appointments. The strings to change are in
-`QueuePositionCard` and the join form's projection note.
+The old claim was measured and correct when written: every `queue_your_turn` row in the outbox
+was `failed` with "no deliverable channel" and `devices` had no rows, so the app's "we'll notify
+you" was kept by nothing. **Measured again 2026-08-18: `devices` holds 17 tokens (14 android, 3
+ios) and `notifications` has 7 rows `sent` over the `push` channel — one of them a
+`queue_your_turn`.** `20260730000005_queue_status.sql` enqueues that event when the salon calls
+the next customer, and the outbox now delivers it.
+
+What follows for this repo:
+
+- **The web card's copy is still right, and for its original reason.** A browser gets nothing
+  pushed, so "the page updates itself" is what this platform can promise. It is now a
+  *difference between clients* rather than a correction of a false claim — and the marketing
+  FAQ, which had built a flat denial on the old fact, now names which client does which.
+- **Do not write copy that says THO never notifies.** Two strings on the marketing site did, and
+  both had to be rewritten on 2026-08-18. `PARITY.md` §7 has the entry.
+
+Web Push stays deferred **by decision** — the in-app inbox is the channel this app offers — and
+the mechanism upstream is done: the app carries `firebase_messaging`, registers tokens through
+`register_device`, and `pushPlatformFor` already returns `'web'` for a browser, which
+`devices.platform` accepts. So a web token would be accepted with **no change in `../tho`**, and
+`FCM_SERVICE_ACCOUNT` **is set now** — this paragraph used to name that secret as missing, which
+was the load-bearing half of the excuse. What a browser still lacks is a Firebase *web* config and
+a service worker, neither of which exists in any repo. If it lands, register through the
+**`register_device` RPC**, never a direct `devices` insert — it deletes another profile's claim on
+the same token, which the client cannot do and which is what stops a resold handset receiving the
+previous owner's appointments. The strings to change are in `QueuePositionCard` and the join form's
+projection note.
 
 ### Reminders are real now, and the toggle is ported
 
@@ -711,6 +739,25 @@ and points at the price list; the **request** lives on `/business/plans`, where 
 by side (see `components/owner/plan-cards.tsx` for the 3.1.1 story and the three things the
 request has to get right).
 
+**Those two files are a published claim, so re-check them against `entitlements.dart` when the app
+moves.** They went four days out of step in August 2026 in the worst direction: `Feature.priorityPlacement`
+was deleted upstream as a claim with no implementation behind it (audit A3-04 — nothing ever called
+`has()` on it, and there is no plan term in the recommender), and **this repo went on selling
+"Priority placement"** in the console's paywall *and* on `/for-salons`, which renders `PLAN_TIERS`
+bullets on an indexable page. A build, a lint and 639 green tests did not notice, because nothing
+asserted what the tier sets *contain*. `lib/entitlements.test.ts` now does, in both directions —
+including that no feature exists here which the app does not have.
+
+Two consequences worth keeping:
+
+- **A feature list is not documentation, it is a price.** Payment is off-app and an operator flips
+  `businesses.plan`, so there is no refund path; a wrong bullet is a wrong charge.
+- **`lib/plans.ts` deliberately diverges from `plans_config.dart` in one label.** The app's Pro card
+  still says "Deposits & no-show cover"; no-show cover is not built (`late_fee_amount` defaults to 0
+  and is referenced by no function), so this says "Deposits & payments on a booking". Divergences
+  from upstream copy are normally forbidden — this one is documented at the call site because the
+  alternative is publishing something untrue.
+
 **Not every gate is real, and this paragraph was wrong about which.** It used to say the Insights
 paywall was client-side only, on the measured grounds that `analytics_dashboard` and
 `analytics_peak_heatmap` never read `businesses.plan`. **`20260807000005_analytics_plan_gate`
@@ -725,6 +772,12 @@ So: **five of the six locked surfaces are gated in SQL** — `client_book`, `pay
 publishes any active program regardless of tier — but the feature *is* gated at the point of use,
 because `request_redemption` refuses unless the programme is active **and** the plan is
 growth/pro (`20260729000003_loyalty_rpcs.sql:88`). A customer cannot redeem at a Basic salon.
+
+The upstream batch added four more server-side gates, all following the same pattern and none with
+a surface here yet: `upsert_promo_code` / `expire_promo_code` / `record_order_payment` /
+`product_analytics` re-check growth+, and the seven pack RPCs re-derive `businesses.plan = 'pro'`.
+The rule they all confirm is the one this section exists for: **the client check is never the
+gate**, so a locked surface is safe to *draw* wrong and never safe to *rely* on.
 
 ### `staff_members` had it too — the third instance
 
@@ -903,12 +956,50 @@ could say *"New booking — Pema, Fri 11:30"*, which is **the same mistake this 
 app for** at `notifications_screen.dart` (it renders `payload['message']`, a key the server has
 never written). Say only what the row can support.
 
-### Orders are forward-only, so there is no Undo
+### Orders are forward-only, so there is no Undo — and there are two lifecycles
 
-`set_order_status` allows `new → ready`, `ready → collected`, and `declined` from either. Every
-case is one-directional or terminal, so `canOwnerTransition(target, previous)` is never true for a
-reverse move and an Undo button could only ever fail. A decline **requires a reason**, and the
-customer reads it in their `order_declined` notification.
+Still forward-only, and **more** so than this section used to say. `20260814000006` split the tail
+of the lifecycle in two and gated each half on the order's own `fulfilment`:
+
+```
+pickup:    new → ready → collected
+delivery:  new → ready → out_for_delivery → delivered
+either:    new|ready → declined      (owner, reason required)
+           new       → cancelled     (customer)
+```
+
+Every case is one-directional or terminal, so `canOwnerTransition` is never true for a reverse move
+and an Undo button could only ever fail. A decline **requires a reason**, the customer reads it in
+their `order_declined` notification, and a decline is **refused once the order is out for
+delivery** — the goods have left the shop.
+
+**`fulfilment` is a required argument to `canOwnerTransition`, not an optional hint.** The server
+refuses `ready → collected` on a delivery order and `ready → out_for_delivery` on a pickup one, so a
+signature a caller could forget is a signature that offers a button which always raises. Read it
+through `orderFulfilment(order)`, the one named place that decides.
+
+**And the four checkout columns are `not null`, which this paragraph used to deny.** It said a null
+`fulfilment` meant an order placed before the checkout migration — the sentence was repeated into
+`Order`'s doc comments, into `OrderLines`' `!= null` guard and its `!` assertion, and into
+`toOrder`'s choice of `numOrNull`. It was never true:
+`20260814000003_orders_checkout_columns.sql` adds `subtotal_nu`, `discount_nu` and
+`delivery_fee_nu` as `int not null default 0`, adds `fulfilment` as `text not null default
+'pickup'`, and then backfills `subtotal_nu` from `total_nu` on the grounds that before the slice a
+total *was* a subtotal. Measured on the live database 2026-08-18: `is_nullable = NO` on all four,
+and of 10 orders, 0 hold a null, 0 hold a zero subtotal, 0 have a subtotal differing from the
+total. A pre-checkout row is an exact pickup order with no discount and no fee — which is what it
+always was. **The rule this cost:** a claim about a column is checked against
+`information_schema`, not against the sentence next to it.
+
+**Every `OrderStatus` must be in exactly one `ORDER_SEGMENTS` entry.** The owner's inbox filters
+`.in("status", segment.statuses)`, so a status in no segment is an order in **no list** — which is
+exactly what happened to the two new values for four days: live rows, invisible in the console,
+nothing on screen to suggest they existed. `orderSegmentCoverage()` and its test are the guard.
+
+**And the total is not the sum of the lines.** `place_order` computes `subtotal − discount +
+delivery fee`, where the discount is a promo code, points spent at checkout, or both. `OrderLines`
+renders the breakdown when there is one to render; `discount_nu` is a **positive magnitude**, so the
+minus sign belongs to the display — the same rule, and the same trap, as `payments`.
 
 Restoring an order during verification needs direct SQL: nothing in the schema can move a status
 backwards.
@@ -1008,9 +1099,23 @@ showing why one is worth having is the one thing this app deliberately protects 
 ### `in_stock` is a boolean, so there is no "2 left"
 
 And there is no payment: cash on collection is the whole model, `payments` is Pro-gated with 0 rows,
-and nothing in the shop takes a card. Neither `reviews` nor `favourites` has a product column, so
-products have neither. `Api.products` loads everything and there are 4 live, so there is no
-pagination — a limit with no live case would be untested code.
+and nothing in the shop takes a card — including delivery, where the cash changes hands at the door.
+
+**The rest of this paragraph described a shop the app no longer has, so read it as history.** Every
+sentence below was true on 2026-08-11 and was rewritten upstream by the four shop slices; none of
+that has been ported, and `PARITY.md` §5.1 is the list.
+
+- *"Neither `reviews` nor `favourites` has a product column, so products have neither."* Both exist
+  now, in their own tables: `product_reviews` (verified purchase only, writable **solely** through
+  `submit_product_review`) and `product_saves` (the wishlist).
+- *"`Api.products` loads everything and there are 4 live, so there is no pagination."*
+  `Api.products` was **deleted** upstream (`ec8b8ce`) in favour of paginated `browseProducts` over
+  the `product_cards` view. `fetchProducts` here is now the last unbounded catalogue read on any
+  platform. Still harmless at 4 products; it is the first thing to replace when the shop is ported,
+  not the last.
+- Products also gained a taxonomy (`product_categories`, `product_brands`), galleries
+  (`product_photos`), markdowns (`compare_at_nu`), and six description columns. This repo reads
+  none of them.
 
 ### Orders and rewards are one flat list each
 
@@ -1383,12 +1488,25 @@ that the console must not *appear* to have switched.
 
 ## Live data is messier than it looks
 
-**Counted 2026-08-11.** The database is shared and
+**Counted 2026-08-11, spot-checked 2026-08-18.** The database is shared and
 has other people on it, so re-count rather than trusting a figure here that a decision depends
-on. Check assumptions against it before trusting a column:
+on. Check assumptions against it before trusting a column.
 
-- **17 businesses, 14 approved.** Plans across all 17: **basic 13 · growth 3 · pro 1**; across
-  the approved 14: basic 10 · growth 3 · pro 1. Earlier notes said 13 salons and no Pro.
+**Two figures below moved during a single hour on 2026-08-18** — `devices` 15 → 17, push sends
+6 → 7 — because the app is now on real handsets and in use. For most of this repo's life the
+database only changed when this repo changed it; that is over. `PARITY.md` §6 carries the
+2026-08-18 counts.
+
+- **17 businesses, 14 approved — but only 10 approved *and* active *and* not soft-deleted.** Plans
+  across all 17: **basic 13 · growth 3 · pro 1**. The four `Test`-named rows are now `deleted_at`
+  and inactive (one of them by `25aa9dcd` upstream, so a store reviewer could not tap into an empty
+  salon), so a count of "approved" is no longer a count of what a visitor sees. Every public read
+  here already filters all three columns.
+- **Push notifications deliver.** 17 registered devices (14 android · 3 ios) and 7 `notifications`
+  rows `sent` over the `push` channel, including a `queue_your_turn`. Several paragraphs in this
+  file said push had never delivered a single message; each is corrected in place.
+- **`offers` has its first row**, after being 0 platform-wide through every previous audit. The
+  offers surfaces are no longer tests-only.
 - **Every `notifications` row carries server-composed `title` and `body`** — 93 of 93, and the SQL
   branches on audience, so the same `booking_created` reads *"Booking confirmed / Your appointment
   is set for Fri 7 Aug, 09:00"* for the customer and *"New booking / A customer booked Fri 7 Aug,
@@ -1403,11 +1521,12 @@ on. Check assumptions against it before trusting a column:
   ("Norzin Lam, Thimphu" filed under Paro). `addressText` is the field owners
   actually maintain; the mapper deliberately omits `city`.
 - 24 of 34 services have no `gender`; 5 approved salons have no cover; 1 has a gallery;
-  0 have offers; 0 are `home_based`/`mobile`, so the coverage-line branch has no
-  live example and is covered by unit tests instead.
-- Two rows named `Test 01`/`Test 2` are live and approved, so they appear in the
-  catalogue. That's a data cleanup in the admin console, not something to filter out
-  here.
+  **1 has an offer** (0 until 2026-08-18); 0 are `home_based`/`mobile`, so the coverage-line
+  branch has no live example and is covered by unit tests instead.
+- ~~Two rows named `Test 01`/`Test 2` are live and approved.~~ **All four `Test` rows are
+  soft-deleted as of 2026-08-14** and no longer reach any public surface. The cleanup happened in
+  the admin console, as this note asked. `PLACEHOLDER_NAME` in `lib/marketing/salons.ts` stays as
+  the belt to that braces — an operator can approve anything, and the site is public.
 - **Norzin lists 5 services but its stylists perform 3.** `service_staff` is the
   authority on what is bookable, not `services`.
 - **One salon is on Pro** — Norzin — so the Pro-gated hairstyle picker, payroll, the tax
@@ -1423,11 +1542,11 @@ on. Check assumptions against it before trusting a column:
   opened and never written in, which is the live example for "an empty thread is never
   unread". Two of the notifications are `booking_no_show`, the rows the app mislabels. The count
   grows whenever a booking is completed during verification; 92 notifications exist platform-wide.
-- **`payments` and `offers` are still 0 rows; `review_photos` now has 1.** So the receipt's
-  payments block and the offers section have no live example and are covered by unit tests, while
-  the review photo strip has one real row (created 2026-08-05 by another client — see *The
-  database has other people on it* below). Payments rows created during verification were removed
-  with the rest of that run's state; do not assume one is there.
+- **`payments` is still 0 rows; `offers` has 1 as of 2026-08-18; `review_photos` has 1.** So the
+  receipt's payments block still has no live example and rests on unit tests, while the offers
+  section and the review photo strip each have one real row (both created by another client — see
+  *The database has other people on it* below). Payments rows created during verification were
+  removed with the rest of that run's state; do not assume one is there.
 - **Only Norzin has a storefront, and it is unusually well seeded for it.** 4 products, one
   (`Beard Grooming Kit`) **sold out**, prices 280/320/450 so a price-range filter has three
   distinguishable values; 3 orders, one **`new`** (cancellable) and one **`ready`** (not) side by
@@ -1796,6 +1915,56 @@ the page, then wait for `document.body` before reading it; the URL commits befor
 document has parsed.
 
 
+## The in-product guide is made of real screenshots, and that is the whole feature
+
+`components/guide/` is a floating "How it works" button and a player behind it: sixteen
+frames per audience, each a highlight and two sentences. There are two guides —
+`CUSTOMER_GUIDE` and `OWNER_GUIDE` in `lib/guide/steps.ts` — and the shell picks: the
+customer layout mounts one, the console mounts the other, and `(marketing)` picks by route
+because nobody out there has signed in and `/for-salons` is the one public page addressed to
+salons.
+
+**Every frame in `public/guide/**` is a capture of this app running**, taken by
+`scripts/capture-guide-frames.py` against `npm run dev` as the seeded customer and owner. A
+drawn tour starts lying the first time a button moves; this one is re-runnable, so when a
+screen changes the fix is to re-run the script rather than to redraw anything. Its docstring
+carries the five things that make it work — hydration before sign-in, the raw uuid on
+`/salon/<id>/book`, a slot being a `button[aria-pressed]` and not a radio, today usually
+having no free slot, and hiding `nextjs-portal` and the guide's own launcher before each
+shot.
+
+Five things that are decisions rather than styling:
+
+- **The launcher lifts rather than hides.** `lib/guide/placement.ts` is the list of surfaces
+  that pin a control to the bottom edge — the salon page's Book bar, the wizard's total, the
+  reschedule footer, a chat composer either side, the owner's walk-in footer, and `CartBar`
+  whenever it is up — and it clears them by a lane. `/map` is the one route where it is not
+  drawn at all, and that is a licensing constraint, not taste: OpenStreetMap's attribution is
+  bottom-right and the tile policy requires it visible. **Add a fixed footer to a route and
+  this file needs a case**, or the button lands on it; `placement.test.ts` is the list as it
+  stood.
+- **The launcher is paper and hairline, not coral.** A brand-filled pill in the corner of
+  every page competes with the actual call to action on the pages that have one, and a help
+  button must never look more important than *Book · Nu 350*. The coral is in the glyph.
+- **`prefers-reduced-motion` changes three things**, not one: no crossfade, no progress fill,
+  and **autoplay starts paused**. The fill has to go rather than be clamped — the app-wide
+  rule at the foot of `globals.css` would snap it to full and hold it there, i.e. a bar
+  claiming the frame is over while it is still on screen.
+- **Playback is one `setTimeout` per frame and the bar is CSS**, so nothing re-renders
+  between steps and the two cannot drift apart. Three frames are mounted (current, previous,
+  next) so the arrows are instant; the other thirteen are not in the DOM.
+- **`cn` ate this feature's label once.** The hotspot label was `bg-ink text-on-primary
+  text-caption-sm` in one `cn`, and `twMerge` dropped the colour — white text became
+  inherited ink on an ink pill, an unreadable black box, with the class in the source and the
+  build green. Both call sites now put the size on a parent with no colour class, which is
+  remedy 1 in `lib/utils.ts`. **Read that doc comment before passing two `text-*` classes
+  through `cn`.**
+
+The copy has one rule: **it may only claim what the frame shows.** Where something matters
+but sits below the captured fold the body says "further down"; and no `alt` quotes a number
+the database owns, because the shared seed moves under you — an `alt` reading "All 44, two
+unread" was measured true and became false at the next capture without anyone touching it.
+
 ## Verify
 
 ```bash
@@ -1803,12 +1972,21 @@ npm run dev
 npm run build     # also typechecks
 npm run lint
 npm run test      # ported pure logic
+
+python scripts/capture-guide-frames.py   # only when a screen in the guide changes shape
 ```
 
-A clean build, lint and test run is the bar — currently **639 tests across 30 files** and **71
-route entries** in the build tree. Count routes with the tree itself
-(`npm run build | sed -n '/^Route (app)/,/(Dynamic)/p'`) rather than by eye: a loose grep over
-that output has produced 66, 69 and 70 for the same build.
+A clean build, lint and test run is the bar — currently **805 tests across 39 files** and **79
+route entries** in the build tree (2026-08-18). Count routes with the tree itself
+(`npm run build | sed -n '/^Route (app)/,/(Dynamic)/p'` piped to `grep -c "^[├└]"`) rather than by
+eye: a loose grep over that output has produced 66, 69 and 70 for the same build.
+
+**And a green gate cannot catch a claim, either.** The 2026-08-18 pass found this repo selling a
+plan feature the app had deleted and denying push notifications that were being delivered, with the
+build, the lint and every test green throughout — because nothing asserted the *contents* of the
+entitlement sets or checked a copy claim against the database. Two of those are pinned now
+(`lib/entitlements.test.ts`), and the general form is not testable: **when the app moves, re-read
+what this site says about it.**
 
 **A green gate cannot catch a broken route, so sweep them.** Adding `"use client"` to a module
 makes its non-component exports arrive at a server component as client *references*, so the page

@@ -173,6 +173,82 @@ export function cancellationWindow({
   return { freeUntil, closed: now.getTime() > freeUntil.getTime() };
 }
 
+/**
+ * The salon's cancellation rule, as one sentence, **before** the customer commits.
+ *
+ * A port of `cancellationNotice` in `../tho/app/lib/customer/booking_guards.dart:234`, which
+ * upstream added on 2026-08-12 to close audit finding **A1-08**: the window was shown on no screen
+ * in the booking flow — it first appeared on the confirmation sheet, i.e. after the booking
+ * existed. That was survivable while the column was decorative. It stopped being survivable when
+ * A1-02 gave the window teeth, because an unshown term became an **enforced** one:
+ * `cancel_booking` and `reschedule_booking` both raise P0015 past the cutoff.
+ *
+ * Three things this deliberately gets right, all pinned by tests:
+ *
+ * - **Zero hours is "any time before your appointment"**, which is the migration's own reading of
+ *   a zero window, and not "0 hours before" — a sentence that says nothing while looking like a
+ *   rule.
+ * - **Whole days are said in days.** 24 and 48 are the two values an owner actually picks, and
+ *   "up to 2 days before" is what they would say out loud.
+ * - **It quotes the same number the refusal does.** `cancellationWindow` computes the cutoff from
+ *   the same column, so the notice shown beforehand and the P0015 message shown afterwards cannot
+ *   disagree — the upstream test exists for exactly that, since disagreeing about it is how a
+ *   customer ends up feeling misled rather than informed.
+ *
+ * It takes a plain `number` rather than the nullable column: `businesses.cancellation_window_hours`
+ * is `not null` with a default, and `toBusiness` falls back to 12, so a caller inside the booking
+ * flow always has a figure. The null case belongs to `cancellationWindow`, where it means "the
+ * salon did not load" and has to fail open.
+ *
+ * **Every surface that quotes the window goes through here or through `changeWindowNotice`.** The
+ * three cases above are only fixed where the helper is actually called: while this shipped, the
+ * confirmation sheet and the reschedule page still interpolated the raw column, so the same salon
+ * said "up to 1 day before" in the wizard and "up to 24 hours before" on the sheet a minute later,
+ * and a one-hour window read "up to 1 hours before" on both.
+ */
+export function cancellationNotice(hours: number): string {
+  const phrase = windowPhrase(hours);
+  return phrase
+    ? `Free cancellation up to ${phrase} before.`
+    : "Free cancellation any time before your appointment.";
+}
+
+/**
+ * The same window, in the sentence a **closed** one needs.
+ *
+ * `/bookings/[id]/reschedule` states the rule after refusing to offer times, where "free
+ * cancellation" would be the wrong half of it — the customer is trying to *move* the booking, and
+ * what they need is the salon's cutoff for changes and the fact that a phone call still works. So
+ * it is a different sentence built on the same phrase, rather than the same sentence reused: the
+ * only thing the two must never disagree about is the number, and `windowPhrase` is why they
+ * cannot.
+ */
+export function changeWindowNotice(salonName: string, hours: number): string {
+  const phrase = windowPhrase(hours);
+  return phrase
+    ? `${salonName} takes changes up to ${phrase} before an appointment.`
+    : `${salonName} takes changes right up to the appointment.`;
+}
+
+/**
+ * The window as a duration — "1 hour", "12 hours", "2 days" — or null for a window with no
+ * duration to name.
+ *
+ * Null rather than "0 hours" is the whole point, and it is the migration's own reading: a zero
+ * window is not a rule measured in zero, it is the absence of a cutoff, and each caller says that
+ * in its own words. Whole days are said in days because 24 and 48 are the two values an owner
+ * actually picks.
+ */
+function windowPhrase(hours: number): string | null {
+  if (hours <= 0) return null;
+  if (hours === 1) return "1 hour";
+  if (hours % 24 === 0) {
+    const days = hours / 24;
+    return days === 1 ? "1 day" : `${days} days`;
+  }
+  return `${hours} hours`;
+}
+
 /* --------------------------------------------------------------------------
    Travel feasibility — stopping someone booking a slot they cannot reach.
    -------------------------------------------------------------------------- */

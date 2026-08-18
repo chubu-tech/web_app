@@ -1,3 +1,4 @@
+import { MarketingGuideLauncher } from "@/components/guide/marketing-guide-launcher";
 import { WaitlistProvider } from "@/components/marketing/waitlist-provider";
 
 /**
@@ -30,5 +31,20 @@ import { WaitlistProvider } from "@/components/marketing/waitlist-provider";
 export default function MarketingLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return <WaitlistProvider>{children}</WaitlistProvider>;
+  return (
+    <WaitlistProvider>
+      {children}
+      {/*
+        "How it works", on the pages somebody reaches before they have an account — which is
+        the audience a first-run guide is actually for. The walkthrough it opens is the same
+        one the product shells mount, so a visitor who watches it here and then signs up
+        meets the screens they were just shown.
+
+        `MarketingGuideLauncher` picks the audience from the route, because out here nobody
+        has signed in and `/for-salons` is the one page addressed to salon owners. Removing
+        the button from the public site is deleting this line.
+      */}
+      <MarketingGuideLauncher />
+    </WaitlistProvider>
+  );
 }

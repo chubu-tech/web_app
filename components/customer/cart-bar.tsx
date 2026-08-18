@@ -3,9 +3,36 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icons, IconSize } from "@/components/ui/icons";
-import { cartItemCount, cartSubtotal } from "@/lib/cart";
+import { cartItemCount, cartSubtotal, isCartEmpty, type Cart } from "@/lib/cart";
 import { useCart } from "@/lib/use-cart";
 import { formatNu } from "@/lib/utils";
+
+/**
+ * Whether the bar is on screen — the three conditions, in one place.
+ *
+ * `GuideLauncher` has to lift clear of this bar, so it needs the same answer the bar gives
+ * itself. It used to re-derive the rule and got two of the three: it missed `/cart`, and so
+ * lifted the button 64px above a bar that is deliberately not rendered there. A predicate the
+ * bar itself uses cannot drift from the bar.
+ */
+export function cartBarVisible({
+  cart,
+  hydrated,
+  pathname,
+}: {
+  cart: Cart;
+  hydrated: boolean;
+  pathname: string;
+}): boolean {
+  return hydrated && !isCartEmpty(cart) && pathname !== "/cart";
+}
+
+/** `cartBarVisible` for a client component that has no cart of its own. */
+export function useCartBarVisible(): boolean {
+  const { cart, hydrated } = useCart();
+  const pathname = usePathname();
+  return cartBarVisible({ cart, hydrated, pathname });
+}
 
 /**
  * The pinned cart summary — a port of `ShopCartBar` in
@@ -29,9 +56,7 @@ export function CartBar() {
 
   // See `useCart` on hydration: the first client render must match the server's, which has no
   // `localStorage` and so no cart.
-  if (!hydrated) return null;
-  if (cart.lines.length === 0) return null;
-  if (pathname === "/cart") return null;
+  if (!cartBarVisible({ cart, hydrated, pathname })) return null;
 
   const count = cartItemCount(cart);
 

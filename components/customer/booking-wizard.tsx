@@ -25,6 +25,7 @@ import {
 import {
   blockForSlot,
   bookingBlockMessage,
+  cancellationNotice,
   distanceKm,
   travelWarning,
 } from "@/lib/booking-guards";
@@ -546,7 +547,31 @@ export function BookingWizard({
     );
   })();
 
-  const note =
+  /*
+    **A1-08: the salon's cancellation rule, at the moment of commitment.**
+
+    It was shown on no screen in this flow — `booking-confirmed-sheet.tsx` states it *after* the
+    booking exists — and `20260807000032` gave the window teeth, so an unshown term is an enforced
+    one. Upstream fixed this on 2026-08-12 by putting `cancellationNotice()` directly above its
+    Confirm button; the same place, here, is the summary rail's `note` slot, which renders above the
+    action in both the desktop card and the phone bar.
+
+    It rides **alongside** a block or travel warning rather than instead of one. Those are about
+    this slot; this is about the commitment, and it is always true — so a customer being told they
+    already have a booking that day must not thereby lose the sentence explaining the cancellation
+    terms of the one they are about to make.
+
+    Muted and unadorned on purpose: it is a term, not a warning, and dressing a standing rule as an
+    alert is how people learn to skip alerts.
+  */
+  const cancelTerms =
+    step === "confirm" && selectedStart ? (
+      <p className="text-caption-sm text-muted">
+        {cancellationNotice(business.cancellationWindowHours)}
+      </p>
+    ) : null;
+
+  const alert =
     step === "confirm" && block ? (
       <Notice kind="error">
         {bookingBlockMessage(block.reason, block.clash?.businessName)}
@@ -555,6 +580,16 @@ export function BookingWizard({
       // A warning, not a block: the customer may be about to set off, or may know
       // something a straight line doesn't.
       <Notice kind="warn">{travel}</Notice>
+    ) : null;
+
+  const note =
+    alert || cancelTerms ? (
+      // A `div`, not a `span`: `Notice` renders a `<p>`, which is flow content and may not sit
+      // inside phrasing content. Both of the summary rail's slots are already `div`s.
+      <div className="gap-sm flex flex-col">
+        {alert}
+        {cancelTerms}
+      </div>
     ) : undefined;
 
   return (

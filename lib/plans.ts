@@ -67,14 +67,31 @@ export const PLAN_TIERS: readonly PlanTier[] = [
     tagline: "Run your day and grow.",
     priceLabel: "Nu 699/mo",
     highlighted: true,
+    /*
+      **This list is wider than `plans_config.dart`'s Growth card, and deliberately.** Upstream
+      shipped the shop rework without going back to its own price list, so mirroring it verbatim
+      would publish a *smaller* tier than the database actually sells.
+
+      Every clause here is gated at Growth server-side, which is what makes it a price rather than
+      a wish: the storefront and its delivery half by `products_select_public` and
+      `set_order_status`, discount codes by `upsert_promo_code` / `expire_promo_code`, the recorded
+      payment by `record_order_payment`, and "what sells" by `product_analytics`. All of them
+      re-derive `businesses.plan` themselves.
+
+      Two have no surface in *this* client yet (`PARITY.md` §5.1) — an owner creates a discount code
+      and reads product analytics in the app. That is a gap in the console, not an overstatement of
+      the plan: the subscription buys what the database unlocks.
+    */
     features: [
       { label: "Everything in Basic" },
       { label: "Unlimited stylists" },
       { label: "Week view" },
       { label: "Automatic reminders" },
-      { label: "Full analytics (trends, heatmap, leaderboard)" },
+      { label: "Full analytics (trends, heatmap, leaderboard, what sells)" },
       { label: "Client book" },
-      { label: "Product storefront" },
+      { label: "Product storefront, for collection or delivery" },
+      { label: "Discount codes" },
+      { label: "Order payments recorded at the counter" },
       { label: "Loyalty program" },
       { label: "Walk-in queue" },
     ],
@@ -84,11 +101,31 @@ export const PLAN_TIERS: readonly PlanTier[] = [
     name: "Pro",
     tagline: "Everything, for busy teams.",
     priceLabel: "Nu 1,499/mo",
+    /*
+      Two lines changed here on 2026-08-18, and both are corrections rather than edits.
+
+      **"Priority placement" is gone**, following `fb9791c` upstream (audit A3-04). It was
+      read by no code in either client, so a Pro salon ranked exactly like a Basic one. This
+      list is not only the console's paywall: `/for-salons` renders these bullets on an
+      indexable page, so the website went on *publishing* the claim for four days after the
+      app stopped making it. See the note in `lib/entitlements.ts`.
+
+      **"Deposits & no-show cover" reads "Deposits & payments on a booking"**, which is the
+      one place this file deliberately diverges from `plans_config.dart`'s wording. The
+      deposit half is real — `record_payment`, Pro-gated, kinds `deposit | balance | full |
+      refund`. The no-show half is not built: `businesses.late_fee_amount` defaults to 0, is
+      not in the owner-updatable column grant, and is referenced by no function in the
+      schema. Nothing charges anybody for a no-show. The app's card still carries the old
+      label; `lib/marketing/content.ts` reached this same conclusion for the homepage, and
+      the divergence is the same one, applied to the list a crawler reads.
+
+      **Prepaid packs is new** — `Feature.servicePacks`, and the label is the app's own.
+    */
     features: [
       { label: "Everything in Growth" },
-      { label: "Priority placement" },
       { label: "Commissions & payroll" },
-      { label: "Deposits & no-show cover" },
+      { label: "Deposits & payments on a booking" },
+      { label: "Prepaid packs (sell 10 cuts up front)" },
     ],
   },
 ] as const;
@@ -161,17 +198,24 @@ export const FEATURE_COPY: Record<Feature, { tier: Plan; title: string; blurb: s
   },
   deposits: {
     tier: "pro",
-    title: "Deposits & no-show cover",
-    blurb: "Take deposits to protect against no-shows.",
-  },
-  priorityPlacement: {
-    tier: "pro",
-    title: "Priority placement",
-    blurb: "Rank higher in customer search results.",
+    /*
+      Same divergence as the Pro card's bullet, for the same reason: the deposit is real and
+      the no-show cover is not built. The app's `_paywallCopy` still says "Deposits & no-show
+      cover · Take deposits to protect against no-shows" — a paywall is a sentence somebody
+      reads while deciding to pay, so it says only what `record_payment` does.
+    */
+    title: "Deposits & payments",
+    blurb: "Record a deposit or a payment against a booking, so the balance is on the receipt.",
   },
   stylePicker: {
     tier: "pro",
     title: "Style selection",
     blurb: "Customers pick the exact cut they want when they book.",
+  },
+  /* Verbatim from `_paywallCopy`'s `Feature.servicePacks` case. */
+  servicePacks: {
+    tier: "pro",
+    title: "Prepaid packs",
+    blurb: "Sell ten cuts up front and lock in the repeat visits.",
   },
 };

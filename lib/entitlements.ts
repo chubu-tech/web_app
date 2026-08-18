@@ -24,9 +24,9 @@ export type Feature =
   | "loyalty"
   | "commissions"
   | "deposits"
-  | "priorityPlacement"
   | "walkInQueue"
-  | "stylePicker";
+  | "stylePicker"
+  | "servicePacks";
 
 /** Features introduced AT each tier; higher tiers inherit the lower ones. */
 const GROWTH_ADDS: readonly Feature[] = [
@@ -43,11 +43,28 @@ const GROWTH_ADDS: readonly Feature[] = [
 const PRO_ADDS: readonly Feature[] = [
   "commissions",
   "deposits",
-  "priorityPlacement",
   // Hairstyle selection at booking — Pro only, matching the gate in
   // `set_booking_hairstyle`.
   "stylePicker",
+  /*
+    Prepaid service packs — "12 cuts for Nu 4,000", sold up front. Pro only, matching the
+    gate `create_service_pack` / `update_service_pack` re-derive from `businesses.plan`.
+
+    It ships upstream **with** its implementation — five tables and seven RPCs — which is
+    the standard the removal below set.
+  */
+  "servicePacks",
 ];
+
+/*
+  **Do not re-add `priorityPlacement` without a plan term in the recommender.**
+
+  It sat here reading nothing — `lib/recommendations.ts` has no plan term and there is no
+  ranking code in `supabase/` — so a Pro salon ranked exactly like a Basic one while the Pro
+  card sold the opposite. `/for-salons` renders `PLAN_TIERS` bullets on an indexable page, so
+  a feature nothing implements is not a stale flag here, it is a published false claim to
+  somebody about to pay Nu 1,499 a month off-app with no refund path. AGENTS.md has the rest.
+*/
 
 const UNLOCKED: Record<Plan, ReadonlySet<Feature>> = {
   basic: new Set(),

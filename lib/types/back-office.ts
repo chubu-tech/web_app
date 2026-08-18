@@ -55,8 +55,67 @@ export type ClientHistoryEntry = {
  * `new` is the wire value; the Dart calls the case `newOrder` because `new` is a keyword
  * there. TypeScript has no such problem, so the union is the wire value exactly and no
  * translation table is needed in either direction.
+ *
+ * ## `out_for_delivery` and `delivered` were missing, and an order went invisible
+ *
+ * `20260814000001_order_status_values.sql` grew the enum by two, and this union did not
+ * follow. Nothing broke loudly, which is why it took a diff of the enum to find:
+ *
+ * - The **owner's inbox** filters `.in("status", segment.statuses)`, and neither new value
+ *   was in any of the three segments — so an order the salon sent out for delivery from the
+ *   app appeared in **New, Ready and Done alike: nowhere.** A row that exists, is live, and
+ *   is in no list is worse than an error.
+ * - The **customer's list** renders the raw value through `StatusPill`, which title-cases
+ *   it, so a delivery order read **"Out_for_delivery"**.
+ *
+ * The enum is append-only and both values are terminal-ish, so the fix is to name them and
+ * let every table below key off the union rather than off a hand-written list.
  */
-export type OrderStatus = "new" | "ready" | "collected" | "cancelled" | "declined";
+export const ORDER_STATUSES = [
+  "new",
+  "ready",
+  "out_for_delivery",
+  "delivered",
+  "collected",
+  "cancelled",
+  "declined",
+] as const;
+
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+/**
+ * Wire string → status. Anything unrecognised becomes `new`.
+ *
+ * The same shape as `queueStatusFromWire`, and the same kind of default: an unknown status
+ * must not read as **terminal**, because a finished order is one nobody looks at again. A
+ * live order mislabelled "New" is at least in a list somebody works through, which is the
+ * lesson the two delivery values taught when they were in no list at all.
+ *
+ * It exists because `toOrder` asserted instead — `str(m.status) as OrderStatus` — so a value
+ * the union does not model became an `OrderStatus` the type system then trusted everywhere,
+ * and `ORDER_STATUS_LABEL[status]` handed back `undefined`. Casting past the boundary is how
+ * the enum and the union went four days out of step without anything failing.
+ */
+export function orderStatusFromWire(value: string | null | undefined): OrderStatus {
+  return ORDER_STATUSES.find((s) => s === value) ?? "new";
+}
+
+/**
+ * `orders.fulfilment` — how the order leaves the salon.
+ *
+ * **It decides which statuses are legal**, which is why it is a field rather than a
+ * presentation detail: `set_order_status` gates the delivery transitions on the order's own
+ * fulfilment, so a pickup order can never reach `out_for_delivery` and a delivery order can
+ * never be marked `collected`.
+ *
+ * **The column is `not null default 'pickup'`**, added that way by
+ * `20260814000003_orders_checkout_columns.sql` — so a row placed before that migration is a
+ * *pickup* row, not a row with an unknown shape. Measured on the live database 2026-08-18:
+ * `is_nullable = NO`, and 0 of 10 orders carry a null. The server's `coalesce(…, 'pickup')` is
+ * belt to that braces rather than the load-bearing part, and `orderFulfilment` mirrors it for
+ * the one case a client can still produce: a projection that does not select the column.
+ */
+export type OrderFulfilment = "pickup" | "delivery";
 
 /** A line item, snapshotted at purchase so a later price change can't rewrite history. */
 export type OrderItem = {
@@ -73,7 +132,39 @@ export type Order = {
   businessId: string;
   customerProfileId: string;
   status: OrderStatus;
+  /**
+   * What the order comes to, and the figure both sides must agree on.
+   *
+   * **It is not the sum of the lines any more.** Since
+   * `20260814000005_place_order_checkout.sql` the server computes
+   * `subtotal − discount + delivery fee`, so an order carrying a promo code or a delivery fee
+   * has a `total_nu` that no addition of `order_items` reproduces. Rendering the line sum as
+   * "Total" was how a discounted order could be shown at a price nobody paid; `subtotalNu`,
+   * `discountNu` and `deliveryFeeNu` exist so the breakdown can be shown instead of guessed.
+   */
   totalNu: number;
+  /*
+    The checkout breakdown, and **none of these four is nullable**.
+    `20260814000003_orders_checkout_columns.sql` declares the three ints `not null default 0`
+    and `fulfilment` `not null default 'pickup'`, then backfills `subtotal_nu` from `total_nu`.
+
+    So "this order predates the breakdown" is not a state the data has: such a row is an exact
+    pickup order with no discount and no fee. **Do not reintroduce `| null` here** — it cost
+    `OrderLines` a `!= null` guard and then a `!` assertion to get back past its own field.
+    AGENTS.md carries the measurement that settled it.
+  */
+  /** `subtotal − discount + delivery fee = total`. */
+  subtotalNu: number;
+  /** A promo code, points spent at checkout, or both — a positive magnitude. */
+  discountNu: number;
+  /** Zero on a pickup order, and zero on a delivery order the salon delivered free. */
+  deliveryFeeNu: number;
+  /** Which lifecycle the order is on. Read it through `orderFulfilment`. */
+  fulfilment: OrderFulfilment;
+  /** Delivery only, and the three fields arrive together or not at all. */
+  deliveryAddress: string | null;
+  deliveryPhone: string | null;
+  deliveryNote: string | null;
   note: string | null;
   declineReason: string | null;
   placedAt: Date;
