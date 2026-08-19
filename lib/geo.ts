@@ -41,6 +41,11 @@ export function plausibleFix(gps: Coords): Coords {
  * covers a denied prompt, no sensor, a timeout, and a fix too far from Bhutan to
  * believe — in every one of those the reference point is the Thimphu centre, so that
  * is what the header should name.
+ *
+ * It is also what decides whether the coordinates may be **named**: a `'gps'` fix goes
+ * through `placeAt` (`lib/places.ts`) to get the town the viewer is standing in, and a
+ * `'fallback'` never does — naming the stand-in would tell somebody in Paro they are in
+ * Thimphu, which is the whole error the source flag exists to prevent.
  */
 export type Fix = { coords: Coords; source: "gps" | "fallback" };
 

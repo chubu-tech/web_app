@@ -1,3 +1,4 @@
+import type { Coords } from "./discover-logic";
 import type { Business } from "./types/salon";
 
 /**
@@ -285,6 +286,41 @@ export function placeOf(
   // one. Same inference as the last branch of `isIn`, and the same live case.
   const town = matchedTown ?? (area?.parent ? placeBySlug(area.parent) : null);
   return { town, area };
+}
+
+/**
+ * The town a **point** falls in, or `null` when it falls outside every box.
+ *
+ * This is {@link placeOf}'s coordinate pass with no salon attached, and its caller is the
+ * viewer rather than a business: Discover's location line uses it to name where a GPS fix
+ * actually is instead of saying "Near you" — see `LocationHeader` in
+ * `components/customer/discover.tsx`.
+ *
+ * Three properties it has to keep:
+ *
+ * - **Town-level, and no finer.** Only a `dzongkhag` carries a `bbox`, so a fix can resolve
+ *   to Thimphu and never to Norzin Lam. A neighbourhood is matched by owner-typed text
+ *   everywhere else in this module, and there is no such text for a viewer — drawing
+ *   neighbourhood boxes to fill the gap would be inventing boundaries this repo does not
+ *   have, and the wrong street is a worse answer than the right town.
+ * - **`null` is a real answer**, not a failure. Bhutan is mostly not inside one of these
+ *   boxes: a fix in the Punakha valley 40 km from Thimphu matches nothing, and the caller
+ *   renders "Near you" — which is still true, because the distances below it are measured
+ *   from that fix.
+ * - **Registry order breaks an overlap.** Phuentsholing's box sits inside Chukha's and is
+ *   listed first, so a fix on the border town resolves to the town somebody would name
+ *   rather than to the dzongkhag containing it.
+ *
+ * It stays coordinate-only for the reason in this module's header: `businesses.city` is
+ * wrong on 7 of 10 live rows, and a location line that reported Paro to a viewer standing on
+ * Norzin Lam is the bug this whole module was written after.
+ */
+export function placeAt(coords: Coords): Place | null {
+  return (
+    PLACES.find(
+      (p) => p.kind === "dzongkhag" && p.bbox && inBox(coords.lat, coords.lng, p.bbox),
+    ) ?? null
+  );
 }
 
 /**

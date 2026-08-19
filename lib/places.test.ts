@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { THIMPHU_CENTER } from "./geo";
 import {
   areasOf,
   isIn,
   PLACES,
+  placeAt,
   placeBySlug,
   placeOf,
   publishedPlaces,
@@ -177,6 +179,42 @@ describe("placeOf", () => {
       area: null,
     });
     expect(placeOf({ addressText: "behind the shop", lat: null, lng: null }).town).toBeNull();
+  });
+});
+
+describe("placeAt — naming where the viewer is", () => {
+  it("names the town a fix is standing in", () => {
+    // Discover's location line renders these as "Thimphu, Bhutan" / "Paro, Bhutan".
+    const norzin = LIVE.find((s) => s.name === "Norzin Salon & Spa")!;
+    const glow = LIVE.find((s) => s.name === "Paro Glow Beauty Lounge")!;
+    expect(placeAt({ lat: norzin.lat!, lng: norzin.lng! })?.slug).toBe("thimphu");
+    expect(placeAt({ lat: glow.lat!, lng: glow.lng! })?.slug).toBe("paro");
+  });
+
+  it("names the border town rather than the dzongkhag containing it", () => {
+    // Phuentsholing's box sits inside Chukha's, and registry order is what decides.
+    // A person on the border names the town, not the dzongkhag.
+    const serenity = LIVE.find((s) => s.name === "Serenity Day Spa")!;
+    expect(placeAt({ lat: serenity.lat!, lng: serenity.lng! })?.slug).toBe("phuentsholing");
+  });
+
+  it("agrees with the copy the fallback branch hardcodes", () => {
+    // `LocationHeader` writes "Thimphu, Bhutan" literally for a fallback fix, and derives
+    // the same words from the registry for a real one. This is what stops an edit to
+    // Thimphu's box making the two branches disagree about the same coordinates.
+    expect(placeAt(THIMPHU_CENTER)?.name).toBe("Thimphu");
+  });
+
+  it("returns null for a fix between towns, which reads as 'Near you'", () => {
+    // ~40 km from Thimphu, so `plausibleFix` keeps it — most of Bhutan is not in a box,
+    // and "Near you" is still exactly true there.
+    expect(placeAt({ lat: 27.2, lng: 89.9 })).toBeNull();
+  });
+
+  it("returns null for a fix outside Bhutan", () => {
+    // Unreachable through `resolveLocation`, which replaces an implausible fix with the
+    // Thimphu centre — but this function must not name a town for London regardless.
+    expect(placeAt({ lat: 51.5074, lng: -0.1278 })).toBeNull();
   });
 });
 

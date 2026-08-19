@@ -15,6 +15,7 @@ import { CUSTOMER_HOME } from "@/lib/auth";
 import { availableToday } from "@/lib/available-today";
 import { formatKm, kmTo, nearestSalons, withinDistance } from "@/lib/discover-logic";
 import { resolveLocation, type Fix } from "@/lib/geo";
+import { placeAt } from "@/lib/places";
 import { rebookable, resolveRebook } from "@/lib/rebook";
 import { rank, topRated } from "@/lib/recommendations";
 import { createClient } from "@/lib/supabase/client";
@@ -418,7 +419,7 @@ export function Discover({
       grid of cards; it hurts a paragraph.
     */
     <div className="px-base w-full tablet:px-lg">
-      <LocationHeader source={fix?.source ?? null} />
+      <LocationHeader fix={fix} />
 
       {/*
         The two segments, as links in the URL rather than local state — so a Products view is
@@ -864,24 +865,42 @@ function IconToggle({
  * shipped to Bhutan and a claim about the reader on a website. So this states the
  * one thing we actually know: **where the distances below are measured from.**
  *
- * It deliberately does *not* name a city from the data. The first attempt read the
- * `city` of the nearest salon, which looked more honest and was not: on 8 of the 13
+ * It deliberately does *not* name a city from the salon **data**. The first attempt read
+ * the `city` of the nearest salon, which looked more honest and was not: on 8 of the 13
  * live salons `city` contradicts the salon's own address — "Norzin Lam, Thimphu"
  * filed under Paro — so a viewer at the Thimphu centre was told "Paro, Bhutan". That
  * swapped the app's lie for a worse one.
+ *
+ * **It now names the town the fix itself is in**, which is a different claim from that
+ * one and a sound one: {@link placeAt} resolves the viewer's own coordinates against the
+ * dzongkhag boxes in `lib/places.ts`, so "Thimphu, Bhutan" here is derived from where the
+ * viewer is standing and not from a column an owner mistyped. Two limits are deliberate:
+ *
+ * - **It resolves in the browser and the coordinates go nowhere.** No reverse-geocoding
+ *   request is made, because the privacy policy states a customer's location "is used on
+ *   your device" and "never sent to us" — see `lib/marketing/content.ts`. That is what
+ *   caps this at town level: a street name would mean handing the fix to a geocoder.
+ * - **A fix outside every box still reads "Near you".** Most of Bhutan is between towns,
+ *   and "Near you" remains exactly true — the distances below are measured from there.
  */
-function LocationHeader({ source }: { source: "gps" | "fallback" | null }) {
+function LocationHeader({ fix }: { fix: Fix | null }) {
+  // Only a real fix may be named. A `fallback` is the Thimphu centre standing in for a
+  // denied prompt, so naming *it* would tell somebody in Paro they are in Thimphu — which
+  // is why the eyebrow below says "Showing distances from" rather than "Location".
+  const town = fix?.source === "gps" ? placeAt(fix.coords) : null;
   const label =
-    source === "gps"
-      ? "Near you"
-      : source === "fallback"
+    fix?.source === "gps"
+      ? town
+        ? `${town.name}, Bhutan`
+        : "Near you"
+      : fix?.source === "fallback"
         ? "Thimphu, Bhutan"
         : "Bhutan";
 
   return (
     <div className="pt-sm">
       <p className="text-caption-sm text-muted">
-        {source === "fallback" ? "Showing distances from" : "Location"}
+        {fix?.source === "fallback" ? "Showing distances from" : "Location"}
       </p>
       <p className="text-title text-ink mt-xxs gap-xs flex items-center font-medium">
         <Icons.location
