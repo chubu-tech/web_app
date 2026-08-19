@@ -23,8 +23,12 @@ import { NARRATION_RATE, estimateSpeechSeconds, pickVoice } from "@/lib/guide/na
  * - **`end` sometimes never arrives** (Android WebView, and Safari when the tab is
  *   backgrounded). Without a fallback the guide stops dead on one frame, so a timer sized
  *   from the estimate plus a generous margin finishes the step anyway.
- * - **Voices arrive late.** `getVoices()` is empty until the engine has loaded on Chrome, so
- *   the voice is chosen at speak time and re-chosen if `voiceschanged` fires.
+ * - **Voices arrive late, and sometimes never come at all.** `getVoices()` is empty until the
+ *   engine has loaded on Chrome, so the voice is chosen at speak time. And a browser can have
+ *   the whole API and **no voices** — a bare Linux box, a container, a headless run — where
+ *   `speak()` reports `end` immediately and a guide driven by that would flash through
+ *   sixteen frames in as many seconds. So an empty voice list counts as *not supported*: the
+ *   narration switch is not offered, and the frames fall back to their own timing.
  *
  * ## A recorded voiceover would land here
  *
@@ -50,15 +54,41 @@ export function useNarration({
   /** Called once, when this frame's narration has finished of its own accord. */
   onFinished: () => void;
 }): { supported: boolean } {
-  const [supported] = useState(
+  const [hasApi] = useState(
     () => typeof window !== "undefined" && "speechSynthesis" in window,
   );
+  // Voices are not there on the first render in Chrome, so this starts as whatever is loaded
+  // and is corrected when the engine says so. `useState` + an event rather than
+  // `useSyncExternalStore`, because `getVoices()` returns a fresh array every call and a
+  // snapshot that is never referentially equal re-renders for ever.
+  const [voiceCount, setVoiceCount] = useState(() =>
+    typeof window !== "undefined" && "speechSynthesis" in window
+      ? window.speechSynthesis.getVoices().length
+      : 0,
+  );
+
+  useEffect(() => {
+    if (!hasApi) return;
+    const synth = window.speechSynthesis;
+    const onVoices = () => setVoiceCount(synth.getVoices().length);
+    onVoices();
+    synth.addEventListener?.("voiceschanged", onVoices);
+    return () => synth.removeEventListener?.("voiceschanged", onVoices);
+  }, [hasApi]);
+
+  const supported = hasApi && voiceCount > 0;
 
   // The callback changes identity on every render of the player, and it must not restart the
   // narration when it does — the effect below depends on what is being said, not on who is
   // listening.
   const finished = useRef(onFinished);
-  finished.current = onFinished;
+  // Updated in an effect, not during render: `react-hooks/refs` refuses a write during
+  // render, and rightly — under concurrent rendering a render can be thrown away, so a ref
+  // written there can hold a callback from a render that never committed. No dependency
+  // array, so it tracks every commit.
+  useEffect(() => {
+    finished.current = onFinished;
+  });
 
   useEffect(() => {
     if (!enabled || !playing || (!text && !audio)) return;
@@ -94,8 +124,18 @@ export function useNarration({
     const chosen = pickVoice(synth.getVoices());
     // `null` is not "no voice" — it hands the choice back to the browser, whose default is a
     // better guess than anything this module can make about a machine with no English voice.
+    //
+    // Wrapped because `utterance.voice` is a typed slot: assigning anything that is not a
+    // real `SpeechSynthesisVoice` throws, and that throw happens inside an effect, which
+    // takes the whole player down with it. Found with a test double rather than in the wild
+    // — but "the guide crashed because the voice list was odd" is not a trade worth making
+    // for a line of narration.
     if (chosen) {
-      utterance.voice = synth.getVoices().find((v) => v.name === chosen.name) ?? null;
+      try {
+        utterance.voice = synth.getVoices().find((v) => v.name === chosen.name) ?? null;
+      } catch {
+        // The browser's own default reads it instead.
+      }
     }
 
     utterance.onend = done;

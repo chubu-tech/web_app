@@ -33,7 +33,6 @@ export function Pricing() {
     <Section id="pricing" aria-labelledby="pricing-title">
       <Container>
         <SectionHeading
-          eyebrow={pricing.eyebrow}
           title="Customers never pay. _Only salons do._"
           body={pricing.body}
           titleId="pricing-title"
@@ -44,8 +43,12 @@ export function Pricing() {
           <div className="bg-surface-soft ring-hairline rounded-lg p-6 ring-1 ring-inset sm:p-8">
             <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-12">
               <div className="max-w-[36rem]">
-                <span className="bg-canvas text-ink ring-hairline inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-badge font-semibold tracking-[0.1em] uppercase ring-1 ring-inset">
-                  <Smartphone className="size-3.5" strokeWidth={2.2} aria-hidden />
+                <span className="bg-paper text-ink ring-hairline inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-badge font-semibold tracking-[0.1em] uppercase ring-1 ring-inset">
+                  <Smartphone
+                    className="size-3.5"
+                    strokeWidth={2.2}
+                    aria-hidden
+                  />
                   {pricing.customer.label}
                 </span>
 
@@ -53,7 +56,7 @@ export function Pricing() {
                     type for a single trust signal per page and sets everything else
                     modestly; "Nu 0" is that signal here. */}
                 <p className="mt-5 flex items-baseline gap-2">
-                  <span className="text-ink text-editorial-lg font-semibold">
+                  <span className="text-ink text-editorial-lg font-display font-semibold">
                     {pricing.customer.price}
                   </span>
                   <span className="text-muted text-body-md">
@@ -96,10 +99,17 @@ export function Pricing() {
             section, so the scroll margin lands the heading clear of the fixed
             header — and the margin is the header's own token now, where it used to
             be a hardcoded `7rem` against a bar that is 4.5–5rem. */}
-        <div className="scroll-mt-[calc(var(--site-header-height)+2rem)]" id="salon-plans">
+        <div
+          className="scroll-mt-[calc(var(--site-header-height)+2rem)]"
+          id="salon-plans"
+        >
           <Reveal className="mt-14 flex items-center gap-4 sm:mt-16">
             <h3 className="text-ink text-heading inline-flex shrink-0 items-center gap-2.5 font-semibold">
-              <Store className="text-rausch size-5" strokeWidth={2} aria-hidden />
+              <Store
+                className="text-rausch size-5"
+                strokeWidth={2}
+                aria-hidden
+              />
               {pricing.salonHeading}
             </h3>
             <span className="bg-hairline-soft h-px flex-1" aria-hidden />
@@ -114,7 +124,7 @@ export function Pricing() {
             <Reveal asChild key={tier.name}>
               <div
                 className={cn(
-                  "bg-canvas relative flex h-full flex-col rounded-md p-6 ring-inset",
+                  "bg-paper relative flex h-full flex-col rounded-md p-6 ring-inset",
                   "transition-shadow duration-300",
                   tier.featured
                     ? "ring-rausch ring-2"
@@ -123,7 +133,11 @@ export function Pricing() {
               >
                 {tier.featured && (
                   <span className="bg-rausch-cta absolute -top-3 left-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-badge font-semibold tracking-[0.1em] text-white uppercase">
-                    <Sparkles className="size-3.5" strokeWidth={2.4} aria-hidden />
+                    <Sparkles
+                      className="size-3.5"
+                      strokeWidth={2.4}
+                      aria-hidden
+                    />
                     Most salons pick this
                   </span>
                 )}
@@ -131,20 +145,24 @@ export function Pricing() {
                 <h4 className="text-ink text-heading font-semibold">
                   {tier.name}
                 </h4>
-                <p className="text-muted text-ui mt-1">{tier.tagline}</p>
+                <p className="text-muted text-title mt-1">{tier.tagline}</p>
 
                 <p className="mt-6 flex items-baseline gap-1">
-                  <span className="text-ink text-editorial-md font-semibold">
+                  <span className="text-ink text-editorial-md font-display font-semibold">
                     {tier.price}
                   </span>
-                  <span className="text-muted text-ui">{tier.period}</span>
+                  <span className="text-muted text-title">{tier.period}</span>
                 </p>
 
                 <ul className="border-hairline-soft mt-6 flex flex-1 flex-col gap-3 border-t pt-6">
                   {tier.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-3">
                       <span className="bg-rausch-soft text-rausch mt-0.5 grid size-5 shrink-0 place-items-center rounded-full">
-                        <Check className="size-3" strokeWidth={3.2} aria-hidden />
+                        <Check
+                          className="size-3"
+                          strokeWidth={3.2}
+                          aria-hidden
+                        />
                       </span>
                       <span className="text-body text-body-sm">{feature}</span>
                     </li>

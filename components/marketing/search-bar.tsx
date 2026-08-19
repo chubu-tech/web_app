@@ -11,7 +11,12 @@ import {
 } from "lucide-react";
 import { search as copy } from "@/lib/marketing/content";
 import type { SalonIndex } from "@/lib/marketing/salons";
-import { TIME_WINDOWS, type Coords, type Query, type TimeWindow } from "@/lib/marketing/search";
+import {
+  TIME_WINDOWS,
+  type Coords,
+  type Query,
+  type TimeWindow,
+} from "@/lib/marketing/search";
 import { cn } from "@/lib/marketing/utils";
 import {
   PanelChip,
@@ -78,7 +83,8 @@ export function SearchBar({
 
   const treatmentCount = useMemo(
     () =>
-      new Set(index.groups.flatMap((g) => g.treatments.map((t) => t.name))).size,
+      new Set(index.groups.flatMap((g) => g.treatments.map((t) => t.name)))
+        .size,
     [index.groups],
   );
 
@@ -114,7 +120,7 @@ export function SearchBar({
       */}
       <div
         className={cn(
-          "bg-canvas ring-hairline shadow-card flex flex-col gap-1 rounded-lg p-2 ring-1 ring-inset",
+          "bg-paper ring-hairline shadow-card flex flex-col gap-1 rounded-lg p-2 ring-1 ring-inset",
           "sm:h-16 sm:flex-row sm:items-center sm:gap-0 sm:rounded-full sm:py-0 sm:pr-2 sm:pl-2",
         )}
       >
@@ -140,7 +146,11 @@ export function SearchBar({
             <PanelOption
               active={!query.treatment}
               onSelect={() => {
-                onQuery({ ...query, treatment: null, treatmentIsCategory: false });
+                onQuery({
+                  ...query,
+                  treatment: null,
+                  treatmentIsCategory: false,
+                });
                 close();
               }}
             >
@@ -151,7 +161,10 @@ export function SearchBar({
               <div key={group.category}>
                 <PanelHeading>{group.category}</PanelHeading>
                 <PanelOption
-                  active={query.treatmentIsCategory && query.treatment === group.category}
+                  active={
+                    query.treatmentIsCategory &&
+                    query.treatment === group.category
+                  }
                   meta={`${group.salonCount}`}
                   onSelect={() => {
                     onQuery({
@@ -167,7 +180,10 @@ export function SearchBar({
                 {group.treatments.slice(0, 6).map((treatment) => (
                   <PanelOption
                     key={treatment.name}
-                    active={!query.treatmentIsCategory && query.treatment === treatment.name}
+                    active={
+                      !query.treatmentIsCategory &&
+                      query.treatment === treatment.name
+                    }
                     meta={`${treatment.salonCount}`}
                     onSelect={() => {
                       onQuery({
@@ -329,7 +345,7 @@ export function SearchBar({
             type="button"
             onClick={close}
             className={cn(
-              "bg-rausch-cta hover:bg-rausch-cta-pressed text-ui inline-flex h-12 w-full items-center justify-center gap-2 rounded-full font-medium text-white",
+              "bg-rausch-cta hover:bg-rausch-cta-pressed text-title inline-flex h-12 w-full items-center justify-center gap-2 rounded-full font-medium text-white",
               "transition-colors duration-200 sm:size-12 sm:w-12 sm:shrink-0",
             )}
           >
@@ -359,8 +375,10 @@ function Divider() {
 
 function CountChip({ label, value }: { label: string; value: number }) {
   return (
-    // `bg-surface-soft`, not `bg-canvas`: the panel this sits in is canvas-white,
-    // so a canvas chip on it was invisible. Same bug the option rows had.
+    // `bg-surface-soft`, not `bg-canvas`: the panel this sits in is paper white, so
+    // a chip needs a step away from white. When the public pages were themselves white
+    // this was the difference between a visible chip and an invisible one — canvas on
+    // canvas. Same bug the option rows had, and the same fix outlives the cause.
     <span className="bg-surface-soft text-body inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-caption-sm font-medium">
       {label}
       <span className="text-muted tabular-nums">{value}</span>
@@ -390,7 +408,9 @@ function MonthGrid({
 
   const cells: (string | null)[] = [
     ...Array.from({ length: leading }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, i) => iso(new Date(year, monthIndex, i + 1))),
+    ...Array.from({ length: daysInMonth }, (_, i) =>
+      iso(new Date(year, monthIndex, i + 1)),
+    ),
   ];
 
   return (
@@ -404,8 +424,11 @@ function MonthGrid({
         >
           <ChevronLeft className="size-4" aria-hidden />
         </button>
-        <p className="text-ui font-semibold">
-          {month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+        <p className="text-title font-semibold">
+          {month.toLocaleDateString(undefined, {
+            month: "long",
+            year: "numeric",
+          })}
         </p>
         <button
           type="button"

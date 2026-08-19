@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <article className="scroll-mt-[calc(var(--site-header-height)+1.5rem)]">
-      <h1 className="text-editorial-lg font-semibold">Terms of Service</h1>
+      <h1 className="text-editorial-lg font-display font-semibold">Terms of Service</h1>
 
       <div className="bg-hairline-soft mt-10 h-px" />
 
@@ -50,7 +50,7 @@ export default function TermsPage() {
         </section>
       ))}
 
-      <p className="text-muted border-hairline-soft mt-14 border-t pt-8 text-ui">
+      <p className="text-muted border-hairline-soft mt-14 border-t pt-8 text-title">
         Version {TERMS_VERSION}
       </p>
     </article>

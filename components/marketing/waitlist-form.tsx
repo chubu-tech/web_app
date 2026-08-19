@@ -4,7 +4,11 @@ import { useId, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check, Loader2 } from "lucide-react";
 import { waitlist } from "@/lib/marketing/content";
-import { joinWaitlist, validateEmail, type WaitlistSource } from "@/lib/marketing/waitlist";
+import {
+  joinWaitlist,
+  validateEmail,
+  type WaitlistSource,
+} from "@/lib/marketing/waitlist";
 import { cn } from "@/lib/marketing/utils";
 import { Button } from "./ui/button";
 
@@ -121,7 +125,7 @@ export function WaitlistForm({
         </p>
         <p
           className={cn(
-            "mt-2 text-ui leading-relaxed",
+            "mt-2 text-title leading-relaxed",
             dark ? "text-white/70" : "text-body",
           )}
         >
@@ -143,7 +147,9 @@ export function WaitlistForm({
         {waitlist.emailLabel}
       </label>
 
-      <div className={cn("mt-2 flex flex-col gap-3", !stacked && "sm:flex-row")}>
+      <div
+        className={cn("mt-2 flex flex-col gap-3", !stacked && "sm:flex-row")}
+      >
         <input
           id={`${id}-email`}
           name="email"
@@ -166,10 +172,10 @@ export function WaitlistForm({
             // is the *main* axis, so `flex-basis: 0%` replaces `h-12` as the base
             // size — and a percentage against an auto-height container cannot
             // resolve, so it falls back to the input's max-content height: 21px of
-            // `text-ui` leading, with `px-5` supplying no vertical padding to pad
+            // `text-title` leading, with `px-5` supplying no vertical padding to pad
             // it out. A half-height field beside a 48px button. It sizes the
             // *width* and only the width, so it belongs on the row branch alone.
-            "h-12 w-full min-w-0 rounded-full px-5 text-ui",
+            "h-12 w-full min-w-0 rounded-full px-5 text-title",
             !stacked && "sm:flex-1",
             "ring-1 ring-inset transition-shadow duration-200 outline-none",
             // The reference's `text-input` focus: the stroke thickens to 2px and
@@ -177,13 +183,13 @@ export function WaitlistForm({
             "focus:ring-2",
             dark
               ? "bg-white/10 text-white placeholder:text-white/40"
-              : "text-ink placeholder:text-muted-soft bg-canvas",
+              : "text-ink placeholder:text-muted-soft bg-paper",
             error
-              // `error-text` (#c13515), not rausch. They are different reds for a
-              // reason: rausch is the submit button sitting immediately beside this
-              // field, so an invalid address used to outline itself in the same
-              // colour as the control that would accept it.
-              ? "ring-error-text focus:ring-error-text"
+              ? // `error-text` (#c13515), not rausch. They are different reds for a
+                // reason: rausch is the submit button sitting immediately beside this
+                // field, so an invalid address used to outline itself in the same
+                // colour as the control that would accept it.
+                "ring-error-text focus:ring-error-text"
               : dark
                 ? "ring-white/25 focus:ring-white/70"
                 : "ring-hairline focus:ring-ink",

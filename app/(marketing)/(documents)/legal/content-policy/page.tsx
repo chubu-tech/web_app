@@ -8,7 +8,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Content policy",
-  description: "What can't be posted on Tho, and what happens when you report something.",
+  description: "What can’t be posted on Tho, and what happens when you report something.",
   alternates: { canonical: "/legal/content-policy" },
 };
 
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
 export default function ContentPolicyPage() {
   return (
     <article className="scroll-mt-[calc(var(--site-header-height)+1.5rem)]">
-      <h1 className="text-editorial-lg font-semibold">Content policy</h1>
+      <h1 className="text-editorial-lg font-display font-semibold">Content policy</h1>
 
       <p className="text-body mt-6 text-body-lg leading-relaxed">
         {CONTENT_POLICY_INTRO}

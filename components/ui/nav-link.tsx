@@ -58,7 +58,9 @@ export function NavLink({
         // The underline. `left-3` and the width calc keep it inside the horizontal
         // padding, so it spans the label rather than the whole hit area.
         "after:bg-rausch after:absolute after:bottom-1.5 after:left-3 after:h-px",
-        "after:transition-all after:duration-300 after:ease-[cubic-bezier(0.16,1,0.3,1)]",
+        // `width` is the only thing that moves — the blanket form here also animated the
+        // pseudo-element's colour and position for no reason.
+        "after:transition-[width] after:duration-300 after:ease-[cubic-bezier(0.16,1,0.3,1)]",
         current
           ? "text-ink after:w-[calc(100%-1.5rem)]"
           : "text-muted hover:text-ink after:w-0 hover:after:w-[calc(100%-1.5rem)]",

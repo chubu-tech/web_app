@@ -51,7 +51,6 @@ export function Faq() {
         <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
           <div className="lg:sticky lg:top-[calc(var(--site-header-height)+2rem)] lg:col-span-5 lg:self-start">
             <SectionHeading
-              eyebrow="Questions"
               title="The things _everyone asks_"
               body="Still stuck? Message us on WhatsApp"
               titleId="faq-title"
@@ -79,7 +78,9 @@ export function Faq() {
                         <span
                           className={cn(
                             "text-subheading flex-1 font-medium transition-colors duration-200",
-                            isOpen ? "text-ink" : "text-body group-hover:text-ink",
+                            isOpen
+                              ? "text-ink"
+                              : "text-body group-hover:text-ink",
                           )}
                         >
                           {item.q}
@@ -89,7 +90,11 @@ export function Faq() {
                             panel it controls is open. */}
                         <span
                           className={cn(
-                            "grid size-9 shrink-0 place-items-center rounded-full transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                            // The disc swaps fill and label colour and rotates. Those three, named — the
+                            // rotate is a `transform`, so it composites; the blanket transition was
+                            // also animating layout properties it never changes.
+                            "grid size-9 shrink-0 place-items-center rounded-full",
+                            "transition-[background-color,color,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
                             isOpen
                               ? "bg-rausch-cta rotate-135 text-white"
                               : "bg-surface-strong text-ink",
@@ -111,7 +116,10 @@ export function Faq() {
                       aria-labelledby={buttonId}
                       aria-hidden={!isOpen}
                       initial={false}
-                      animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
+                      animate={{
+                        height: isOpen ? "auto" : 0,
+                        opacity: isOpen ? 1 : 0,
+                      }}
                       transition={{ duration: 0.5, ease: EASE }}
                       className="overflow-hidden"
                     >

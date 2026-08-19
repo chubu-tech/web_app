@@ -39,9 +39,11 @@ export const metadata: Metadata = {
 export default function DeleteAccountPage() {
   return (
     <article className="scroll-mt-[calc(var(--site-header-height)+1.5rem)]">
-      <h1 className="text-editorial-lg font-semibold">{deletion.title}</h1>
+      <h1 className="text-editorial-lg font-display font-semibold">{deletion.title}</h1>
 
-      <p className="text-body mt-6 text-body-lg leading-relaxed">{deletion.lead}</p>
+      <p className="text-body mt-6 text-body-lg leading-relaxed">
+        {deletion.lead}
+      </p>
 
       <div className="bg-hairline-soft mt-10 h-px" />
 
@@ -56,7 +58,7 @@ export default function DeleteAccountPage() {
               className="text-body relative pl-8 text-body-lg leading-relaxed"
             >
               <span
-                className="text-rausch absolute top-0 left-0 text-ui font-semibold tabular-nums"
+                className="text-rausch absolute top-0 left-0 text-title font-semibold tabular-nums"
                 aria-hidden
               >
                 {i + 1}.
@@ -148,7 +150,7 @@ export default function DeleteAccountPage() {
         </p>
       </section>
 
-      <p className="text-muted mt-14 text-ui">
+      <p className="text-muted mt-14 text-title">
         <Link href="/privacy" className="hover:text-ink transition-colors">
           Privacy policy
         </Link>

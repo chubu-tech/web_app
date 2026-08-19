@@ -1,13 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Fraunces, Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { brand } from "@/lib/marketing/content";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 /**
- * **One face, every route.** Inter carries the whole product — the 25 customer routes and
- * the 26 owner-console routes alike.
+ * **One face across the product; a second one only where the site has to have a voice.**
+ * Inter carries the whole product — the 25 customer routes and the 26 owner-console
+ * routes alike — and Fraunces carries display type on the public marketing pages only.
+ * See the `fraunces` loader below for why the split falls exactly there.
  *
  * ## What this replaced, and why it was wrong
  *
@@ -44,6 +46,61 @@ const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   display: "swap",
+});
+
+/**
+ * **The display face, and it renders on the seven public marketing routes only.**
+ *
+ * ## Why a second family exists at all
+ *
+ * Until now this file loaded exactly one, and the whole product — marketing, customer and
+ * console — set every headline in Inter at a heavier weight. A single-family page has no
+ * display *voice*: hierarchy comes only from size and weight, which is the same lever the
+ * body copy already uses, so a 54px headline is a big paragraph rather than a different
+ * kind of thing. That reads as untyped, and it is the most-cited signature of a generated
+ * layout.
+ *
+ * ## Why it is Fraunces
+ *
+ * `marketing-tokens.css` is explicit that display weights stay modest — 500/600, never the
+ * 700+ an enterprise system leans on — "because the brand trusts photography and generous
+ * whitespace over typographic muscle". A heavier grotesque would have fought that; a serif
+ * adds voice without adding weight, which is the one axis this design has already spent.
+ * Fraunces is variable, so its 600 comes from the same file as its 400, and it is warm
+ * rather than austere — the right register for a salon marketplace and for the Bhutanese
+ * identity the kira rule and the woven motif carry elsewhere on the page.
+ *
+ * ## Why the console does NOT get it
+ *
+ * The seam this repo cares about is marketing → product, and it is a *colour* seam, closed
+ * by `data-shell` on the marketing layout. Typeface is the opposite case: the console is a
+ * dense operational tool somebody works at a till, its largest step is a 32px figure, and a
+ * display serif on a payroll column is decoration on a spreadsheet. So `--font-display` is
+ * referenced only by marketing components, and every product route stays exactly as it was.
+ *
+ * ## The mechanism, and the trap it shares with Inter
+ *
+ * `globals.css` maps this to `--font-display` in `@theme`, which is what emits the
+ * `font-display` utility. That is an **explicit class on an element**, not an inherited
+ * `font-family` — which matters, because a `font-family` set in a shell scope is the exact
+ * bug that once left the console on the visitor's OS font (see above). `fraunces.variable`
+ * must therefore stay on `<html>` beside `inter.variable`: both resolve at `:root`, and
+ * moving either onto a layout's `<div>` breaks it silently.
+ *
+ * `--font-display` was declared here once before, for Bricolage Grotesque, and deleted
+ * because **nothing referenced it**. This time the call sites land in the same change:
+ * `hero.tsx`'s `h1`, `SectionHeading`'s `h2`, and the two wordmarks.
+ */
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  display: "swap",
+  // Fraunces ships four axes. `opsz` is requested explicitly because the face is drawn
+  // with optical sizing and the browser will not apply it from a bare variable load;
+  // `SOFT` and `WONK` are deliberately left at their defaults — the wonky leg on the
+  // `g` is a personality this page does not need, and it is the axis that would make
+  // the face read as a costume rather than a voice.
+  axes: ["opsz"],
 });
 
 /*
@@ -114,14 +171,29 @@ export default function RootLayout({
         one country.
       */
       lang="en-BT"
-      className={`${inter.variable} h-full antialiased`}
+      className={`${inter.variable} ${fraunces.variable} h-full overflow-x-clip antialiased`}
     >
-      <body className="bg-canvas text-ink flex min-h-full flex-col overflow-x-hidden">
+      <body className="bg-canvas text-ink flex min-h-full flex-col overflow-x-clip">
         {/*
-          From the marketing site's root layout, kept because it is the only skip link in the
-          merged app and it now serves every route rather than three. `overflow-x-hidden`
-          came with it: the marketing pages run full-bleed bands and off-canvas animations
-          that would otherwise let the document scroll sideways by a pixel or two.
+          The skip link comes from the marketing site's root layout, kept because it is the
+          only one in the merged app and it now serves every route rather than three.
+
+          **`overflow-x-clip`, on `html` AND `body` — it was `hidden`, on `body` alone.**
+
+          Three things were wrong with that. `hidden` makes the element a *scroll container*,
+          which silently breaks `position: sticky` on descendants in some engines — and this
+          app has sticky rails on `/salon/[id]`, a sticky composer in `chat-thread.tsx` and a
+          sticky footer in `walk-in-form.tsx`. `clip` forbids the scroll without creating the
+          container, which is the whole reason it exists.
+
+          It was also only on `body`, so `html` could still be the one that scrolled.
+
+          And it was hiding real bugs rather than preventing them. `site-header.tsx` documents
+          finding one — a `w-full` element with `sm:mx-4`, i.e. 100% of the viewport plus 32px
+          of margin — and says outright that it "only ever hid behind the root layout's
+          `overflow-x-hidden`". That one was caught by reading the code. The mask is why
+          nobody could know about the others, which is why this changed and why the widths
+          were swept afterwards.
         */}
         <a
           href="#main"

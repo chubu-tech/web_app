@@ -27,10 +27,22 @@ function PlayMark({ className }: { className?: string }) {
       className={cn("size-5 shrink-0", className)}
       aria-hidden
     >
-      <path d="M2.4 1.6a1.5 1.5 0 0 0-.4 1.03v18.74a1.5 1.5 0 0 0 .4 1.03l9.5-10.4z" fill="#00C3FF" />
-      <path d="M2.4 1.6a1.4 1.4 0 0 1 1.42-.06l11.6 6.53-3.52 3.86z" fill="#00E177" />
-      <path d="M15.42 8.07l3.9 2.2a1.5 1.5 0 0 1 0 2.62l-3.93 2.21-3.49-3.83z" fill="#FFCE00" />
-      <path d="M11.9 11.9l3.49 3.83-11.57 6.51a1.4 1.4 0 0 1-1.42-.06z" fill="#FF3A44" />
+      <path
+        d="M2.4 1.6a1.5 1.5 0 0 0-.4 1.03v18.74a1.5 1.5 0 0 0 .4 1.03l9.5-10.4z"
+        fill="#00C3FF"
+      />
+      <path
+        d="M2.4 1.6a1.4 1.4 0 0 1 1.42-.06l11.6 6.53-3.52 3.86z"
+        fill="#00E177"
+      />
+      <path
+        d="M15.42 8.07l3.9 2.2a1.5 1.5 0 0 1 0 2.62l-3.93 2.21-3.49-3.83z"
+        fill="#FFCE00"
+      />
+      <path
+        d="M11.9 11.9l3.49 3.83-11.57 6.51a1.4 1.4 0 0 1-1.42-.06z"
+        fill="#FF3A44"
+      />
     </svg>
   );
 }
@@ -108,7 +120,7 @@ export function StoreBadges({
               <span className="block text-badge tracking-[0.1em] text-white/65 uppercase">
                 {badge.href ? badge.top : "Coming soon to"}
               </span>
-              <span className="block truncate text-ui leading-tight font-semibold">
+              <span className="block truncate text-title leading-tight font-semibold">
                 {badge.store}
               </span>
             </span>
@@ -116,7 +128,12 @@ export function StoreBadges({
         );
 
         return badge.href ? (
-          <a key={badge.store} href={badge.href} aria-label={badge.label} className={shell}>
+          <a
+            key={badge.store}
+            href={badge.href}
+            aria-label={badge.label}
+            className={shell}
+          >
             {inner}
           </a>
         ) : (

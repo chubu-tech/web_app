@@ -95,7 +95,6 @@ export function FindSalon({ index }: { index: SalonIndex }) {
       <Section id="find" aria-labelledby="find-title">
         <Container>
           <SectionHeading
-            eyebrow={searchCopy.eyebrow}
             title={searchCopy.title}
             body={copy.offline}
             titleId="find-title"
@@ -109,7 +108,6 @@ export function FindSalon({ index }: { index: SalonIndex }) {
     <Section id="find" aria-labelledby="find-title">
       <Container>
         <SectionHeading
-          eyebrow={searchCopy.eyebrow}
           title={searchCopy.title}
           body={searchCopy.body}
           titleId="find-title"
@@ -144,7 +142,7 @@ export function FindSalon({ index }: { index: SalonIndex }) {
                 <button
                   type="button"
                   onClick={() => setQuery(EMPTY_QUERY)}
-                  className="text-muted hover:text-ink text-ui font-medium underline decoration-current/30 decoration-2 underline-offset-4 transition-colors"
+                  className="text-muted hover:text-ink text-title font-medium underline decoration-current/30 decoration-2 underline-offset-4 transition-colors"
                 >
                   {searchCopy.clear}
                 </button>
@@ -153,10 +151,7 @@ export function FindSalon({ index }: { index: SalonIndex }) {
               {found.matches.length === 0 ? (
                 <Empty />
               ) : (
-                <SalonRail
-                  matches={found.matches}
-                  label={copy.resultsTitle}
-                />
+                <SalonRail matches={found.matches} label={copy.resultsTitle} />
               )}
             </Band>
 
@@ -178,10 +173,7 @@ export function FindSalon({ index }: { index: SalonIndex }) {
               {/* Absent rather than empty when nothing clears the bar — an
                   empty "Recommended" would be worse than no section. */}
               {bands.recommended.length > 0 && (
-                <Band
-                  title={copy.recommendedTitle}
-                  body={copy.recommendedBody}
-                >
+                <Band title={copy.recommendedTitle} body={copy.recommendedBody}>
                   <SalonRail
                     matches={bands.recommended}
                     label={copy.recommendedTitle}
@@ -204,7 +196,7 @@ export function FindSalon({ index }: { index: SalonIndex }) {
                       type="button"
                       onClick={locate}
                       disabled={locating}
-                      className="text-ink ring-border-strong hover:ring-ink hover:bg-surface-soft text-ui inline-flex h-12 shrink-0 items-center gap-2 rounded-full px-5 font-medium ring-1 ring-inset transition-colors disabled:opacity-50"
+                      className="text-ink ring-border-strong hover:ring-ink hover:bg-surface-soft text-title inline-flex h-12 shrink-0 items-center gap-2 rounded-full px-5 font-medium ring-1 ring-inset transition-colors disabled:opacity-50"
                     >
                       <LocateFixed className="text-rausch size-4" aria-hidden />
                       {locating ? searchCopy.place.locating : copy.nearbyAction}
@@ -345,7 +337,7 @@ function SalonRail({ matches, label }: { matches: Match[]; label: string }) {
 
 function Note({ children }: { children: React.ReactNode }) {
   return (
-    <p className="bg-surface-soft ring-hairline-soft text-muted text-ui mt-7 rounded-md px-6 py-8 text-center ring-1 ring-inset">
+    <p className="bg-surface-soft ring-hairline-soft text-muted text-title mt-7 rounded-md px-6 py-8 text-center ring-1 ring-inset">
       {children}
     </p>
   );

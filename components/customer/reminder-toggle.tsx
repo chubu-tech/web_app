@@ -100,8 +100,15 @@ export function ReminderToggle({
       >
         <span
           className={cn(
-            "bg-canvas absolute top-0.5 size-5 rounded-full shadow-sm transition-all duration-[var(--duration-fast)]",
-            on ? "left-[1.125rem]" : "left-0.5",
+            // **`transform`, not `left`.** This animated `left` under a blanket all-property
+            // transition,
+            // which is a layout property: every frame of the knob's travel was a layout
+            // pass, on the one control most likely to be tapped repeatedly. The knob now
+            // sits at `left-0.5` always and slides 16px — 2px → 18px, the same two
+            // positions — on the compositor.
+            "bg-canvas absolute top-0.5 left-0.5 size-5 rounded-full shadow-sm",
+            "transition-transform duration-[var(--duration-fast)]",
+            on ? "translate-x-4" : "translate-x-0",
           )}
         />
       </span>

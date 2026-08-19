@@ -94,8 +94,18 @@ export function Rail({
       */}
       <Edge show={edges.right} />
 
-      <Arrow side="left" show={edges.left} label={label} onClick={() => page(-1)} />
-      <Arrow side="right" show={edges.right} label={label} onClick={() => page(1)} />
+      <Arrow
+        side="left"
+        show={edges.left}
+        label={label}
+        onClick={() => page(-1)}
+      />
+      <Arrow
+        side="right"
+        show={edges.right}
+        label={label}
+        onClick={() => page(1)}
+      />
     </div>
   );
 }
@@ -142,8 +152,8 @@ function Arrow({
       tabIndex={show ? 0 : -1}
       aria-label={`${side === "left" ? "Previous" : "Next"} — ${label}`}
       className={cn(
-        "bg-canvas/95 text-ink shadow-card ring-hairline absolute top-[35%] hidden size-10 -translate-y-1/2 place-items-center rounded-full ring-1 ring-inset backdrop-blur-sm",
-        "hover:bg-canvas transition-opacity duration-300",
+        "bg-paper/95 text-ink shadow-card ring-hairline absolute top-[35%] hidden size-10 -translate-y-1/2 place-items-center rounded-full ring-1 ring-inset backdrop-blur-sm",
+        "hover:bg-paper transition-opacity duration-300",
         side === "left" ? "left-2" : "right-2",
         show ? "opacity-100 sm:grid" : "invisible opacity-0 sm:grid",
       )}

@@ -89,7 +89,7 @@ export function SearchPanel({
           </span>
           <span
             className={cn(
-              "block truncate text-ui",
+              "block truncate text-title",
               value ? "text-ink font-medium" : "text-muted-soft",
             )}
           >
@@ -112,7 +112,7 @@ export function SearchPanel({
               // `rounded-md` + the one shadow tier. The reference applies exactly
               // this definition to its own dropdowns — account menu, language
               // picker, date picker — and has no second tier to reach for.
-              "bg-canvas shadow-card absolute top-[calc(100%+0.75rem)] z-30 overflow-hidden rounded-md",
+              "bg-paper shadow-card absolute top-[calc(100%+0.75rem)] z-30 overflow-hidden rounded-md",
               "ring-hairline ring-1 ring-inset",
               width,
               align === "right" ? "right-0" : "left-0",
@@ -144,11 +144,12 @@ export function PanelOption({
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "flex w-full items-center justify-between gap-3 px-5 py-3 text-left text-ui",
+        "flex w-full items-center justify-between gap-3 px-5 py-3 text-left text-title",
         "transition-colors duration-200",
-        // `hover:bg-surface-soft`, not `hover:bg-canvas`. The panel's own surface
-        // is canvas, so the hover state resolved to the colour already underneath
-        // it and these rows had no hover feedback at all.
+        // `hover:bg-surface-soft`, not `hover:bg-canvas`. The panel's surface is
+        // paper, so a hover has to move away from white. It used to be worse than a
+        // taste call: canvas was white too, so the hover resolved to the colour
+        // already underneath and these rows had no feedback at all.
         active
           ? "bg-rausch-soft text-ink font-semibold"
           : "text-body hover:bg-surface-soft",

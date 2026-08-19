@@ -47,7 +47,6 @@ export function Proof({ index }: { index: SalonIndex }) {
       <Container>
         <div className="grid gap-10 lg:grid-cols-12 lg:items-end lg:gap-14">
           <SectionHeading
-            eyebrow={proof.eyebrow}
             title={proof.title}
             body={proof.body}
             titleId="proof-title"
@@ -69,7 +68,7 @@ export function Proof({ index }: { index: SalonIndex }) {
                     <dt className="text-muted mt-1.5 text-body-sm">
                       {stat.label}
                     </dt>
-                    <dd className="text-ink text-editorial-lg font-semibold tabular-nums">
+                    <dd className="text-ink text-editorial-lg font-display font-semibold tabular-nums">
                       {stat.value}
                     </dd>
                   </div>

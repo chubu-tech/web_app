@@ -532,7 +532,7 @@ function ShopScreen({
   return (
     <div
       ref={ref}
-      className="bg-canvas ring-hairline shadow-card overflow-hidden rounded-md ring-1 ring-inset"
+      className="bg-paper ring-hairline shadow-card overflow-hidden rounded-md ring-1 ring-inset"
     >
       {/* A window, not a browser: no URL bar, nothing to decode. */}
       <div className="border-hairline-soft flex items-center gap-3 border-b px-4 py-3 sm:px-5">
@@ -598,7 +598,7 @@ function ShopScreen({
           initial={reduced ? false : { opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: EASE }}
-          className="text-ink text-ui font-semibold"
+          className="text-ink text-title font-semibold"
         >
           {features[active].title}
         </motion.span>
@@ -953,7 +953,7 @@ function RailHint({
 function PanelHeading({ title, meta }: { title: string; meta: string }) {
   return (
     <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <span className="text-ink text-ui font-semibold">{title}</span>
+      <span className="text-ink text-title font-semibold">{title}</span>
       <span className="text-muted text-caption">{meta}</span>
     </div>
   );
@@ -1003,11 +1003,16 @@ function BookingsPanel() {
               {row.name}
             </span>
             {/*
-              `bg-surface-soft`, not `bg-canvas` — the mock's own surface is white
-              and `--color-canvas` on the public pages *is* white, so every
-              "background" inside this card used to resolve to the colour already
-              behind it. `rounded-md` too: `rounded-lg` here is `--radius-lg`,
-              **20px**, which on a 36px track is very nearly a pill.
+              `bg-surface-soft`, not `bg-canvas` — the mock's own surface is paper
+              white, so a "background" inside this card has to be a step away from
+              white rather than white again. It used to be the sharper version of the
+              same bug: `--color-canvas` was itself white out here, so the track
+              resolved to the exact colour already behind it and vanished. The public
+              pages are cream now (`data-shell="marketing"`) and `surface-soft` is a
+              warm tint of it, so this reads as a track either way — but the rule that
+              produced it is unchanged: inside a card, reach for `surface-soft`.
+              `rounded-md` too: `rounded-lg` here is `--radius-lg`, **20px**, which on
+              a 36px track is very nearly a pill.
             */}
             <div className="bg-surface-soft relative h-9 flex-1 rounded-md">
               {row.blocks.map((block) => (
@@ -1074,7 +1079,7 @@ function LinePanel() {
             <span
               className={cn(
                 "grid size-7 shrink-0 place-items-center rounded-full text-caption-sm font-semibold",
-                i === 0 ? "bg-ink text-white" : "bg-canvas text-muted",
+                i === 0 ? "bg-ink text-white" : "bg-paper text-muted",
               )}
             >
               {i}
@@ -1093,7 +1098,7 @@ function LinePanel() {
                 i === 1
                   ? "bg-rausch-cta text-white"
                   : i === 0
-                    ? "bg-canvas text-ink"
+                    ? "bg-paper text-ink"
                     : "text-muted",
               )}
             >

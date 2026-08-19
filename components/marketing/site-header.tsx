@@ -174,9 +174,17 @@ export function SiteHeader() {
         <div
           className={cn(
             "mx-auto flex max-w-[82rem] items-center justify-between",
-            "transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+            // Named properties, and 300ms rather than 500. Chrome that takes half a
+            // second to settle is chrome the reader watches instead of reads — and
+            // the blanket all-property form was animating `color` and `gap` alongside the six that
+            // actually change. `components/ui/app-header.tsx` runs the same list.
+            "transition-[background-color,box-shadow,margin,padding,border-radius] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
             condensed
-              ? "mt-3 gap-3 rounded-full bg-white/80 px-4 py-2.5 shadow-card backdrop-blur-xl sm:mx-4 sm:px-5 lg:mx-auto"
+              ? // `bg-paper/80`, not `bg-white/80`. Same pixels while the public site was
+                // white, and not the same thing now it is cream: `paper` follows the
+                // shell, a raw white does not. It is also what `components/ui/app-header.tsx`
+                // uses for the identical pill, so the two headers cannot drift.
+                "mt-3 gap-3 rounded-full bg-paper/80 px-4 py-2.5 shadow-card backdrop-blur-xl sm:mx-4 sm:px-5 lg:mx-auto"
               : "mt-0 gap-3 rounded-none bg-transparent px-5 py-5 sm:px-8 lg:px-10",
           )}
         >
@@ -211,7 +219,11 @@ export function SiteHeader() {
                 className="size-full object-cover"
               />
             </span>
-            <span className="text-ink text-body-lg font-semibold tracking-tight">
+            {/* The wordmark takes the display face too. `typography.md`'s rule for
+                editorial pages: collapsing the wordmark into the body family flattens
+                the hierarchy and the page reads as un-branded. It is the one place the
+                serif appears above the fold at UI size. */}
+            <span className="text-ink text-body-lg font-display font-semibold tracking-tight">
               {brand.name}
             </span>
           </Link>
@@ -225,22 +237,32 @@ export function SiteHeader() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "group/nav relative overflow-hidden rounded-full px-3.5 py-2 text-ui font-medium",
-                  // Underline grows from the left on hover.
-                  "after:bg-rausch after:absolute after:bottom-1.5 after:left-3.5 after:h-px after:w-0 after:transition-all after:duration-300 after:ease-[cubic-bezier(0.16,1,0.3,1)] hover:after:w-[calc(100%-1.75rem)]",
+                  "relative rounded-full px-3.5 py-2 text-title font-medium",
+                  "text-body hover:text-ink transition-colors duration-200",
+                  /*
+                    **One hover signal, not three.**
+
+                    This link used to run an underline growing from the left (300ms), the
+                    label sliding up and out of a clipped box (400ms), and a *duplicate*
+                    label rising from below to replace it (400ms) — three animations, two
+                    of them carrying the same information, on a control whose whole job is
+                    to scroll the page down.
+
+                    The underline survives because it is the one that says something the
+                    colour change does not: where the link starts and ends. The slide and
+                    its duplicate `<span>` are gone, which also takes `overflow-hidden`
+                    with them — that was only ever there to clip the outgoing label, and
+                    while it was on the link it was also quietly clipping the focus ring.
+
+                    `width` alone, named: the blanket form here animated the rule's colour
+                    and position too.
+                  */
+                  "after:bg-rausch after:absolute after:bottom-1.5 after:left-3.5 after:h-px after:w-0",
+                  "after:transition-[width] after:duration-300 after:ease-[cubic-bezier(0.16,1,0.3,1)]",
+                  "hover:after:w-[calc(100%-1.75rem)]",
                 )}
               >
-                {/* The label slides out of the top while a brand-coloured copy
-                    rises to take its place. */}
-                <span className="text-body block transition-transform duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/nav:-translate-y-[130%]">
-                  {item.label}
-                </span>
-                <span
-                  className="text-ink absolute inset-0 flex translate-y-[130%] items-center justify-center transition-transform duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover/nav:translate-y-0"
-                  aria-hidden
-                >
-                  {item.label}
-                </span>
+                {item.label}
               </a>
             ))}
           </nav>

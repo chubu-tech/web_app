@@ -1,4 +1,3 @@
-
 /* ---------------------------------------------------------------------------
    The marketing site's own layer, on top of the product tokens in `globals.css`.
 
@@ -42,13 +41,29 @@
    only — do not add a token here that a product route would pick up.
 --------------------------------------------------------------------------- */
 @theme {
-  /* Semantic. `globals.css` owns the rest of the palette. */
-  --color-success: #0b6b3a;
+  /* `--color-success` used to be declared here as `#0b6b3a` — byte-identical to
+     `--color-success-text` in `globals.css`, which is the token every surface in the
+     product actually uses (`text-success-text`, `bg-success-soft`). Nothing anywhere
+     referenced the bare name: 30-odd call sites, all of them the `-text`/`-soft` pair.
+
+     The header of this file records that 34 tokens were dropped during the merge for
+     being byte-identical duplicates. This was the thirty-fifth. `globals.css` owns the
+     whole palette; this file adds none of it. */
 
   /* --- Type -------------------------------------------------------------
-     **One family.** Inter, loaded variable in `app/layout.tsx`, and the same face
-     the product and the Flutter app render in — so the seam between marketing and
-     product is a URL change and nothing else.
+     **Two families out here, one everywhere else.** Body is Inter — the same face the
+     product and the Flutter app render in, so the seam between marketing and product is
+     a URL change and nothing else. Display is **Fraunces**, via `--font-display` in
+     `globals.css`, and it is the one thing about type that the public pages do and the
+     product does not.
+
+     This block used to open "**One family.** Inter", and the steps below were built on
+     that: every size carries its own leading and tracking precisely because weight and
+     size were the only levers a single family left. They still hold — Fraunces is applied
+     by the `font-display` utility at four call sites (the hero's h1, `SectionHeading`'s
+     h2, and the two wordmarks) and inherits these steps rather than replacing them. A
+     heading that does not opt in is still Inter, which is correct: the display face is a
+     voice for the things that carry the page, not a default.
 
      Every step carries its own leading and tracking. Two rules the numbers follow,
      both from the reference:
@@ -98,10 +113,26 @@
   --text-body-lg: 1.0625rem; /* 17px */
   --text-body-lg--line-height: 1.65;
 
-  /* The UI voice: nav links, buttons, labels, chips. Carries 500. */
-  --text-ui: 0.9375rem; /* 15px */
-  --text-ui--line-height: 1.4;
-  --text-ui--letter-spacing: -0.004em;
+  /* `--text-ui` used to be declared here: 0.9375rem, 1.4 leading, -0.004em tracking,
+     described as "the UI voice: nav links, buttons, labels, chips".
+
+     `globals.css` declares `--text-title` as 0.9375rem, 1.4 leading, -0.006em tracking,
+     described as "the UI voice: nav, buttons, labels, table headers".
+
+     **Same role, same size, same leading, two names** — 0.002em apart, which is 0.03px
+     at 15px. Both reached every route, because this file is imported by that one, so the
+     product had two names for one step and 32 marketing call sites used the second. That
+     is exactly what the rule at the top of `globals.css` forbids: a new name is for a
+     different *size*, not for the same size in a different file.
+
+     The 32 call sites now say `text-title`, and this token is gone.
+
+     **`--text-subheading` below is NOT the same case**, though it looks like one next to
+     `--text-display-sm` (18px, one pixel away). It is 17px because `--text-body-lg` is
+     17px, and the pairing is the point: card titles and running text sit at one size and
+     let *weight* carry the difference, which is what stops a card grid reading as a stack
+     of headlines. Merging it into the 18px step would break that pairing to save a token.
+     Leave it. */
 
   /* --- Chrome ------------------------------------------------------------
      The public header's height, in its own token because four things subtract it:
@@ -155,71 +186,67 @@
 }
 
 @layer base {
-  html {
+  /* ---------------------------------------------------------------------------
+     **Everything in this block is scoped to the marketing shell, and it did not
+     used to be.**
+
+     `globals.css` imports this file, so an unscoped rule here reaches all 79 routes.
+     That is fine for a *token* — a declared variable nothing references costs
+     nothing — and it is not fine for a *rule*. This block previously set
+     `scroll-behavior: smooth`, `-webkit-tap-highlight-color: transparent`,
+     `text-rendering`, `::selection`, `text-wrap` on headings and paragraphs, a
+     `:focus-visible` ring, and a full `body` block, all globally, from a file whose
+     own header says "do not add a token here that a product route would pick up".
+     An owner console at a till was smooth-scrolling because the marketing site
+     wanted anchor links to glide.
+
+     Three things happened to fix it:
+
+     1. **The `body` block is gone entirely.** Every declaration in it — background,
+        colour, font-family, size, leading, smoothing, `font-feature-settings` — was
+        a byte-for-byte duplicate of `globals.css`'s own `@layer base` body rules,
+        which come *later* in the cascade and were winning anyway. Only
+        `text-rendering` was unique, and it is below, scoped.
+     2. **The genuinely global rules moved to `globals.css`** — `::selection` and the
+        `text-wrap` pair. They are good defaults for the whole product, so they are
+        now declared where a reader looking for global base styles would find them,
+        rather than inherited by accident from the marketing layer.
+     3. **The `:focus-visible` ring is deleted rather than scoped**, because it never
+        applied. See the note in `globals.css`.
+  --------------------------------------------------------------------------- */
+
+  /* Smooth scroll belongs to the public site, whose nav is a column of anchors into
+     one long page. The console's nav is routes, and gliding a dense operational
+     screen is motion nobody asked for. `:has()` because the attribute is on a
+     descendant of `html`, not on it. */
+  html:has([data-shell="marketing"]) {
     scroll-behavior: smooth;
+  }
+
+  [data-shell="marketing"] {
+    /* No grey flash on tap. Safe to remove *here* because this shell's controls are
+       large and hover-rich; the product keeps the native highlight, which — until
+       the press states landed alongside this change — was the only touch feedback
+       several of its controls had at all. */
     -webkit-tap-highlight-color: transparent;
-  }
-
-  body {
-    background-color: var(--color-canvas);
-    color: var(--color-ink);
-    font-family: var(--font-sans);
-    /* A default step, so anything that sets no `text-` utility still lands on the
-       scale instead of on the browser's 16px/normal. */
-    font-size: var(--text-body-md);
-    line-height: var(--text-body-md--line-height);
     /* Photography carries the hierarchy; type stays crisp beneath it. */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    /* Inter's contextual alternates close the 'ti'/'tt' gaps its default spacing
-       leaves; `cv11` gives the single-storey 'a' a straight tail. Both matter most
-       at the 12-15px end of the scale, which is where the nav and captions live. */
-    font-feature-settings: "cv11", "calt";
-  }
-
-  ::selection {
-    background-color: var(--color-rausch);
-    color: #fff;
-  }
-
-  /* Tracking is per-step, on the tokens above — a blanket value here would be wrong
-     at both ends, since a display clamp wants about -0.026em and a 15px label wants
-     none at all.
-
-     `text-wrap: balance` stays: it is what stops a two-line heading leaving one
-     orphaned word, and it has nothing to do with tracking. */
-  h1,
-  h2,
-  h3,
-  h4 {
-    text-wrap: balance;
-  }
-
-  /* Long-form copy reads better with the last line not left as one short word. */
-  p {
-    text-wrap: pretty;
-  }
-
-  :focus-visible {
-    outline: 2px solid var(--color-rausch);
-    outline-offset: 3px;
-    border-radius: 4px;
   }
 }
 
-@utility shadow-card {
-  /* The one shadow tier from DESIGN.md — a surface either has it or none. There is
-     no second tier out here any more: the reference applies this *same* definition
-     to hover-floated cards, to the search bar at rest and to every dropdown, and
-     says so explicitly ("This is the single shadow definition in the entire
-     system"). `shadow-lift` stays declared in `globals.css` for the customer shell;
-     nothing under `(marketing)` uses it. */
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / 0.02),
-    0 2px 6px rgb(0 0 0 / 0.04),
-    0 4px 8px rgb(0 0 0 / 0.1);
-}
+/* `@utility shadow-card` used to be declared here as well, with the same three
+   shadows `globals.css` declares — one written `rgb(0 0 0 / 0.02)` and the other
+   `rgba(0, 0, 0, 0.02)`, which is the same colour in two syntaxes.
+
+   Two definitions of one utility name is one definition and a decoy: `globals.css`
+   imports this file at the top, so its own declaration came later and won, and this
+   copy had no effect on any route. What it did do was invite the two to drift, at
+   which point the marketing site and the product would have disagreed about the single
+   shadow tier that DESIGN.md says is the only one.
+
+   The rule it stated is still true and still enforced from `globals.css`: a surface has
+   `shadow-card` or it has nothing. `shadow-lift` is declared there for the customer
+   shell and nothing under `(marketing)` uses it. */
 
 /* Edge-to-edge fade used on the category strip and the motif divider. */
 @utility mask-edges {
@@ -248,16 +275,17 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
+/* The `prefers-reduced-motion` block that used to sit here is gone, because
+   `globals.css` carries a strict superset of it.
 
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
+   This copy set `animation-duration`, `animation-iteration-count` and
+   `transition-duration`, plus `scroll-behavior: auto` on `html`. The one in
+   `globals.css` sets all of those — its universal selector matches `html`, so the
+   scroll rule is covered — **and** `animation-delay`, which this one lacked.
+
+   That missing line is the reason to delete rather than to keep both. Anything with a
+   staggered entrance holds its opening keyframe through the full delay when only the
+   duration is clamped: the collapse nav's rows start at `opacity: 0` with `both` fill,
+   so a reduced-motion visitor would have seen a blank nav. Two blocks that disagree
+   about the fix mean the weaker one is one import-order change away from being the one
+   that applies. */

@@ -7,7 +7,7 @@ import { breadcrumbSchema, faqSchema, jsonLdScript } from "@/lib/seo";
 export const metadata: Metadata = {
   title: "Help — Booking, Queues, Payment & Rewards",
   description:
-    "How to change or cancel a booking, join a salon's walk-in queue, pay, earn and spend loyalty points, report something, and delete your account on THO.",
+    "How to change or cancel a booking, join a salon’s walk-in queue, pay, earn and spend loyalty points, report something, and delete your account on THO.",
   alternates: { canonical: "/help" },
   openGraph: {
     type: "website",
@@ -80,7 +80,9 @@ export default function HelpPage() {
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLdScript(breadcrumbSchema(trail)) }}
+        dangerouslySetInnerHTML={{
+          __html: jsonLdScript(breadcrumbSchema(trail)),
+        }}
       />
 
       <nav aria-label="Breadcrumb" className="mb-4">
@@ -97,7 +99,7 @@ export default function HelpPage() {
         </ol>
       </nav>
 
-      <h1 className="text-editorial-lg font-semibold">
+      <h1 className="text-editorial-lg font-display font-semibold">
         Help — booking, queues, payment and rewards
       </h1>
 
@@ -113,12 +115,16 @@ export default function HelpPage() {
             key={topic.q}
             className="border-hairline-soft border-b py-7 last:border-b-0"
           >
-            <h2 className="text-ink text-subheading font-semibold">{topic.q}</h2>
-            <p className="text-body mt-2 text-body-lg leading-relaxed">{topic.a}</p>
+            <h2 className="text-ink text-subheading font-semibold">
+              {topic.q}
+            </h2>
+            <p className="text-body mt-2 text-body-lg leading-relaxed">
+              {topic.a}
+            </p>
             {topic.href ? (
               <Link
                 href={topic.href}
-                className="text-rausch-cta hover:text-ink mt-4 inline-flex items-center gap-1.5 text-ui font-medium transition-colors"
+                className="text-rausch-cta hover:text-ink mt-4 inline-flex items-center gap-1.5 text-title font-medium transition-colors"
               >
                 {topic.cta}
                 <Icons.forward
@@ -182,7 +188,7 @@ const TOPICS: { q: string; a: string; href?: string; cta?: string }[] = [
     q: "Something here is wrong or abusive",
     a: "Report it. Reports go to our moderators rather than to the salon, they are read by a person, and the person you report is not told who reported them. You can also block someone so their messages stop reaching you.",
     href: "/legal/content-policy",
-    cta: "What can't be posted",
+    cta: "What can’t be posted",
   },
   {
     q: "How do I delete my account?",

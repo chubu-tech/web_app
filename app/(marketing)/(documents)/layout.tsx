@@ -33,10 +33,13 @@ import { Container } from "@/components/marketing/ui/section";
  *    read cookies and are statically rendered — which is the right shape for a
  *    document a store reviewer opens signed out. It also means a *suspended* account
  *    can still read the terms it is being judged against.
- * 2. **No `data-shell`.** The customer group's wrapper re-points `--color-canvas` at
- *    cream; the marketing group deliberately carries no shell attribute, so these
- *    render on the white canvas the rest of the public site uses. The pages were
- *    restyled onto the marketing type scale to match — the words are untouched.
+ * 2. **`data-shell` comes from the parent, not from here.** This used to read "no
+ *    `data-shell`", on the grounds that the marketing group carried none and these
+ *    therefore rendered on white. `app/(marketing)/layout.tsx` declares
+ *    `data-shell="marketing"` now — closing the seam where `/` was `#ffffff` and every
+ *    product route was `#f6f3ee` — and these four nest inside it, so they inherit the
+ *    cream with nothing to add here. The pages were already restyled onto the marketing
+ *    type scale; the words are untouched by any of it.
  * 3. **No `error.tsx`/`loading.tsx` above them any more.** Neither is missed: all
  *    four are static, read nothing and have nothing to fail or to wait for. If a
  *    marketing boundary is ever added it belongs at `app/(marketing)/`, where the

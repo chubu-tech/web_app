@@ -59,7 +59,7 @@ import { breadcrumbSchema, faqSchema, jsonLdScript } from "@/lib/seo";
 const HOW_IT_WORKS = [
   {
     title: "Customers find your salon and book a real time",
-    body: "Your salon gets its own page on THO with your services, your prices, your team, your opening hours and your reviews. Customers in Bhutan search by area, service, price and rating, and book against your stylists' actual working hours — so a booking that lands is a booking you can keep.",
+    body: "Your salon gets its own page on THO with your services, your prices, your team, your opening hours and your reviews. Customers in Bhutan search by area, service, price and rating, and book against your stylists’ actual working hours — so a booking that lands is a booking you can keep.",
   },
   {
     title: "Walk-ins join a live queue instead of filling your shop",
@@ -67,7 +67,7 @@ const HOW_IT_WORKS = [
   },
   {
     title: "You run the day from one screen",
-    body: "The console opens on a laptop or a phone at the counter. It shows the day hour by hour, the live queue, and everything you set up once — services and prices, who works when, your photos and your salon's details.",
+    body: "The console opens on a laptop or a phone at the counter. It shows the day hour by hour, the live queue, and everything you set up once — services and prices, who works when, your photos and your salon’s details.",
   },
   {
     title: "You see how the shop is doing",
@@ -89,7 +89,7 @@ const HOW_IT_WORKS = [
   */
   {
     title: "You can sell more than time",
-    body: "On Growth you can sell products from your salon page for collection or delivery, with your own discount codes, and record the cash when you take it. On Pro you can also sell ahead — a pack of ten cuts, paid at your counter, that the customer spends one visit at a time. THO does not take card payments or hold anyone's money: it records what was agreed and what is still owed.",
+    body: "On Growth you can sell products from your salon page for collection or delivery, with your own discount codes, and record the cash when you take it. On Pro you can also sell ahead — a pack of ten cuts, paid at your counter, that the customer spends one visit at a time. THO does not take card payments or hold anyone’s money: it records what was agreed and what is still owed.",
   },
 ] as const;
 
@@ -100,7 +100,7 @@ const FAQ = [
   },
   {
     q: "How do salons manage appointments and queues on THO?",
-    a: "A salon on THO gets a console showing today's bookings hour by hour and the live walk-in line side by side. You confirm, complete, reschedule or cancel a booking and the customer is told for you; you call the next person in the queue with one press; and you can add a walk-in who arrived without a phone. The customer's queue page updates itself, so nobody has to keep asking how long is left.",
+    a: "A salon on THO gets a console showing today’s bookings hour by hour and the live walk-in line side by side. You confirm, complete, reschedule or cancel a booking and the customer is told for you; you call the next person in the queue with one press; and you can add a walk-in who arrived without a phone. The customer’s queue page updates itself, so nobody has to keep asking how long is left.",
   },
   {
     q: "How much does salon booking software cost in Bhutan?",
@@ -120,7 +120,7 @@ const FAQ = [
   },
   {
     q: "Does THO handle staff and payroll?",
-    a: "THO holds your team, what each stylist does, and the hours each of them works — which is what customer bookings are checked against. On Pro it also records each stylist's commission and base pay and produces a monthly payroll figure, plus a Bhutan presumptive income-tax estimate from your turnover.",
+    a: "THO holds your team, what each stylist does, and the hours each of them works — which is what customer bookings are checked against. On Pro it also records each stylist’s commission and base pay and produces a monthly payroll figure, plus a Bhutan presumptive income-tax estimate from your turnover.",
   },
   {
     q: "Can I take payments through THO?",
@@ -238,7 +238,7 @@ export default function ForSalonsPage() {
           </ol>
         </nav>
 
-        <h1 className="text-editorial-xl text-ink font-semibold tracking-tight">
+        <h1 className="text-editorial-xl font-display text-ink font-semibold tracking-tight">
           Salon booking and management software for Bhutan
         </h1>
         {/*
@@ -255,7 +255,7 @@ export default function ForSalonsPage() {
       </header>
 
       <section className="mt-xl" aria-labelledby="how-heading">
-        <h2 id="how-heading" className="text-editorial-md text-ink font-semibold">
+        <h2 id="how-heading" className="text-editorial-md font-display text-ink font-semibold">
           How THO works for a salon
         </h2>
         {HOW_IT_WORKS.map((item) => (
@@ -267,7 +267,7 @@ export default function ForSalonsPage() {
       </section>
 
       <section className="mt-xl" aria-labelledby="plans-heading">
-        <h2 id="plans-heading" className="text-editorial-md text-ink font-semibold">
+        <h2 id="plans-heading" className="text-editorial-md font-display text-ink font-semibold">
           What THO costs a salon
         </h2>
         <p className="text-body-md text-body mt-xs max-w-[46rem]">
@@ -295,7 +295,7 @@ export default function ForSalonsPage() {
       </section>
 
       <section className="mt-xl" aria-labelledby="owner-faq-heading">
-        <h2 id="owner-faq-heading" className="text-editorial-md text-ink font-semibold">
+        <h2 id="owner-faq-heading" className="text-editorial-md font-display text-ink font-semibold">
           Questions salon owners ask
         </h2>
         <dl className="mt-base max-w-[46rem]">
@@ -311,7 +311,7 @@ export default function ForSalonsPage() {
       </section>
 
       <section className="mt-xl" aria-labelledby="start-heading">
-        <h2 id="start-heading" className="text-editorial-md text-ink font-semibold">
+        <h2 id="start-heading" className="text-editorial-md font-display text-ink font-semibold">
           Get your salon on THO
         </h2>
         <p className="text-body-md text-body mt-xs max-w-[46rem]">

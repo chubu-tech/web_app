@@ -64,7 +64,7 @@ export function DownloadBand() {
               as="h2"
               id="download-title"
               lines={parseHeading("The chair is ready _when you are_")}
-              className="text-editorial-xl mt-3 max-w-[38rem] font-semibold text-white"
+              className="text-editorial-xl font-display mt-3 max-w-[38rem] font-semibold text-white"
               accentClassName="text-rausch"
             />
 
@@ -83,7 +83,7 @@ export function DownloadBand() {
                 {/* The scan route, offered beside the tap route rather than instead
                     of it — a laptop reader taps, a phone reader scans, and neither
                     should have to switch device. */}
-                <div className="bg-canvas shadow-card flex items-center gap-4 rounded-md p-3 pr-4">
+                <div className="bg-paper shadow-card flex items-center gap-4 rounded-md p-3 pr-4">
                   {/*
                     Square corners, and `rounded-none` rather than dropping the class
                     — stating the zero is what stops the next reader "restoring" a
@@ -100,7 +100,7 @@ export function DownloadBand() {
                     />
                   </div>
                   <span className="text-left">
-                    <span className="text-ink text-ui block font-semibold">
+                    <span className="text-ink text-title block font-semibold">
                       {waitlist.qr.caption}
                     </span>
                     <span className="text-muted block text-caption">

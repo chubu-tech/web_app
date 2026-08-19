@@ -73,7 +73,7 @@ export function Hero() {
                   beside it are the whole of the page's Bhutanese identity above the
                   fold — deliberately small, because the reference's restraint is the
                   point and identity does not need to be loud to be present. */}
-              <span className="text-rausch text-ui font-semibold">
+              <span className="text-rausch text-title font-semibold">
                 {brand.greeting}
               </span>
               <TextileRule draw className="w-20" />
@@ -89,7 +89,14 @@ export function Hero() {
               stagger={0.06}
               // 600, not the 900 this used to carry. The token already sets 1.08
               // leading and -0.026em tracking, so nothing is hand-set here.
-              className="text-display-2xl text-ink mt-6 font-semibold"
+              //
+              // `font-display` is Fraunces — the page's one display voice, and the
+              // reason a 54px headline reads as a different *kind* of thing rather
+              // than a large paragraph. It is safe beside `font-semibold` because
+              // the two land in different `twMerge` groups (family vs weight); do
+              // not add a second `text-*` here, which is the collision that once ate
+              // a label's colour (see `lib/utils.ts`).
+              className="text-display-2xl font-display text-ink mt-6 font-semibold"
               accentClassName="text-rausch"
             />
 
@@ -117,7 +124,7 @@ export function Hero() {
               <StoreBadges />
               <a
                 href={hero.ownerCta.href}
-                className="text-ink group text-ui inline-flex items-center gap-1.5 font-medium underline decoration-hairline decoration-2 underline-offset-4 transition-colors hover:decoration-ink"
+                className="text-ink group text-title inline-flex items-center gap-1.5 font-medium underline decoration-hairline decoration-2 underline-offset-4 transition-colors hover:decoration-ink"
               >
                 {hero.ownerCta.label}
                 <ArrowRight
@@ -217,7 +224,7 @@ function QueueCard() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8, delay: 0.9, ease: EASE }}
-      className="bg-canvas shadow-card absolute right-4 bottom-4 left-4 rounded-md p-4 sm:right-auto sm:bottom-5 sm:left-5 sm:w-[19rem]"
+      className="bg-paper shadow-card absolute right-4 bottom-4 left-4 rounded-md p-4 sm:right-auto sm:bottom-5 sm:left-5 sm:w-[19rem]"
     >
       <div className="flex items-center justify-between gap-3">
         <span className="text-muted text-caption-sm font-semibold tracking-[0.14em] uppercase">
@@ -258,7 +265,7 @@ function QueueCard() {
               duration={2.2}
               delay={1.3}
             />
-            <span className="text-ui font-medium"> min</span>
+            <span className="text-title font-medium"> min</span>
           </span>
           <span className="text-muted block text-caption">estimated wait</span>
         </div>
@@ -281,7 +288,7 @@ function QueueCard() {
         ))}
       </div>
       <p className="text-muted mt-3 text-caption">
-        We&apos;ll ping you two turns before your chair is free.
+        We’ll ping you two turns before your chair is free.
       </p>
     </motion.div>
   );

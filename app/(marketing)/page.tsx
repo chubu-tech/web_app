@@ -71,7 +71,7 @@ export const metadata: Metadata = {
   */
   title: { absolute: `${brand.name} — Salon & Barber Booking in Bhutan` },
   description:
-    "Book a salon or barber appointment anywhere in Bhutan, or join a shop's walk-in queue from your phone and watch your place in line. Free for customers — no booking fee, no card needed.",
+    "Book a salon or barber appointment anywhere in Bhutan, or join a shop’s walk-in queue from your phone and watch your place in line. Free for customers — no booking fee, no card needed.",
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",

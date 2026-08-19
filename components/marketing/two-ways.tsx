@@ -38,7 +38,6 @@ export function TwoWays() {
     <Section id="how-it-works" aria-labelledby="how-it-works-title">
       <Container>
         <SectionHeading
-          eyebrow={twoWays.eyebrow}
           title="Two ways into _the chair_"
           body={twoWays.body}
           titleId="how-it-works-title"
@@ -64,8 +63,12 @@ export function TwoWays() {
                     {/* The reference's floating badge: white pill, one shadow tier,
                         top-left over the photo. It was a dark glass capsule centred
                         on the arch's crown — which only had a crown to sit on. */}
-                    <span className="bg-canvas text-ink shadow-card absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-badge font-semibold tracking-[0.08em] uppercase">
-                      <Icon className="size-3.5" strokeWidth={2.4} aria-hidden />
+                    <span className="bg-paper text-ink shadow-card absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-badge font-semibold tracking-[0.08em] uppercase">
+                      <Icon
+                        className="size-3.5"
+                        strokeWidth={2.4}
+                        aria-hidden
+                      />
                       {option.tag}
                     </span>
                   </div>

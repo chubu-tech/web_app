@@ -50,7 +50,9 @@ export function useWaitlist(): WaitlistContext {
     ctx ?? {
       open: () => {
         if (typeof document !== "undefined") {
-          document.getElementById("download")?.scrollIntoView({ behavior: "smooth" });
+          document
+            .getElementById("download")
+            ?.scrollIntoView({ behavior: "smooth" });
         }
       },
     }
@@ -164,7 +166,10 @@ function WaitlistDialog({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.25 }}
-        className="absolute inset-0 cursor-default bg-black/45 backdrop-blur-[2px]"
+        // `scrim`, the utility in `globals.css`, rather than a local `bg-black/45`:
+        // the product's sheets and dialogs all sit behind the same 50% black, and a
+        // marketing modal five points lighter was a second scrim nobody had decided on.
+        className="scrim absolute inset-0 cursor-default backdrop-blur-[2px]"
       />
 
       <motion.div
@@ -183,7 +188,7 @@ function WaitlistDialog({
           // is the same bug that made every `Sheet` in the product a sliver; see
           // `components/ui/sheet.tsx`. Here it left the waitlist modal 24px wide
           // with its heading, field and button spilling out beside it.
-          "bg-canvas shadow-card relative w-full max-w-[32rem] p-6 sm:p-8",
+          "bg-paper shadow-card relative w-full max-w-[32rem] p-6 sm:p-8",
           // A sheet on a phone, a card on everything else — the modal is the
           // full width of a 390px screen either way, so squaring off the
           // bottom corners is the honest shape there.
@@ -213,7 +218,7 @@ function WaitlistDialog({
 
         <h2
           id={`${id}-title`}
-          className="text-ink text-editorial-md mt-3 pr-10 font-semibold"
+          className="text-ink text-editorial-md font-display mt-3 pr-10 font-semibold"
         >
           {lines.map((line, lineIndex) => (
             <span key={lineIndex} className="block">
@@ -221,7 +226,10 @@ function WaitlistDialog({
                 typeof word === "string" ? (
                   <span key={wordIndex}>{word} </span>
                 ) : (
-                  <span key={wordIndex} className="font-normal tracking-[-0.01em]">
+                  <span
+                    key={wordIndex}
+                    className="font-normal tracking-[-0.01em]"
+                  >
                     {word.text}{" "}
                   </span>
                 ),

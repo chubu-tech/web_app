@@ -75,7 +75,9 @@ export const brand = {
    * on 3002 — a plausible default, not a configured one. Set `NEXT_PUBLIC_ADMIN_URL`
    * locally rather than relying on the start order.
    */
-  adminUrl: (process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3002").replace(/\/+$/, ""),
+  adminUrl: (
+    process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3002"
+  ).replace(/\/+$/, ""),
   /**
    * The mailbox on the footer and in the Organization JSON-LD. **Two readers, one
    * constant** — the structured data a crawler files under this Organization has to name
@@ -202,8 +204,8 @@ export const search = {
     anyLabel: "Anywhere",
     nearMe: "Use my location",
     locating: "Finding you…",
-    denied: "We couldn't get your location — pick a town instead.",
-    unsupported: "This browser can't share a location — pick a town instead.",
+    denied: "We couldn’t get your location — pick a town instead.",
+    unsupported: "This browser can’t share a location — pick a town instead.",
   },
   when: {
     label: "When",
@@ -213,7 +215,7 @@ export const search = {
     tomorrow: "Tomorrow",
     timeLabel: "Time of day",
     anyTime: "Any time",
-    note: "Shows salons open then. You'll pick an exact time in the app.",
+    note: "Shows salons open then. You’ll pick an exact time in the app.",
   },
   submit: "Search",
   clear: "Clear",
@@ -232,35 +234,38 @@ export const results = {
     "Our pick of the highest-rated salons customers have actually reviewed.",
   nearbyTitle: "Near you",
   nearbyBody: "The closest salons to where you are now.",
-  nearbyPrompt: "Share your location and we'll show the salons closest to you.",
+  nearbyPrompt: "Share your location and we’ll show the salons closest to you.",
   nearbyAction: "Show salons near me",
-  nearbyNone:
-    "None of the salons near you have put themselves on the map yet.",
+  nearbyNone: "None of the salons near you have put themselves on the map yet.",
   resultsTitle: "Salons",
   partialHeading: "Might also suit",
   partialBody:
-    "These haven't filled in everything yet, so we couldn't check them against all of your choices.",
+    "These haven’t filled in everything yet, so we couldn’t check them against all of your choices.",
   emptyTitle: "Nothing matched everything",
   emptyBody: "Try widening one of your choices.",
   featured: "Featured",
   noRating: "New",
   cta: "Book in the app",
   offline:
-    "The salon list isn't available right now. Everything else on this page still works.",
+    "The salon list isn’t available right now. Everything else on this page still works.",
 } as const;
 
 export const hero = {
   eyebrow: brand.cities.join(" · "),
-  titleLines: [["Book", "your", "chair."], ["Skip", "the", "wait."]],
+  titleLines: [
+    ["Book", "your", "chair."],
+    ["Skip", "the", "wait."],
+  ],
   accents: ["wait."],
   /** The product's purpose, in one sentence. Addressed to the customer. */
   purpose:
     "Book ahead or scan the QR code to join the queue and avoid waiting in line.",
   ownerCta: { label: "I run a salon", href: "#for-salons" },
   image: u("photo-1585747860715-2ba37e788b70", 1800, 1200),
-  imageAlt: "Warmly lit Bhutanese salon interior with mirrors and styling chairs",
+  imageAlt:
+    "Warmly lit Bhutanese salon interior with mirrors and styling chairs",
   liveCard: {
-    label: "You're in the queue",
+    label: "You’re in the queue",
     salon: "Norling Hair Studio",
     position: 3,
     waitMinutes: 18,
@@ -282,7 +287,7 @@ export const services = [
 export const twoWays = {
   eyebrow: "How it works",
   title: "Two ways into the chair",
-  body: "Plan ahead or walk in. Either way you know exactly when it's your turn.",
+  body: "Plan ahead or walk in. Either way you know exactly when it’s your turn.",
   options: [
     {
       tag: "Book ahead",
@@ -327,9 +332,9 @@ export const twoWays = {
 export const queueSection = {
   eyebrow: "Virtual queue",
   title: "Watch the line move, live",
-  body: "Your position and wait time update as each chair frees up. Run your errands and walk back when you're two away.",
+  body: "Your position and wait time update as each chair frees up. Run your errands and walk back when you’re two away.",
   qrCaption: "Scan at the door",
-  qrSub: "You're in line in 3 seconds",
+  qrSub: "You’re in line in 3 seconds",
   queue: [
     { name: "Sonam D.", service: "Beard trim" },
     { name: "Karma W.", service: "Haircut + wash" },
@@ -351,10 +356,10 @@ export const queueSection = {
 export const forSalons = {
   eyebrow: "For salon owners",
   title: "Run the whole shop from one screen",
-  body: "Today's bookings, the walk-in line, your stylists, your price list, the things you sell and how the week is going — all in one place you open on a laptop or a phone.",
+  body: "Today’s bookings, the walk-in line, your stylists, your price list, the things you sell and how the week is going — all in one place you open on a laptop or a phone.",
   features: [
     {
-      title: "Today's bookings",
+      title: "Today’s bookings",
       body: "See every chair by the hour. Move a booking and the customer is told for you.",
     },
     {
@@ -500,7 +505,7 @@ export const pricing = {
   note: "Paid salon plans are billed monthly in Ngultrum. Pay by bank transfer or mBoB — we switch your plan on within a day.",
   /** The free-for-customers panel that sits beside the salon plans. */
   customer: {
-    label: "If you're booking a haircut",
+    label: "If you’re booking a haircut",
     price: "Nu 0",
     period: "forever",
     /*
@@ -539,8 +544,8 @@ export const pricing = {
       features: [
         "Listed in the app, found by customers nearby",
         "Online bookings, confirmed on the spot",
-        "Today's bookings, hour by hour",
-        "Today's numbers at a glance",
+        "Today’s bookings, hour by hour",
+        "Today’s numbers at a glance",
         "Your services, prices and who works when",
         "Your profile, photos and reviews",
         "Message customers and post offers",
@@ -726,7 +731,7 @@ export const faq = [
   },
   {
     q: "What is THO?",
-    a: "THO is a salon and barber booking service for Bhutan. You can find a salon near you, see its services and prices, book an appointment for a specific time, or join a salon's walk-in queue from your phone and watch your place in line. THO is free for customers; salons pay a monthly subscription to be listed and to run their bookings.",
+    a: "THO is a salon and barber booking service for Bhutan. You can find a salon near you, see its services and prices, book an appointment for a specific time, or join a salon’s walk-in queue from your phone and watch your place in line. THO is free for customers; salons pay a monthly subscription to be listed and to run their bookings.",
   },
   {
     q: "How do I book a salon appointment in Bhutan?",
@@ -738,11 +743,11 @@ export const faq = [
   },
   {
     q: "How can I join a salon queue without waiting?",
-    a: "Scan the QR code at the salon's door, or open the salon's page on THO and join from there. THO puts you in the salon's live walk-in line and shows your position and the rough wait, so you can go and do something else instead of sitting in the shop. The page updates itself as each chair frees up — there is nothing to refresh.",
+    a: "Scan the QR code at the salon’s door, or open the salon’s page on THO and join from there. THO puts you in the salon’s live walk-in line and shows your position and the rough wait, so you can go and do something else instead of sitting in the shop. The page updates itself as each chair frees up — there is nothing to refresh.",
   },
   {
     q: "Do I need the app to join a queue?",
-    a: "No — scanning the salon's QR code puts you in line straight away in your phone's browser. Nothing needs to be installed to search salons, book an appointment or join a walk-in queue on THO.",
+    a: "No — scanning the salon’s QR code puts you in line straight away in your phone’s browser. Nothing needs to be installed to search salons, book an appointment or join a walk-in queue on THO.",
   },
   {
     q: "What if I miss my turn?",
@@ -804,7 +809,7 @@ export const faq = [
   },
   {
     q: "How do salons manage their appointments and queues on THO?",
-    a: "A salon on THO gets a console it opens on a laptop or a phone. It shows the day's bookings hour by hour, the live walk-in line with a button to call the next customer, and the salon's services, prices, stylists and working hours. Salons on Growth and Pro also get a client book, loyalty rewards, products to sell for pickup or delivery with their own discount codes, and reporting on bookings, takings, busy hours and what sells.",
+    a: "A salon on THO gets a console it opens on a laptop or a phone. It shows the day’s bookings hour by hour, the live walk-in line with a button to call the next customer, and the salon’s services, prices, stylists and working hours. Salons on Growth and Pro also get a client book, loyalty rewards, products to sell for pickup or delivery with their own discount codes, and reporting on bookings, takings, busy hours and what sells.",
   },
   {
     q: "What does THO cost for a salon?",
@@ -829,7 +834,7 @@ export const download = {
    * revert this to the download wording and the badges become real links again
    * on their own (see `StoreBadges`).
    */
-  body: "Tho is nearly here. Join the waitlist and we'll email you the moment it's on the App Store and Google Play — free to download, free to book.",
+  body: "Tho is nearly here. Join the waitlist and we’ll email you the moment it’s on the App Store and Google Play — free to download, free to book.",
   image: u("photo-1503951914875-452162b0f3f1", 1800, 1000),
   alt: "Barber giving a client a close shave",
 } as const;
@@ -848,7 +853,7 @@ export const waitlist = {
   cta: "Join the waitlist",
   eyebrow: "Coming soon",
   title: "Our mobile app is _coming soon_",
-  body: "Enter your email address to join the waitlist. We'll notify you as soon as the app is available on the App Store and Google Play.",
+  body: "Enter your email address to join the waitlist. We’ll notify you as soon as the app is available on the App Store and Google Play.",
   emailLabel: "Email address",
   emailPlaceholder: "you@example.com",
   submit: "Join the waitlist",
@@ -857,19 +862,19 @@ export const waitlist = {
   reassurance: "One email when we launch. Nothing else, and no charge — ever.",
   success: {
     joined: {
-      title: "You're on the list",
-      body: "We'll email you the moment Tho is on the App Store and Google Play.",
+      title: "You’re on the list",
+      body: "We’ll email you the moment Tho is on the App Store and Google Play.",
     },
     already: {
-      title: "You're already on the list",
-      body: "That address is signed up. We'll be in touch the day we launch.",
+      title: "You’re already on the list",
+      body: "That address is signed up. We’ll be in touch the day we launch.",
     },
   },
   errors: {
     empty: "Enter your email address.",
     invalid: "That does not look like an email address.",
     /** The catch-all. Says what to do, not what broke. */
-    failed: "We couldn't save that just now. Please try again in a moment.",
+    failed: "We couldn’t save that just now. Please try again in a moment.",
     offline: "You appear to be offline. Check your connection and try again.",
   },
   qr: {
@@ -880,7 +885,7 @@ export const waitlist = {
   page: {
     title: "Join the waitlist",
     description:
-      "Tho is nearly here. Leave your email and we'll tell you the day it lands on the App Store and Google Play.",
+      "Tho is nearly here. Leave your email and we’ll tell you the day it lands on the App Store and Google Play.",
     /** The one place the old name was hardcoded rather than read from `brand`. */
     back: "Back to THO",
   },
@@ -1077,7 +1082,7 @@ export const privacy = {
         },
         {
           lead: "Approximate location, as a customer",
-          body: "with your permission, your device's location is used on your device to show salons near you and sort them by distance. As a customer, your location is never sent to us and never stored.",
+          body: "with your permission, your device’s location is used on your device to show salons near you and sort them by distance. As a customer, your location is never sent to us and never stored.",
         },
         {
           /*
@@ -1093,12 +1098,12 @@ export const privacy = {
             coordinates are the pin on the public map. A salon's address being public is
             the point of the product, but a policy has to say that it is.
           */
-          lead: "Your salon's location, if you run one",
-          body: "when a salon owner pins their shop on the map, the precise coordinates are stored with the salon and shown publicly, alongside the address, so customers can find it. This applies to the salon's own location only.",
+          lead: "Your salon’s location, if you run one",
+          body: "when a salon owner pins their shop on the map, the precise coordinates are stored with the salon and shown publicly, alongside the address, so customers can find it. This applies to the salon’s own location only.",
         },
         {
           lead: "Camera",
-          body: "used only to scan a salon's walk-in-queue QR code. The image is decoded on your device and is never uploaded or stored.",
+          body: "used only to scan a salon’s walk-in-queue QR code. The image is decoded on your device and is never uploaded or stored.",
         },
         {
           /*
@@ -1109,7 +1114,7 @@ export const privacy = {
             describing one that is used.
           */
           lead: "Notification token",
-          body: "if you allow notifications in the mobile app, your device's push token is stored so we can send booking reminders and queue updates through Google Firebase Cloud Messaging. It is tied to your account and removed when another account signs in on that device. The website does not send push notifications.",
+          body: "if you allow notifications in the mobile app, your device’s push token is stored so we can send booking reminders and queue updates through Google Firebase Cloud Messaging. It is tied to your account and removed when another account signs in on that device. The website does not send push notifications.",
         },
         {
           /*
@@ -1152,7 +1157,9 @@ export const privacy = {
         {
           body: "To provide the service: discovery, booking, rescheduling and cancellation, walk-in queues, messaging, reviews, loyalty, prepaid packs, product orders and their delivery, and — for salon staff — calendar, client and business management.",
         },
-        { body: "To show salons near you (your location stays on your device)." },
+        {
+          body: "To show salons near you (your location stays on your device).",
+        },
         {
           body: "To notify you about your bookings, your place in a queue, your orders, and rewards.",
         },
@@ -1177,7 +1184,7 @@ export const privacy = {
           body: "Two service providers process data on our behalf and for no purpose of their own: Supabase (the database, sign-in and file storage) and Google Firebase (delivering notifications, and crash reporting).",
         },
         {
-          body: "Access is enforced by row-level security in the database: you see your own data; a salon's owner and staff see the data for that salon's bookings, orders and queue.",
+          body: "Access is enforced by row-level security in the database: you see your own data; a salon’s owner and staff see the data for that salon’s bookings, orders and queue.",
         },
         {
           body: "Salon and stylist gallery photos are public — they are marketing material shown to anyone browsing the app.",
@@ -1215,7 +1222,7 @@ export const privacy = {
             for not working.
           */
           lead: "Notifications",
-          body: "turn them off for the whole app in your device settings. Each booking also has its own \"Remind me\" switch, which only appears at salons that send reminders.",
+          body: "turn them off for the whole app in your device settings. Each booking also has its own “Remind me” switch, which only appears at salons that send reminders.",
         },
         {
           /*
@@ -1311,11 +1318,14 @@ export const deletion = {
         lead: "Your sign-in",
         body: "email, password and every active session. The email address is freed for reuse.",
       },
-      { lead: "Your name, phone number and photo", body: "removed from your profile." },
+      {
+        lead: "Your name, phone number and photo",
+        body: "removed from your profile.",
+      },
       { lead: "Saved salons, and the stylists you follow", body: "deleted." },
       {
         lead: "Your messages to salons",
-        body: "deleted, and the salon's chat list stops showing your name.",
+        body: "deleted, and the salon’s chat list stops showing your name.",
       },
       {
         lead: "Notifications and reminders",
@@ -1332,7 +1342,10 @@ export const deletion = {
         lead: "Appointments that took place",
         body: "the service, the time and the price, which a salon needs for its takings, its staff pay and its tax figures.",
       },
-      { lead: "Reviews you left", body: "these form part of a salon's public rating." },
+      {
+        lead: "Reviews you left",
+        body: "these form part of a salon’s public rating.",
+      },
       {
         lead: "Loyalty points a salon issued you",
         body: "their own record of what they had promised.",
@@ -1360,13 +1373,13 @@ export const queueLanding = {
   title: "Join the walk-in queue",
   /** Used when the salon is known; `{salon}` is replaced with its name. */
   titleWithSalon: "Join the queue at {salon}",
-  lede: `Open this shop's line in the ${brand.appName} app.`,
-  reassurance: `In the app you'll see the shop's live wait and your projected place in line — "You'd be #3 · ~35 min" — before you commit to joining.`,
+  lede: `Open this shop’s line in the ${brand.appName} app.`,
+  reassurance: `In the app you’ll see the shop’s live wait and your projected place in line — "You’d be #3 · ~35 min" — before you commit to joining.`,
   getApp: `Get ${brand.appName}`,
   openApp: `Open in ${brand.appName}`,
   /**
    * Shown when the path segment is not a well-formed shop code — a truncated or
    * mistyped link. (It can never be *absent*: `/q` without a code is a 404.)
    */
-  badId: `That link doesn't carry a valid shop code. Scan the shop's QR again, or open ${brand.appName} and scan from inside the app.`,
+  badId: `That link doesn’t carry a valid shop code. Scan the shop’s QR again, or open ${brand.appName} and scan from inside the app.`,
 } as const;

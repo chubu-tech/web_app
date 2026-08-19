@@ -164,9 +164,15 @@ def scroll_to(page, selector, offset=96):
     at 1280 and halfway through its photos at 390 — so every scrolled frame names what it
     wants to be looking at.
     """
-    page.locator(selector).first.scroll_into_view_if_needed()
-    page.evaluate("off => window.scrollBy(0, -off)", offset)
-    page.wait_for_timeout(500)
+    # **Not `scroll_into_view_if_needed`.** That does nothing when the element is already in
+    # the viewport — including when it is the last thing at the very bottom of it — so the
+    # insights frame came back byte-identical to the one above it, twice, in both viewports.
+    # An explicit scroll to the element's own document position always moves.
+    page.locator(selector).first.evaluate(
+        "(el, off) => window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - off })",
+        offset,
+    )
+    page.wait_for_timeout(600)
 
 
 def shot(page, mode, path, name, *, prepare=None):

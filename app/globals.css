@@ -1,4 +1,24 @@
 @import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   **`.claude/` is documentation, not source, and Tailwind cannot tell.**
+
+   The scanner is content-based: it matches class-shaped candidates in *any*
+   non-ignored file, and `.claude/skills/**` is untracked but not git-ignored, so it
+   is scanned. Those docs discuss Tailwind utilities by name — and a utility named in
+   prose compiles exactly like one written in a component.
+
+   Measured: a `.transition-all` rule was being emitted into the production stylesheet
+   with **no call site anywhere in the app**, purely from the skill's anti-pattern
+   catalogue naming it.
+
+   200 bytes is not the reason this line exists. The reason is the failure mode one
+   step along, which this repo has already paid for twice: a bracket utility written
+   in prose generated invalid CSS and took the dev server down with an unhelpful
+   parse error, while `npm run build` passed. See the note on comment hazards in
+   AGENTS.md. Excluding the directory closes that whole class of bug at the source.
+--------------------------------------------------------------------------- */
+@source not "../.claude";
 /*
   The marketing site's token set, kept in its own file rather than folded into the
   `@theme` below. One file per system is what makes the two legible: this one is the
@@ -303,13 +323,51 @@
      scope block below no longer touches `font-family` at all. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
-  /* `--font-display`, `--font-serif` and the four `--text-editorial-*` clamps used
-     to live here, for Bricolage Grotesque and Instrument Serif. **Nothing in the
-     repo ever referenced any of the six** — no `font-display`, `font-serif` or
-     `text-editorial-*` class exists in any component — so two webfonts were being
-     declared for call sites that never arrived. Deleted with their loaders rather
-     than repointed at Inter: one family needs no display alias, and hierarchy here
-     comes from the weight and size steps above. */
+  /* **The display face. Marketing routes only — read the rule before adding a call site.**
+
+     This token was here once before, for Bricolage Grotesque, alongside `--font-serif`
+     and four `--text-editorial-*` clamps. All six were deleted because **nothing in the
+     repo referenced any of them**: two webfonts were being downloaded for call sites that
+     never arrived. That deletion was right, and it is not what is being reversed.
+
+     What is being reversed is the conclusion drawn from it — that "one family needs no
+     display alias, and hierarchy here comes from the weight and size steps above". That
+     holds for the console and it does not hold for a public marketing page. Size and
+     weight are the levers the body copy already uses, so a headline built only from them
+     is a large paragraph rather than a different kind of object, and the page reads as
+     untyped. `marketing-tokens.css` also caps display weight at 600 on purpose — the
+     brand "trusts photography and generous whitespace over typographic muscle" — which
+     removes the one lever that could have carried it. A second family is the axis left.
+
+     Fraunces, loaded variable in `app/layout.tsx`, where the reasoning for the face is.
+
+     THE RULE, and it is a tier rather than a list of files: **the display face carries
+     the editorial steps, and nothing below them.**
+
+       `--text-display-2xl` and `--text-editorial-{xl,lg,md}`  → Fraunces
+       `--text-heading`, `--text-subheading`, `--text-title`, body  → Inter
+
+     So a page title, a section title, the closing headline and the two figures the page
+     offers as proof are set in the display face; a card title, a document's sub-heading,
+     a label and all running text are not. That split is what keeps the serif reading as
+     a voice rather than a skin — and it is why the two wordmarks take it too, per
+     `typography.md`: a wordmark collapsed into the body family reads un-branded.
+
+     Two deliberate exclusions:
+
+     - **The mobile nav's rows** (`site-header.tsx`) sit at an editorial *size* and stay
+       Inter. They are navigation, which is UI voice; the tier is about what carries a
+       page, not about how big something is.
+     - **Every product route.** The console is a dense operational tool whose largest step
+       is a 32px figure, and a display serif on a payroll column is decoration on a
+       spreadsheet. If a product surface ever wants display voice, take that decision on
+       its own merits rather than by reaching for a token that happens to exist.
+
+     It emits a `font-display` **utility**, applied as an explicit class. Never set
+     `font-family` in a shell scope to achieve the same thing — that is precisely the bug
+     that left the console on the visitor's OS font, and the note above `--font-sans`
+     records what it cost. */
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
 
   /* Generous radii for the editorial layer. Do NOT re-point --radius-md (14px)
      at these: it would reshape every shared card, Sheet, Chip and SelectTile. */
@@ -329,10 +387,14 @@
      whichever button opened it, set from that button's bounding rect. */
   @keyframes nav-reveal {
     from {
-      clip-path: circle(0% at var(--nav-origin-x, 92%) var(--nav-origin-y, 2rem));
+      clip-path: circle(
+        0% at var(--nav-origin-x, 92%) var(--nav-origin-y, 2rem)
+      );
     }
     to {
-      clip-path: circle(150% at var(--nav-origin-x, 92%) var(--nav-origin-y, 2rem));
+      clip-path: circle(
+        150% at var(--nav-origin-x, 92%) var(--nav-origin-y, 2rem)
+      );
     }
   }
 
@@ -381,8 +443,10 @@
      A ring that appears with the screenshot is part of the picture; one that arrives a
      beat later is somebody pointing at it. easeOutBack gives it the small overshoot that
      reads as a point rather than a fade. */
-  --animate-guide-ring: guide-ring-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) 340ms both;
-  --animate-guide-label: guide-label-in 360ms cubic-bezier(0.16, 1, 0.3, 1) 520ms both;
+  --animate-guide-ring: guide-ring-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1)
+    340ms both;
+  --animate-guide-label: guide-label-in 360ms cubic-bezier(0.16, 1, 0.3, 1)
+    520ms both;
 
   /* The explanation. Staggered per line by an inline `--i`, the same pattern `NavRow`
      uses — the delay is set at the call site because the shorthand here resets it. */
@@ -524,13 +588,36 @@
    an owner saw a different one, on the same domain, from the same nav.
 
    It is now attribute-*presence*, so any shell that declares itself gets the
-   editorial layer — `customer`, `owner`, `staff`. The attribute still records which
-   shell is rendering, because `not-found.tsx` and the layouts read as documentation
-   and a bare `data-shell` would say less.
+   editorial layer — `customer`, `owner`, `staff`, and now `marketing`. The attribute
+   still records which shell is rendering, because `not-found.tsx` and the layouts read
+   as documentation and a bare `data-shell` would say less.
 
    Nothing about the mechanism changed, which is the point: every colour utility
    resolves through `var()`, so this re-skins the console with **no class strings
    touched** in 26 routes' worth of components. It is also one line to revert.
+
+   ## `marketing` joined last, and it is what the widening was always for
+
+   The paragraph above closed the split between the customer app and the console and
+   left the public site on the other side of it: `app/(marketing)` declared no attribute,
+   so `/` rendered on `#ffffff` while all 51 product routes rendered on `#f6f3ee`.
+   Crossing from the homepage to Discover changed the colour of the page — which is the
+   exact defect this block exists to prevent, one boundary further out, and it survived
+   because the two decisions were taken months apart and neither knew about the other.
+
+   The marketing layout used to justify its absence by saying the public pages "are what
+   that editorial layer was copied *from*, so they want the base tokens exactly as
+   declared". That was true when the cream came from `../landing_page`. It stopped being
+   true when the marketing redesign moved those pages onto a white canvas and the product
+   kept the cream — after which the sentence described the old world and the seam it
+   licensed was invisible from either side.
+
+   **The cost was one attribute and ~18 class strings**, not a redesign: a card that was
+   `bg-canvas` because canvas happened to be white is now `bg-paper`, which is what that
+   token has always meant — "a thing lifted off the page". In the console `--color-paper`
+   equals `--color-canvas`, so every one of those reclassifications is a no-op there and
+   the correct white-on-cream card here. If a marketing surface looks flat after a change,
+   check that it is asking for `paper` and not for `canvas`.
 --------------------------------------------------------------------------- */
 [data-shell],
 body:has([data-shell]) {
@@ -575,9 +662,46 @@ body:has([data-shell]) {
      and they inherit it from body. */
   p {
     font-variant-numeric: normal;
+    /* Long-form copy reads better with the last line not left as one short word.
+       Moved here from `marketing-tokens.css`, which was applying it to all 79 routes
+       from a file scoped to seven — see the note at the top of that file's base
+       layer. It is a good default everywhere, so it is declared where a reader
+       looking for global base styles would actually look. */
+    text-wrap: pretty;
   }
 
-  /* One visible focus treatment for the whole app. */
+  /* Stops a two-line heading leaving one orphaned word. Global for the same reason
+     as `text-wrap: pretty` above, and moved from the same place. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  /* The brand's selection colour, app-wide. `--color-on-primary`, not the `#fff` this
+     carried when it lived in `marketing-tokens.css`: rausch is a brand fill under
+     white text, which is exactly what that token names, and a raw hex in a file whose
+     sibling forbids hardcoding one was the smallest possible version of the rule
+     being broken. */
+  ::selection {
+    background-color: var(--color-rausch);
+    color: var(--color-on-primary);
+  }
+
+  /* One visible focus treatment for the whole app — and for most of this file's life
+     that was true by accident rather than by design.
+
+     `marketing-tokens.css` also declared `:focus-visible`, with a rausch ring at a
+     3px offset. Both sat in `@layer base` at identical specificity (0,1,0), and this
+     file imports that one at line 16 — so this rule came later in source order and
+     won every time. The marketing ring **never rendered on any route**, in any
+     browser, since the day it was written.
+
+     It is deleted rather than made to work. One focus treatment across the product is
+     the right answer, an ink ring clears contrast against cream and paper alike, and a
+     rule that has never applied is worse than no rule: the next person to notice the
+     cascade would have "fixed" it and silently changed the focus ring on 79 routes. */
   :focus-visible {
     outline: 2px solid var(--color-ink);
     outline-offset: 2px;
@@ -669,7 +793,8 @@ body:has([data-shell]) {
      stagger: leaflet re-creates a marker's DOM whenever its icon changes, so a
      staggered delay would replay on every selection instead of only on arrival.
      The global reduced-motion block above neutralises it for anyone who asks. */
-  animation: salon-pop var(--duration-slow) cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: salon-pop var(--duration-slow) cubic-bezier(0.34, 1.56, 0.64, 1)
+    both;
 }
 
 @keyframes salon-pop {
@@ -694,7 +819,8 @@ body:has([data-shell]) {
   }
   100% {
     opacity: 0;
-    transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--spin)) scale(0.4);
+    transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--spin))
+      scale(0.4);
   }
 }
 
@@ -715,13 +841,13 @@ body:has([data-shell]) {
    not a smaller version of the effect, just a crop nobody asked for. */
 @keyframes guide-frame-in {
   0% {
-    transform: scale(1.045);
+    transform: scale(1.025);
   }
-  12% {
+  10% {
     transform: scale(1);
   }
   100% {
-    transform: scale(1.025);
+    transform: scale(1.015);
   }
 }
 

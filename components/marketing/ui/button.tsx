@@ -19,13 +19,25 @@ type Variant = "primary" | "ink" | "ghost" | "light";
  * `ghost` is the reference's `button-secondary`: canvas fill, ink label, a 1px
  * stroke that darkens on hover. `light` is the same idea over photography.
  */
+/*
+  Each variant carries a press state as well as a hover one, and it is a **colour**
+  press rather than a scale.
+
+  That is deliberate and it differs from `components/ui/button.tsx`, which presses by
+  scaling 2%. The note below this block records the reference's rule for these buttons —
+  "no transform, no shadow change" — and the magnetic spring that used to live here was
+  removed for exactly that reason; adding a scale back would undo it. But `hover:` alone
+  is no feedback on a phone, and this is the public site, which is mostly read on one.
+  So the press is the next step of the same fill.
+*/
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-rausch-cta text-white hover:bg-rausch-cta-pressed",
-  ink: "bg-ink text-white hover:bg-obsidian",
+  primary:
+    "bg-rausch-cta text-white hover:bg-rausch-cta-pressed active:bg-rausch-cta-pressed",
+  ink: "bg-ink text-white hover:bg-obsidian active:bg-obsidian",
   ghost:
-    "bg-canvas text-ink ring-1 ring-inset ring-border-strong hover:ring-ink hover:bg-surface-soft",
+    "bg-canvas text-ink ring-1 ring-inset ring-border-strong hover:ring-ink hover:bg-surface-soft active:bg-surface-strong active:ring-ink",
   light:
-    "bg-white/14 text-white ring-1 ring-inset ring-white/30 backdrop-blur-md hover:bg-white/24",
+    "bg-white/14 text-white ring-1 ring-inset ring-white/30 backdrop-blur-md hover:bg-white/24 active:bg-white/32",
 };
 
 /**
@@ -37,7 +49,7 @@ const VARIANTS: Record<Variant, string> = {
  * `button-md` at 16/500 and `button-sm` at 14/500, and never goes heavier.
  */
 const SIZES = {
-  md: "h-12 px-6 text-ui",
+  md: "h-12 px-6 text-title",
   lg: "h-14 px-7 text-body-md",
 } as const;
 
@@ -67,7 +79,12 @@ type Common = {
   className?: string;
 };
 
-type AsLink = Common & { href: string; onClick?: never; type?: never; disabled?: never };
+type AsLink = Common & {
+  href: string;
+  onClick?: never;
+  type?: never;
+  disabled?: never;
+};
 type AsButton = Common & {
   href?: never;
   onClick?: () => void;

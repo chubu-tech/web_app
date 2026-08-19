@@ -49,13 +49,13 @@ CUSTOMER_TARGETS = {
     "01-discover": "[document.querySelector('[role=tablist]'), document.querySelector('a[href=\"/scan\"]')]",
     "02-salon": "[document.querySelector('a[href=\"#services\"]'), document.querySelector('a[href=\"#about\"]')]",
     "03-services": "[document.querySelector('#services h2'), [...document.querySelectorAll('#services button')].find(b => /^Book$/.test((b.textContent ?? '').trim()))]",
-    "04-book-service": "[[...document.querySelectorAll('nav, ol, div')].filter(e => /^Services.?Professional.?Time.?Confirm$/.test((e.textContent ?? '').replace(/\s+/g, ' ').trim())).pop()]",
+    "04-book-service": "[deepest(/^Services.?Professional.?Time.?Confirm$/, 'nav,ol,div')]",
     "05-book-professional": "[document.querySelector('button[aria-pressed]')]",
     "06-book-time": "[document.querySelector('ul[aria-label=\"Choose a date\"]')]",
-    "07-book-confirm": "[[...document.querySelectorAll('button')].find(b => /^Book\b/.test((b.textContent ?? '').trim()))]",
+    "07-book-confirm": "[deepest(/Free cancellation/i)]",
     "08-bookings": "[document.querySelector('[role=tablist]')]",
-    "09-booking-detail": "[[...document.querySelectorAll('*')].find(e => e.textContent?.trim().startsWith('Text and push reminders') && e.children.length === 0)?.closest('div')]",
-    "10-queue-join": "[[...document.querySelectorAll('span,div')].find(e => /No queue|in line|waiting/.test(e.textContent ?? '') && e.children.length === 0)]",
+    "09-booking-detail": "[deepest(/^Text and push reminders/)]",
+    "10-queue-join": "[deepest(/^No queue/)]",
     "11-map": "[document.querySelector('input[type=search], input[type=text]')]",
     "12-shop": "[document.querySelector('#shop button')]",
     "13-rewards": "[document.querySelector('main a[href^=\"/salon/\"]')]",
@@ -67,25 +67,40 @@ CUSTOMER_TARGETS = {
 OWNER_TARGETS = {
     "01-calendar": "[document.querySelector('[role=tablist]')]",
     "02-booking-detail": "[document.querySelector('h1'), document.querySelector('h1')?.nextElementSibling]",
-    "03-queue-board": "[[...document.querySelectorAll('a,button')].find(e => /Add walk-?in/i.test(e.textContent ?? ''))]",
+    "03-queue-board": "[deepest(/^Add walk-?in$/i, 'a,button')]",
     "04-walk-in": "[document.querySelector('input')]",
     "05-insights": "[document.querySelector('a[href=\"/business/orders\"]')]",
     "06-insights-charts": "[document.querySelector('a[href*=\"period=daily\"]'), document.querySelector('a[href*=\"period=annually\"]')]",
     "07-services": "[document.querySelector('h1'), document.querySelector('h1')?.nextElementSibling]",
     "08-staff": "[document.querySelector('a[href^=\"/business/staff/\"]')]",
     "09-hours": "[document.querySelector('input[type=time]')]",
-    "10-settings": "[[...document.querySelectorAll('h2')].find(h => /Run the business/i.test(h.textContent ?? ''))]",
+    "10-settings": "[document.querySelector('a[href=\"/business/settings/salon\"]')]",
     "11-salon-details": "[document.querySelector('h1'), document.querySelector('h1')?.nextElementSibling]",
     "12-orders": "[document.querySelector('a[href*=\"orders?status=new\"]'), document.querySelector('a[href*=\"orders?status=done\"]')]",
     "13-clients": "[document.querySelector('h1'), document.querySelector('h1')?.nextElementSibling]",
-    "14-loyalty": "[[...document.querySelectorAll('a,section,div')].find(e => /Redemptions/.test(e.textContent ?? '') && e.textContent.length < 120)]",
+    "14-loyalty": "[deepest(/^Redemptions/, 'a,section,div')]",
     "15-messages": "[document.querySelector('h1'), document.querySelector('h1')?.nextElementSibling]",
     "16-plans": "[document.querySelector('h1'), document.querySelector('h1')?.nextElementSibling]",
 }
 
 MEASURE = """
 ([exprSource, pad]) => {
-  const els = (new Function('return ' + exprSource))().filter(Boolean);
+  // `visible` is load-bearing, not a nicety. Several strings appear twice in the DOM — once
+  // in the desktop card and once in a `desktop:hidden` sticky footer — and the hidden copy
+  // is LATER in document order, so "the deepest match" without this check is a box of zero
+  // size on the very viewport where the text is plainly on screen.
+  const visible = (e) => {
+    const r = e.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  // The deepest visible element whose text matches. Ancestors precede descendants in
+  // document order, so the last match is the tightest one that still says it.
+  const deepest = (pattern, sel = '*') =>
+    [...document.querySelectorAll(sel)]
+      .filter((e) => pattern.test((e.textContent ?? '').replace(/\s+/g, ' ').trim()) && visible(e))
+      .pop() ?? null;
+  const els = (new Function('deepest', 'visible', 'return ' + exprSource))(deepest, visible)
+    .filter(Boolean);
   if (els.length === 0) return null;
   const rects = els.map(e => e.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0);
   if (rects.length === 0) return null;
@@ -199,6 +214,11 @@ def measure(page, key, name, expr):
     if not result:
         print(f"    {name:22s} NOT FOUND")
         return
+    if result["w"] <= 0 or result["h"] <= 0:
+        # Clamped to nothing, which means the target was off the bottom of the viewport —
+        # and a frame is only the viewport, so there is nothing there to ring.
+        print(f"    {name:22s} OFF-FRAME (w={result['w']} h={result['h']})")
+        return
     measured[key] = {k: round(result[k], 1) for k in ("x", "y", "w", "h")}
     print(
         f"    {name:22s} {{ x: {result['x']}, y: {result['y']}, "
@@ -231,6 +251,7 @@ def run_customer(browser, mode):
             None,
         ),
         ("08-bookings", "/bookings", None),
+        # 09 is measured just below, because it needs a real booking id from the list above.
         ("10-queue-join", f"/q/{NORZIN_ID}", None),
         ("11-map", "/map", None),
         ("12-shop", f"/salon/{NORZIN_SLUG}", lambda p: open_section(p, "Shop")),
@@ -246,6 +267,25 @@ def run_customer(browser, mode):
             prepare(page)
             settle(page)
         measure(page, key_for("customer", mode, name), name, CUSTOMER_TARGETS[name])
+
+    # The booking detail, on whichever booking the list links to first — the same one the
+    # capture opens. It was missing from this list entirely for a while, which is worth
+    # noting: the symptom was a step with no highlight, and it looked exactly like a selector
+    # that had stopped matching.
+    page.goto(f"{BASE}/bookings", wait_until="domcontentloaded")
+    settle(page)
+    href = page.eval_on_selector_all(
+        "a[href^='/bookings/']", "e => e.map(x => x.getAttribute('href'))[0] || ''"
+    )
+    if href:
+        page.goto(BASE + href, wait_until="domcontentloaded")
+        settle(page)
+        measure(
+            page,
+            key_for("customer", mode, "09-booking-detail"),
+            "09-booking-detail",
+            CUSTOMER_TARGETS["09-booking-detail"],
+        )
 
     # The wizard's later steps have to be walked to, exactly as the capture walks them.
     page.goto(f"{BASE}/salon/{NORZIN_ID}/book", wait_until="networkidle")
@@ -276,6 +316,7 @@ def run_customer(browser, mode):
     page.get_by_role("button", name="Continue").first.click()
     page.wait_for_timeout(2500)
     settle(page)
+    print(f"      (confirm walkthrough landed on {page.url.split('?')[-1][:60]})")
     measure(page, key_for("customer", mode, "07-book-confirm"), "07-book-confirm", CUSTOMER_TARGETS["07-book-confirm"])
     measure(page, key_for("customer", mode, "16-profile"), "16-profile", CUSTOMER_TARGETS["16-profile"])
 
@@ -326,9 +367,13 @@ def run_owner(browser, mode):
     page.goto(f"{BASE}/business/insights", wait_until="domcontentloaded")
     settle(page)
     try:
-        page.locator("h2:has-text('Trends')").first.scroll_into_view_if_needed(timeout=8000)
-        page.evaluate("() => window.scrollBy(0, -96)")
-        page.wait_for_timeout(600)
+        # See `scroll_to` in the capture script: `scroll_into_view_if_needed` is a no-op on an
+        # element that is already visible, which "Trends" is — at the very bottom of the fold.
+        page.locator("h2:has-text('Trends')").first.evaluate(
+            "(el, off) => window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - off })",
+            96,
+        )
+        page.wait_for_timeout(700)
     except Exception as exc:
         print(f"    (could not reach Trends: {str(exc)[:60]})")
     measure(page, key_for("owner", mode, "06-insights-charts"), "06-insights-charts", OWNER_TARGETS["06-insights-charts"])

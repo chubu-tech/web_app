@@ -35,7 +35,7 @@ export default function WaitlistPage() {
       <div className="mx-auto flex w-full max-w-[36rem] flex-1 flex-col justify-center px-5 py-16 sm:px-8">
         <Link
           href="/"
-          className="text-body hover:text-ink group inline-flex items-center gap-2 self-start text-ui font-medium transition-colors"
+          className="text-body hover:text-ink group inline-flex items-center gap-2 self-start text-title font-medium transition-colors"
         >
           <ArrowLeft
             className="size-4 transition-transform duration-300 group-hover:-translate-x-0.5"
@@ -58,14 +58,17 @@ export default function WaitlistPage() {
 
           {/* `text-editorial-lg` clamps 30-48px and carries its own leading and
               tracking, so the manual pair and the `sm:` step both go. */}
-          <h1 className="text-ink text-editorial-lg mt-3 font-semibold">
+          <h1 className="text-ink text-editorial-lg font-display mt-3 font-semibold">
             {lines.map((line, lineIndex) => (
               <span key={lineIndex} className="block">
                 {line.map((word, wordIndex) =>
                   typeof word === "string" ? (
                     <span key={wordIndex}>{word} </span>
                   ) : (
-                    <span key={wordIndex} className="font-normal tracking-[-0.01em]">
+                    <span
+                      key={wordIndex}
+                      className="font-normal tracking-[-0.01em]"
+                    >
                       {word.text}{" "}
                     </span>
                   ),

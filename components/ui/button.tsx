@@ -13,10 +13,25 @@ import { cn } from "@/lib/utils";
 
 type Variant = "filled" | "outlined" | "quiet" | "pill" | "pillQuiet";
 
+/*
+  **The press state, which `--duration-fast` was always documented for and never got.**
+
+  `globals.css` describes that token as "chip fills, **press scales**, colour swaps".
+  The scale was in `primary_button.dart` and did not survive the port, so until now the
+  only feedback any button in this app gave was `hover:` — which does not exist on the
+  device most of this product is used on. Between tap and server response there was
+  nothing at all.
+
+  2% is the whole movement: enough to read as a press, small enough that a 48px control
+  does not appear to jump. `transform` is named alongside the colours rather than left to
+  `transition-colors`, and `disabled:active:scale-100` is what stops a blocked button —
+  including a `busy` one, which is `disabled` — from acknowledging a press it is ignoring.
+*/
 const base =
   "inline-flex min-h-12 items-center justify-center gap-2 rounded-sm px-4 " +
-  "text-title font-medium transition-colors duration-[var(--duration-fast)] " +
-  "disabled:cursor-not-allowed select-none";
+  "text-title font-medium select-none " +
+  "transition-[background-color,color,transform] duration-[var(--duration-fast)] " +
+  "active:scale-[0.98] disabled:active:scale-100 disabled:cursor-not-allowed";
 
 const variants: Record<Variant, string> = {
   filled:

@@ -141,7 +141,13 @@ export function AppHeader({
               // what `/map` subtracts from `100svh` and what `/salon/[id]`'s sticky rail
               // offsets by, so a row taller than the token pushes the map off-screen by the
               // difference and no test would catch it.
-              "gap-base flex h-19 items-center transition-all duration-[var(--duration-base)]",
+              // Named properties, not the blanket all-property form. The pill toggles exactly these six;
+              // That blanket form additionally animated `color`, and would silently animate
+              // anything a future variant adds — including a focus ring, which must never
+              // fade in.
+              "gap-base flex h-19 items-center",
+              "transition-[background-color,box-shadow,height,margin,padding,border-radius]",
+              "duration-[var(--duration-base)]",
               // The floating pill on scroll, for **every** shell. `tone` used to gate this so
               // the console stayed square, which meant the one piece of chrome the whole
               // product shares behaved differently depending on who was signed in — the same
@@ -168,7 +174,9 @@ export function AppHeader({
                 `tablet`: between 744 and 1024 the console's nav is `display: none`, so
                 cancelling the auto margin parked the bell and the hamburger against the
                 salon switcher instead of the right edge. */}
-            <div className="gap-xs ml-auto flex shrink-0 items-center">{right}</div>
+            <div className="gap-xs ml-auto flex shrink-0 items-center">
+              {right}
+            </div>
           </div>
         </div>
       </header>

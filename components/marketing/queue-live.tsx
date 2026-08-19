@@ -79,17 +79,16 @@ export function QueueLive() {
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
           <div className="min-w-0">
             <SectionHeading
-              eyebrow={queueSection.eyebrow}
               title="Watch the line _move, live_"
               body={queueSection.body}
               titleId="queue-title"
             />
 
             <Reveal delay={0.12} className="mt-8">
-              <div className="bg-canvas ring-hairline shadow-card inline-flex items-center gap-4 rounded-md p-4 ring-1 ring-inset">
+              <div className="bg-paper ring-hairline shadow-card inline-flex items-center gap-4 rounded-md p-4 ring-1 ring-inset">
                 <QrTile />
                 <span className="min-w-0">
-                  <span className="text-ink text-ui block font-semibold">
+                  <span className="text-ink text-title block font-semibold">
                     {queueSection.qrCaption}
                   </span>
                   <span className="text-muted block text-caption">
@@ -130,7 +129,7 @@ function QueueBoard() {
   return (
     <div
       ref={ref}
-      className="bg-canvas ring-hairline shadow-card relative rounded-md p-5 ring-1 ring-inset sm:p-6"
+      className="bg-paper ring-hairline shadow-card relative rounded-md p-5 ring-1 ring-inset sm:p-6"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -138,7 +137,7 @@ function QueueBoard() {
             <Scissors className="size-5" strokeWidth={2.2} aria-hidden />
           </span>
           <span className="min-w-0">
-            <span className="text-ink text-ui block truncate font-semibold">
+            <span className="text-ink text-title block truncate font-semibold">
               Norling Hair Studio
             </span>
             <span className="text-muted block truncate text-caption">
@@ -182,11 +181,15 @@ function QueueBoard() {
                       ? "bg-ink text-white"
                       : isYou
                         ? "bg-rausch-cta text-white"
-                        : "bg-canvas text-muted",
+                        : "bg-paper text-muted",
                   )}
                 >
                   {state === "in-chair" ? (
-                    <Scissors className="size-4" strokeWidth={2.4} aria-hidden />
+                    <Scissors
+                      className="size-4"
+                      strokeWidth={2.4}
+                      aria-hidden
+                    />
                   ) : (
                     `#${i}`
                   )}
@@ -195,7 +198,7 @@ function QueueBoard() {
                 <span className="min-w-0 flex-1">
                   <span
                     className={cn(
-                      "text-ui block truncate font-medium",
+                      "text-title block truncate font-medium",
                       isYou ? "text-ink font-semibold" : "text-ink",
                     )}
                   >
@@ -207,7 +210,7 @@ function QueueBoard() {
                 </span>
 
                 {state === "in-chair" && (
-                  <span className="bg-canvas text-muted shrink-0 rounded-full px-2.5 py-1 text-badge font-semibold tracking-[0.08em] uppercase">
+                  <span className="bg-paper text-muted shrink-0 rounded-full px-2.5 py-1 text-badge font-semibold tracking-[0.08em] uppercase">
                     In chair
                   </span>
                 )}
@@ -243,7 +246,7 @@ function QueueBoard() {
             </span>
             <span className="min-w-0">
               <span className="block text-body-sm font-semibold text-white">
-                You&apos;re two away — start heading back
+                You’re two away — start heading back
               </span>
               <span className="block truncate text-caption text-white/60">
                 Norling Hair Studio · about 18 min

@@ -124,7 +124,9 @@ export function SalonCard({
   // so. Either half can be missing — 8 of the live salons have no category row — and
   // the line is absent rather than half-empty when both are.
   const kind = salon.categories[0] ?? salon.services[0] ?? null;
-  const detail = [kind, reviewLine(salon.reviewCount)].filter(Boolean).join(" · ");
+  const detail = [kind, reviewLine(salon.reviewCount)]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <article className="group relative flex flex-col">
@@ -164,7 +166,7 @@ export function SalonCard({
              shadow tier, floated top-left over the photo. Deliberately the *only*
              thing over the image — the reference's heart belongs to a signed-in
              account, and this site has no session to save one against. */
-          <span className="bg-canvas text-ink shadow-card absolute top-3 left-3 rounded-full px-2.5 py-1 text-badge font-semibold">
+          <span className="bg-paper text-ink shadow-card absolute top-3 left-3 rounded-full px-2.5 py-1 text-badge font-semibold">
             {copy.featured}
           </span>
         )}

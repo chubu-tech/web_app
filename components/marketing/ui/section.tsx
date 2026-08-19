@@ -69,8 +69,38 @@ export function Eyebrow({
 }
 
 /**
- * Eyebrow + masked display heading + optional lede. Heading accepts the
+ * Optional eyebrow + masked display heading + optional lede. Heading accepts the
  * `_accent_` / `|` syntax from `parseHeading`.
+ *
+ * ## The eyebrow is OFF by default, and two of them exist on the whole site
+ *
+ * Every band on the home page used to pass one — nine of nine, plus the waitlist page —
+ * and at that density they stop being labels and become a tic: a page of *labelled
+ * lists*, where the small tracked caps say "this is an editorial site" and nothing else.
+ * When every section is chaptered, none of them are. The dot beside each one also spent
+ * the brand accent nine times on a page whose own rule is that rausch "appears once or
+ * twice".
+ *
+ * Six were cut by asking one question of each — **does the eyebrow say something the
+ * heading does not?** Mostly it did not: *"Live right now"* over "Already open for
+ * business", *"Who pays what"* over "Customers never pay. Only salons do.",
+ * *"Questions"* over "The things everyone asks". Those are the same sentence twice.
+ *
+ * Two survive because they carry information the heading actively lacks:
+ *
+ * - **`ForSalons` — "For salon owners".** The one place the page changes who it is
+ *   talking to. Everything above it addresses a customer.
+ * - **`DownloadBand` — "Coming soon"** (rendered inline there, not through this
+ *   component). "The chair is ready when you are" reads as a live download; the app has
+ *   not shipped. That is a material fact and the heading hides it.
+ *
+ * The hero's line is `brand.cities` — a coverage claim in the identity row beside the
+ * Dzongkha greeting, not a section label — and is not counted against this.
+ *
+ * **Before adding a third, cut one.** And keep the stack vertical: the eyebrow sits
+ * directly above its heading in the same column. A label in a narrow left column with the
+ * heading to its right is the hanging-header pattern, which is the single most reliable
+ * templated-editorial tell.
  *
  * **Left-aligned by default, and every band on the page now takes the default.**
  * Three sections used to centre themselves and the rest did not, so the page had no
@@ -123,7 +153,9 @@ export function SectionHeading({
         id={titleId}
         lines={parseHeading(title)}
         className={cn(
-          "text-editorial-lg mt-4 font-semibold",
+          // Fraunces, as on the hero's h1 — every display heading on the public site
+          // speaks in one voice, and this component is where all but one of them are.
+          "text-editorial-lg font-display mt-4 font-semibold",
           tone === "light" ? "text-white" : "text-ink",
           titleClassName,
         )}
@@ -193,6 +225,9 @@ export function Section({
 /** A full-width hairline between two bands on the same surface. */
 export function BandRule({ className }: { className?: string }) {
   return (
-    <div className={cn("border-hairline-soft border-t", className)} aria-hidden />
+    <div
+      className={cn("border-hairline-soft border-t", className)}
+      aria-hidden
+    />
   );
 }

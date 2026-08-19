@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "web-performance-optimization",
+  "owner": "sickn33",
+  "repo": "antigravity-awesome-skills",
+  "path": "plugins/agentic-awesome-skills-claude/skills/web-performance-optimization",
+  "branch": "main",
+  "sha": "580aaeaf32b69ebc2478f929ccfc7467327c0c9f",
+  "source": "manual"
+}

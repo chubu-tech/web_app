@@ -1,7 +1,12 @@
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
 import { heatGrid } from "@/lib/analytics";
-import type { HeatCell, OpsRates, RetentionSplit, StaffStat } from "@/lib/types/analytics";
+import type {
+  HeatCell,
+  OpsRates,
+  RetentionSplit,
+  StaffStat,
+} from "@/lib/types/analytics";
 import { formatNu } from "@/lib/utils";
 
 /**
@@ -77,7 +82,9 @@ export function RadialGauge({
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">
         <div>
-          <p className="text-display-sm text-ink font-semibold tabular-nums">{centerValue}</p>
+          <p className="text-display-sm text-ink font-semibold tabular-nums">
+            {centerValue}
+          </p>
           <p className="text-caption-sm text-muted">{centerLabel}</p>
         </div>
       </div>
@@ -102,9 +109,24 @@ export function OpsDonut({ ops }: { ops: OpsRates }) {
   const c = 2 * Math.PI * r;
 
   const slices = [
-    { key: "completed", value: ops.completed, colour: "var(--color-success-text)", label: "Completed" },
-    { key: "noShow", value: ops.noShow, colour: "var(--color-error-text)", label: "No-shows" },
-    { key: "cancelled", value: ops.cancelled, colour: "var(--color-border-strong)", label: "Cancelled" },
+    {
+      key: "completed",
+      value: ops.completed,
+      colour: "var(--color-success-text)",
+      label: "Completed",
+    },
+    {
+      key: "noShow",
+      value: ops.noShow,
+      colour: "var(--color-error-text)",
+      label: "No-shows",
+    },
+    {
+      key: "cancelled",
+      value: ops.cancelled,
+      colour: "var(--color-border-strong)",
+      label: "Cancelled",
+    },
   ];
 
   let offset = 0;
@@ -143,7 +165,9 @@ export function OpsDonut({ ops }: { ops: OpsRates }) {
         </svg>
         <div className="absolute inset-0 grid place-items-center text-center">
           <div>
-            <p className="text-display-sm text-ink font-semibold tabular-nums">{total}</p>
+            <p className="text-display-sm text-ink font-semibold tabular-nums">
+              {total}
+            </p>
             <p className="text-caption-sm text-muted">bookings</p>
           </div>
         </div>
@@ -157,7 +181,9 @@ export function OpsDonut({ ops }: { ops: OpsRates }) {
               aria-hidden
             />
             <dt className="text-body-sm text-body min-w-0 flex-1">{s.label}</dt>
-            <dd className="text-title text-ink font-medium tabular-nums">{s.value}</dd>
+            <dd className="text-title text-ink font-medium tabular-nums">
+              {s.value}
+            </dd>
           </div>
         ))}
       </dl>
@@ -210,7 +236,9 @@ export function RetentionWaffle({ split }: { split: RetentionSplit }) {
         <div className="gap-sm flex items-center">
           <span className="bg-surface-strong size-3 rounded-full" aria-hidden />
           <dt className="text-body-sm text-body">New</dt>
-          <dd className="text-title text-ink font-medium tabular-nums">{split.newCustomers}</dd>
+          <dd className="text-title text-ink font-medium tabular-nums">
+            {split.newCustomers}
+          </dd>
         </div>
       </dl>
     </div>
@@ -287,7 +315,10 @@ export function PeakHeatmap({ cells }: { cells: HeatCell[] }) {
           <span
             key={i}
             className="border-hairline-soft size-3 rounded-[2px] border"
-            style={{ backgroundColor: i === 0 ? "var(--color-canvas)" : heatColour(i, 4) }}
+            style={{
+              backgroundColor:
+                i === 0 ? "var(--color-canvas)" : heatColour(i, 4),
+            }}
             aria-hidden
           />
         ))}
@@ -298,19 +329,26 @@ export function PeakHeatmap({ cells }: { cells: HeatCell[] }) {
 }
 
 /**
- * `rausch-disabled` (#ffd1da) → `rausch-active` (#e00b41), and **white at zero**.
+ * `rausch-disabled` → `rausch-active`, and **white at zero**.
  *
  * Interpolated in sRGB, which is what `Color.lerp` does in Flutter — a perceptually-even space
  * would be better colour science and a different picture from the same data, so the two clients
- * would disagree about how busy a Tuesday looks.
+ * would disagree about how busy a Tuesday looks. `in srgb` is what pins that.
+ *
+ * **The endpoints are read from the tokens, not transcribed.** This used to hold them as
+ * `[255, 209, 218]` and `[224, 11, 65]` and lerp them by hand — the two brand colours copied
+ * into JS, where changing `--color-rausch-active` in `globals.css` would have left the busiest
+ * hour of the week painted in the *old* brand with nothing in the diff to say so. `color-mix`
+ * does the same arithmetic in the same space against the live values.
+ *
+ * `A p%` mixes A at p% with B at the remainder, so t=0 is pure `rausch-disabled` and t=1 is
+ * pure `rausch-active` — the direction the old triples had.
  */
 function heatColour(value: number, max: number): string {
   if (value <= 0 || max <= 0) return "var(--color-canvas)";
   const t = Math.min(value / max, 1);
-  const from = [255, 209, 218];
-  const to = [224, 11, 65];
-  const mix = from.map((f, i) => Math.round(f + (to[i] - f) * t));
-  return `rgb(${mix[0]} ${mix[1]} ${mix[2]})`;
+  const pct = (t * 100).toFixed(2);
+  return `color-mix(in srgb, var(--color-rausch-active) ${pct}%, var(--color-rausch-disabled))`;
 }
 
 /* ------------------------------------------------------------- leaderboard --- */
@@ -343,8 +381,12 @@ export function StaffLeaderboard({ staff }: { staff: StaffStat[] }) {
             aria-hidden
           />
           <div className="px-sm py-sm gap-sm relative flex items-center">
-            <span className="text-caption-sm text-muted w-4 shrink-0 tabular-nums">{i + 1}</span>
-            <span className="text-body-md text-ink min-w-0 flex-1 truncate">{s.name}</span>
+            <span className="text-caption-sm text-muted w-4 shrink-0 tabular-nums">
+              {i + 1}
+            </span>
+            <span className="text-body-md text-ink min-w-0 flex-1 truncate">
+              {s.name}
+            </span>
             {s.avgRating != null ? (
               <span className="text-caption-sm text-muted gap-xxs flex shrink-0 items-center tabular-nums">
                 <Icons.star

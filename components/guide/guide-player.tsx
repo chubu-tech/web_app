@@ -1,7 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { useDialogOverlay } from "@/components/ui/use-dialog-overlay";
@@ -168,7 +175,6 @@ export function GuidePlayer({
   const steps = guide.steps;
   const total = steps.length;
   const step = steps[index]!;
-  const frame = step[variant];
   const atEnd = index === total - 1;
 
   useDialogOverlay({ open: true, onClose, panel });
@@ -299,7 +305,13 @@ export function GuidePlayer({
           "tablet:h-auto tablet:max-h-[92svh] tablet:w-[calc(100%-2rem)] tablet:max-w-[68rem] tablet:rounded-lg",
         )}
       >
-        <Header guide={guide} index={index} total={total} titleId={titleId} onClose={onClose} />
+        <Header
+          guide={guide}
+          index={index}
+          total={total}
+          titleId={titleId}
+          onClose={onClose}
+        />
 
         <ProgressRail
           steps={steps}
@@ -351,7 +363,9 @@ export function GuidePlayer({
             setPlaying(false);
             next();
           }}
-          onToggle={() => (atEnd && !playing ? restart() : setPlaying((p) => !p))}
+          onToggle={() =>
+            atEnd && !playing ? restart() : setPlaying((p) => !p)
+          }
           onJump={(i) => {
             setPlaying(false);
             goTo(i);
@@ -376,7 +390,9 @@ export function GuidePlayer({
 function isControl(node: Element | null): boolean {
   return (
     node instanceof HTMLElement &&
-    (node.tagName === "BUTTON" || node.tagName === "A" || node.tagName === "INPUT")
+    (node.tagName === "BUTTON" ||
+      node.tagName === "A" ||
+      node.tagName === "INPUT")
   );
 }
 
@@ -415,7 +431,10 @@ function Header({
         aria-label="Close the guide"
         className="text-muted hover:text-ink -mr-2 flex size-12 shrink-0 items-center justify-center rounded-full"
       >
-        <Icons.close style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
+        <Icons.close
+          style={{ width: IconSize.sm, height: IconSize.sm }}
+          aria-hidden
+        />
       </button>
     </div>
   );
@@ -444,7 +463,10 @@ function ProgressRail({
   run: number;
 }) {
   return (
-    <div aria-hidden className="px-base tablet:px-lg gap-xxs flex shrink-0 py-2">
+    <div
+      aria-hidden
+      className="px-base tablet:px-lg gap-xxs flex shrink-0 py-2"
+    >
       {steps.map((step, i) => (
         <span
           key={step.id}
@@ -546,12 +568,17 @@ function Stage({
             style={{
               aspectRatio: FRAME_RATIO[variant],
               transform: `translateY(-${pan}%)`,
-              ...(reduced
+              /*
+                Applied only while playing, and that is a correctness fix rather than a
+                tidy-up: paused, a `both`-filled animation holds its **first** keyframe, so
+                a stopped guide sat at the arrival zoom for as long as somebody read it — and
+                on a phone, where the frame is seen through a window, that pushed a highlight
+                near the bottom edge out of view. At rest the layer is untransformed, which
+                is also the state every hotspot percentage was measured against.
+              */
+              ...(reduced || !playing
                 ? {}
-                : {
-                    animation: `guide-frame-in ${holdSeconds}s linear both`,
-                    animationPlayState: playing ? "running" : "paused",
-                  }),
+                : { animation: `guide-frame-in ${holdSeconds}s linear both` }),
             }}
           >
             <Frame frame={frame} priority />
@@ -564,7 +591,10 @@ function Stage({
             thirty-two. `opacity-0` rather than `hidden`, because a display-none image is
             not guaranteed to be fetched at all.
           */}
-          <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 opacity-0">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-10 opacity-0"
+          >
             {[index - 1, index + 1]
               .filter((i) => i >= 0 && i < steps.length)
               .map((i) => (
@@ -577,7 +607,13 @@ function Stage({
   );
 }
 
-function Frame({ frame, priority = false }: { frame: GuideFrame; priority?: boolean }) {
+function Frame({
+  frame,
+  priority = false,
+}: {
+  frame: GuideFrame;
+  priority?: boolean;
+}) {
   return (
     <Image
       src={`/guide/${frame.image}`}
@@ -604,7 +640,11 @@ function Frame({ frame, priority = false }: { frame: GuideFrame; priority?: bool
  * It arrives a beat after the frame does (the delay is in `--animate-guide-ring`), which is
  * the difference between a ring that is part of the picture and somebody pointing at one.
  */
-function Highlight({ hotspot }: { hotspot: NonNullable<GuideFrame["hotspot"]> }) {
+function Highlight({
+  hotspot,
+}: {
+  hotspot: NonNullable<GuideFrame["hotspot"]>;
+}) {
   const { x, y, w, h, label, place = "below" } = hotspot;
   // Anchor the label to whichever edge of the ring keeps it inside the picture: pinned left
   // by default, and to the right once the ring itself starts past the middle.
@@ -675,7 +715,10 @@ function Explanation({
       >
         {step.title}
       </h3>
-      <p className="text-body-sm text-body motion-safe:animate-guide-copy mt-2" style={line(2)}>
+      <p
+        className="text-body-sm text-body motion-safe:animate-guide-copy mt-2"
+        style={line(2)}
+      >
         {step.body}
       </p>
       <p
@@ -716,7 +759,11 @@ function Controls({
   onJump: (index: number) => void;
 }) {
   const finished = atEnd && !playing;
-  const ToggleIcon = finished ? Icons.restart : playing ? Icons.pause : Icons.play;
+  const ToggleIcon = finished
+    ? Icons.restart
+    : playing
+      ? Icons.pause
+      : Icons.play;
   const toggleLabel = finished
     ? "Start the guide again"
     : playing
@@ -738,7 +785,10 @@ function Controls({
         aria-label="Previous step"
         className="border-hairline text-ink hover:bg-surface-soft disabled:text-muted-soft disabled:hover:bg-transparent flex size-12 shrink-0 items-center justify-center rounded-full border disabled:cursor-not-allowed"
       >
-        <Icons.chevronLeft style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
+        <Icons.chevronLeft
+          style={{ width: IconSize.sm, height: IconSize.sm }}
+          aria-hidden
+        />
       </button>
 
       <button
@@ -747,7 +797,10 @@ function Controls({
         aria-label={toggleLabel}
         className="bg-rausch-cta text-on-primary hover:bg-rausch-cta-pressed flex size-12 shrink-0 items-center justify-center rounded-full"
       >
-        <ToggleIcon style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
+        <ToggleIcon
+          style={{ width: IconSize.sm, height: IconSize.sm }}
+          aria-hidden
+        />
       </button>
 
       <button
@@ -757,7 +810,10 @@ function Controls({
         aria-label="Next step"
         className="border-hairline text-ink hover:bg-surface-soft disabled:text-muted-soft disabled:hover:bg-transparent flex size-12 shrink-0 items-center justify-center rounded-full border disabled:cursor-not-allowed"
       >
-        <Icons.chevronRight style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
+        <Icons.chevronRight
+          style={{ width: IconSize.sm, height: IconSize.sm }}
+          aria-hidden
+        />
       </button>
 
       {/*
@@ -783,9 +839,15 @@ function Controls({
           )}
         >
           {sound ? (
-            <Icons.sound style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
+            <Icons.sound
+              style={{ width: IconSize.sm, height: IconSize.sm }}
+              aria-hidden
+            />
           ) : (
-            <Icons.soundOff style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
+            <Icons.soundOff
+              style={{ width: IconSize.sm, height: IconSize.sm }}
+              aria-hidden
+            />
           )}
         </button>
       ) : null}

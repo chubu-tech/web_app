@@ -27,11 +27,11 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <article className="scroll-mt-[calc(var(--site-header-height)+1.5rem)]">
-      <h1 className="text-editorial-lg font-semibold">{privacy.title}</h1>
+      <h1 className="text-editorial-lg font-display font-semibold">{privacy.title}</h1>
 
-      <p className="text-muted mt-6 text-ui leading-relaxed">
-        Last updated: <strong className="text-body">{legal.lastUpdated}</strong>.
-        Operated by <strong className="text-body">{legal.operator}</strong>,{" "}
+      <p className="text-muted mt-6 text-title leading-relaxed">
+        Last updated: <strong className="text-body">{legal.lastUpdated}</strong>
+        . Operated by <strong className="text-body">{legal.operator}</strong>,{" "}
         {legal.jurisdiction}. Contact:{" "}
         <a
           href={`mailto:${legal.contactEmail}`}
@@ -105,7 +105,7 @@ export default function PrivacyPage() {
         </p>
       </section>
 
-      <p className="text-muted mt-14 text-ui">
+      <p className="text-muted mt-14 text-title">
         <Link href="/" className="hover:text-ink transition-colors">
           {brand.name}
         </Link>{" "}
