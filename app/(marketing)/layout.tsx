@@ -1,5 +1,4 @@
 import type { Viewport } from "next";
-import { MarketingGuideLauncher } from "@/components/guide/marketing-guide-launcher";
 import { WaitlistProvider } from "@/components/marketing/waitlist-provider";
 
 /**
@@ -74,17 +73,6 @@ export default function MarketingLayout({
         className="bg-canvas flex min-h-full flex-col"
       >
         {children}
-        {/*
-          "How it works", on the pages somebody reaches before they have an account — which is
-        the audience a first-run guide is actually for. The walkthrough it opens is the same
-        one the product shells mount, so a visitor who watches it here and then signs up
-        meets the screens they were just shown.
-
-        `MarketingGuideLauncher` picks the audience from the route, because out here nobody
-        has signed in and `/for-salons` is the one page addressed to salon owners. Removing
-        the button from the public site is deleting this line.
-      */}
-        <MarketingGuideLauncher />
       </div>
     </WaitlistProvider>
   );

@@ -30,7 +30,9 @@ export default async function StaffLayout({
     <div data-shell="owner" className="bg-canvas flex min-h-full flex-col">
       <StaffHeader displayName={me?.displayName ?? null} />
       {/* `id="main"` — the root layout's skip link targets it on every route. */}
-        <main id="main" className="flex-1">{children}</main>
+      <main id="main" className="flex-1">
+        {children}
+      </main>
 
       {/* Same idle cut as the owner console — a stylist's shell runs on the same shared
           machine. See `lib/session-timeout.ts`. */}

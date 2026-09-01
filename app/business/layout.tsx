@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { GuideLauncher } from "@/components/guide/guide-launcher";
 import { OwnerHeader } from "@/components/owner/owner-nav";
 import { SalonSwitcher } from "@/components/owner/salon-switcher";
 import { IdleTimeout } from "@/components/ui/idle-timeout";
@@ -58,7 +57,9 @@ export default async function OwnerLayout({
   const supabase = await createClient();
   const [unreadNotifications, conversations] = await Promise.all([
     unreadNotificationCount(supabase).catch(() => 0),
-    active ? fetchOwnerConversations(supabase, active.id).catch(() => []) : Promise.resolve([]),
+    active
+      ? fetchOwnerConversations(supabase, active.id).catch(() => [])
+      : Promise.resolve([]),
   ]);
   const unreadMessages = unreadThreadCount(conversations, userId);
 
@@ -97,7 +98,9 @@ export default async function OwnerLayout({
       <SalonSwitcher active={active} businesses={businesses} />
 
       {/* `id="main"` — the root layout's skip link targets it on every route. */}
-        <main id="main" className="flex-1">{children}</main>
+      <main id="main" className="flex-1">
+        {children}
+      </main>
 
       {/*
         Thirty minutes without interaction signs this console out. Here rather than on the
@@ -106,19 +109,6 @@ export default async function OwnerLayout({
         carries the full reasoning, including why `../tho` has no equivalent.
       */}
       <IdleTimeout />
-
-      {/*
-        The floating "How it works" button, carrying the **owner** walkthrough — sixteen
-        frames of this console rather than the customer app. Same component as the customer
-        shell, a different guide, which is the whole reason it takes an audience: an owner
-        who opens a guide about booking a haircut has been shown the wrong product.
-
-        It lifts itself clear of `/business/walk-in`'s sticky footer and a chat composer on
-        `/business/messages/<id>` — see `lib/guide/placement.ts`. `IdleTimeout`'s warning is
-        z-50 and this is z-30, so on the rare occasion both are up the warning wins, which is
-        the right order.
-      */}
-      <GuideLauncher audience="owner" />
     </div>
   );
 }

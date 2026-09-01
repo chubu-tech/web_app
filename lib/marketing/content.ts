@@ -416,6 +416,58 @@ export const proof = {
 } as const;
 
 /**
+ * The supporter credit, immediately below the proof band.
+ *
+ * ## The copy says almost nothing, and that is the decision
+ *
+ * It names who supports Tho and stops. There is no line about what Dabtong House
+ * does, what the arrangement is, or what it has enabled — because nobody has told us,
+ * and this file is two paragraphs away from the note explaining that the site's
+ * testimonials were removed for being invented. A partnership blurb written on the
+ * partner's behalf is the same failure in a nicer suit: it puts words in the mouth of
+ * a named third party who has not seen them.
+ *
+ * So `body` is one sentence that is true whatever the arrangement turns out to be.
+ * **Widen it only with something Dabtong House has actually agreed to**, and when that
+ * happens the band has room for it — `SupportedBy` renders `body` as a block and the
+ * column it sits in is half the grid.
+ *
+ * ## The spelling is `Dabtong`, from the artwork
+ *
+ * The request that prompted this said "Daptong"; the supplied PDF sets **DABTONG**
+ * in the wordmark, and a logo is the one place a company's own spelling is not in
+ * question. The `b` is what the vector says. Worth a second look before print all the
+ * same — this constant is the only place the name is typed, and the wordmark beside
+ * it is drawn rather than set, so the two cannot silently disagree.
+ *
+ * ## `href` is empty on purpose
+ *
+ * Same convention as `brand.stores` and `brand.social`: an unset URL renders the
+ * lockup as a plain lockup rather than as a link to nowhere. Paste the address here
+ * and both the band and the footer credit become links, with no other edit —
+ * `SupportedBy` and `DabtongCredit` each branch on `length > 0`. A dead link under a
+ * supporter's name is worse than no link at all.
+ */
+export const supporter = {
+  /**
+   * Rendered as the band's `<h2>` in the footer's tracked-caps style rather than
+   * through `Eyebrow`. `ui/section.tsx` caps the site at two eyebrows and says to cut
+   * one before adding a third; this band has no display heading for an eyebrow to sit
+   * above anyway, so the label *is* the heading and takes no accent dot.
+   */
+  label: "Supported by",
+  name: "Dabtong House",
+  body: "Tho is built in Bhutan, with the support of Dabtong House.",
+  /** Paste the website here to turn the lockup into a link. See the note above. */
+  href: "",
+  /**
+   * The footer's one-line version, which sets the name as text beside the mark
+   * instead of drawing the wordmark. See `DabtongCredit` for why.
+   */
+  footerLabel: "Supported by",
+} as const;
+
+/**
  * **Prices are mirrored from `../tho/app/lib/business/plans/plans_config.dart`, never
  * set here.** That file is what a salon owner actually sees inside the app, and it is
  * explicit: the final launch prices set 2026-08-03 are **Nu 399 / 699 / 1,499** a month,

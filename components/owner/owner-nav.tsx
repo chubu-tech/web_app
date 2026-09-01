@@ -42,7 +42,10 @@ import { readyOwnerTabs } from "./destinations";
  * wrong for chrome, and it is no longer competing with the destinations for width â€” which is
  * what pushed this header's collapse out to 1024 in the first place.
  *
- * The logo points at `/business`, not `/`: `/` only redirects an owner back here.
+ * The logo points at `/business`, not `/`. Not because `/` bounces back — measured, and it does
+ * not: `landAfterAuth` only chooses a destination at sign-in, and `/` is the marketing home,
+ * which renders for anybody. Pointing the console's logo there would drop an owner out of the
+ * console and onto a sales page mid-shift.
  *
  * ## One row, and one collapse, at 1024
  *

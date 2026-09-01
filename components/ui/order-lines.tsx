@@ -110,7 +110,7 @@ function Row({
       {/*
         A template literal rather than `cn`, deliberately: this carries a size class and a
         colour class, and `twMerge` files both under *colour* and silently drops one — the trap
-        `lib/utils.ts` documents and the one that turned the guide's hotspot label into an
+        `lib/utils.ts` documents and the one that turned a label on a photograph into an
         unreadable black box. Nothing here needs merging, so nothing merges it.
       */}
       <span

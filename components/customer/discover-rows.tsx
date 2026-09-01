@@ -8,9 +8,7 @@ import { categoryIcon, Icons, IconSize } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
 import { availableLabel, type AvailableSalon } from "@/lib/available-today";
 import { formatKm } from "@/lib/discover-logic";
-import { rebookSubtitle } from "@/lib/rebook";
 import type { RankedSalon } from "@/lib/recommendations";
-import type { Booking } from "@/lib/types/booking";
 import {
   cardMetaLine,
   offerEndsLabel,
@@ -28,7 +26,9 @@ import { cn } from "@/lib/utils";
  * decorative one was only taking up the first screen.
  *
  * Each row renders nothing when it has no items, so Discover does not need to guard
- * — which matters, because today 0 salons have offers and 4 have no cover.
+ * — which matters, because **1 salon of the 14 approved has an offer** and 5 have no cover,
+ * so an absent row is the ordinary state rather than the broken one. (Counted 2026-08-19;
+ * `offers` was 0 platform-wide until 2026-08-18, so re-count before leaning on it.)
  *
  * **Every row is a `Carousel`.** They were each their own `flex overflow-x-auto pb-2`,
  * which drew a permanent grey scrollbar under all four on Windows and Linux. See that
@@ -264,55 +264,300 @@ export function NearbyRow({
 }
 
 /**
- * "Offers" — the real live promotions, from `fetchLiveOffers`.
+ * "Offers" — the real live promotions, from `fetchLiveOffers`, and the **first** thing
+ * on Discover.
  *
- * The read policy already filters to in-window offers, so this never re-checks
- * dates. Zero salons have one today, so it renders nothing; that is the same
- * behaviour as the app rather than an empty heading.
+ * The read policy already filters to in-window offers, so this never re-checks dates.
+ *
+ * ## Why it is a banner and not a card
+ *
+ * Every other row on this page is a *browse*: five interchangeable salons, each card
+ * answering the same question, and the row's job is to let the eye run along them. An
+ * offer is the opposite — there is one live on the platform, it expires, and the thing
+ * being sold is a **number**. Rendering it as a 260px salon card with a 92px cover strip
+ * made the discount the smallest element on it and put the salon's photograph where the
+ * price should have been.
+ *
+ * So the offer takes the full height of a banner and the cover becomes its *ground*: the
+ * photograph goes behind a scrim, the discount is a stamped medallion, and the title is
+ * set at display size over the top. It is the only surface in the customer shell where
+ * text sits on a photograph, which is exactly why it reads as a promotion rather than as
+ * another row of salons.
+ *
+ * ## Four animations, and each is answering something
+ *
+ * - **`offer-in`** staggers the banners in, 70ms apart — the same idea as `card-in` on the
+ *   salon rows, slower and with a touch of scale, because a banner arriving is a bigger
+ *   movement than a card arriving.
+ * - **`offer-stamp`** lands the medallion after its own banner with `--ease-spring`'s
+ *   overshoot, so the discount is the last thing to settle and therefore the thing the eye
+ *   finishes on.
+ * - **`offer-sheen`** passes one specular highlight diagonally across the cover, once. A
+ *   sheen that loops is a casino; a sheen that runs once is a surface catching the light as
+ *   it arrives.
+ * - **`offer-drift`** is the only infinite one: a slow Ken Burns on the cover, so the top
+ *   of Discover is not a still photograph. It is small enough (1.06 → 1.12 over 18s) that
+ *   nothing moves out from under the type.
+ *
+ * All four are `motion-safe:`, and none can strand the banner mid-gesture: `both` fill plus
+ * the app-wide reduced-motion rule resolves each to its finished state. See the block in
+ * `globals.css` for why the drift is safe to truncate.
+ *
+ * **The scrim is not decoration.** `text-on-primary` over an owner-uploaded photograph has
+ * no contrast guarantee at all — the file is as often a bright price list as a dark
+ * interior — so the gradient is what makes the type legible, and it is drawn over the
+ * monogram fallback too rather than only over a real cover.
  */
-export function OffersRow({ offers }: { offers: Offer[] }) {
+export function OffersRow({
+  offers,
+  priority = false,
+}: {
+  offers: Offer[];
+  /**
+   * Eager-load the **first** banner's cover.
+   *
+   * Passed by Discover only while there is an offer to draw, and `RecommendedRow` gives its
+   * own up in exchange — the two rows swap the flag rather than both holding it, because two
+   * eager covers compete for one connection and neither wins. See `SalonScroller`.
+   */
+  priority?: boolean;
+}) {
   if (offers.length === 0) return null;
   return (
     <section>
-      <SectionHeader title="Offers" className="mb-base" />
-      {/* The one row that keeps its own cover geometry: a 92px banner in a 260px card
-          is nothing like the browse ratio, and with 0 offers live platform-wide there is
-          no way to look at a change here before shipping it. Spacing only. */}
+      <SectionHeader
+        title="Offers"
+        className="mb-base"
+        action={
+          <span className="text-caption-sm text-muted gap-xs px-sm inline-flex items-center">
+            <Icons.offer
+              className="text-rausch-cta shrink-0"
+              style={{ width: IconSize.xxs, height: IconSize.xxs }}
+              aria-hidden
+            />
+            {offers.length === 1 ? "1 live deal" : `${offers.length} live deals`}
+          </span>
+        }
+      />
       <Carousel label="Offers">
-        {offers.map((o) => (
-          <li key={o.id} className="w-[260px] shrink-0 snap-start">
-            <article className="border-hairline-soft shadow-card relative overflow-hidden rounded-md border">
-              <CoverImage
-                label={o.businessName ?? o.title}
-                imageUrl={o.businessCoverUrl}
-                sizes="260px"
-                className="h-[92px] w-full"
-              />
-              <div className="p-md">
-                <div className="gap-sm flex items-start">
-                  <h3 className="text-title text-ink flex-1 truncate font-medium">
-                    <Link
-                      href={`/salon/${o.businessId}`}
-                      className="after:absolute after:inset-0 after:content-['']"
-                    >
-                      {o.title}
-                    </Link>
-                  </h3>
-                  {o.discountPct != null ? (
-                    <span className="bg-rausch/10 text-rausch-cta text-badge px-sm py-xxs shrink-0 rounded-full font-semibold">
-                      -{o.discountPct}%
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-caption-sm text-muted truncate">
-                  {[o.businessName, offerEndsLabel(o)].filter(Boolean).join(" · ")}
-                </p>
-              </div>
-            </article>
+        {offers.map((o, i) => (
+          <li
+            key={o.id}
+            className={cn(
+              "motion-safe:animate-offer-in shrink-0 snap-start",
+              /*
+                **One offer fills the row; two or more become a rail.**
+
+                This is the shape of the live data rather than a flourish: there is exactly
+                one offer on the platform, and a 464px card parked in a 915px column reads as
+                a rail whose other cards failed to load. A width is also the *only* thing that
+                distinguishes them — same banner, same animations, same markup — so there is
+                no second component to keep in step, and the second offer a salon publishes
+                turns this into a carousel with nothing to change.
+              */
+              offers.length === 1
+                ? "w-full"
+                : "w-[288px] tablet:w-[420px] desktop:w-[464px]",
+            )}
+            style={{ "--i": i, animationDelay: "calc(var(--i) * 70ms)" } as React.CSSProperties}
+          >
+            <OfferBanner
+              offer={o}
+              index={i}
+              solo={offers.length === 1}
+              priority={priority && i === 0}
+            />
           </li>
         ))}
       </Carousel>
     </section>
+  );
+}
+
+/**
+ * One offer, as a banner.
+ *
+ * `group` on the article is what drives the hover: the cover brightens, the banner lifts,
+ * and the arrow slides. All three are `transition`s rather than animations, so they reverse
+ * when the pointer leaves — an animation would have to be re-triggered and would jump on
+ * the way out.
+ *
+ * The `<Link>` covers the whole banner through an `after:` pseudo-element rather than
+ * wrapping it, which keeps the accessible name to the offer's own title while leaving the
+ * medallion and the meta line as text rather than as part of a link label.
+ */
+function OfferBanner({
+  offer: o,
+  index,
+  solo,
+  priority,
+}: {
+  offer: Offer;
+  /** Only for staggering the medallion behind its own banner. */
+  index: number;
+  /** The only offer, so it holds the whole width and can afford more height and type. */
+  solo: boolean;
+  priority: boolean;
+}) {
+  const ends = offerEndsLabel(o);
+
+  return (
+    <article
+      className={cn(
+        "group shadow-card relative isolate overflow-hidden rounded-lg",
+        solo ? "h-[228px] tablet:h-[288px]" : "h-[200px] tablet:h-[232px]",
+        "transition-transform duration-[var(--duration-slow)] ease-[var(--ease-out-expo)]",
+        "motion-safe:hover:-translate-y-1",
+      )}
+    >
+      {/*
+        The ground. The pan lives on this wrapper rather than on `CoverImage`, whose own div
+        is what `next/image`'s `fill` measures against — animating that would move the box
+        the picture is being fitted into rather than the picture.
+
+        **The overscan is in the keyframe and nowhere else.** A `scale-` utility carrying an
+        arbitrary 1.06 here as well would not be belt and braces: Tailwind 4 emits that as
+        the CSS `scale` property, which *composes* with the keyframe's `transform: scale(...)`
+        rather than being overridden by it, so the pan would silently run 1.12 → 1.19. (Named
+        without its bracket deliberately — a utility prefix followed by one is the comment
+        that took the dev server down twice; see AGENTS.md.) Under reduced motion
+        `motion-safe:` drops the animation entirely and the cover sits unscaled, which is the
+        right still frame anyway.
+      */}
+      <div
+        className="motion-safe:animate-offer-drift absolute inset-0 transition-[filter] duration-[var(--duration-slow)] group-hover:brightness-110"
+        aria-hidden
+      >
+        <CoverImage
+          label={o.businessName ?? o.title}
+          imageUrl={o.businessCoverUrl}
+          sizes={
+            solo
+              ? "(min-width: 1128px) 920px, (min-width: 744px) 700px, 100vw"
+              : "(min-width: 1128px) 464px, (min-width: 744px) 420px, 288px"
+          }
+          priority={priority}
+          className="size-full"
+        />
+      </div>
+
+      {/*
+        The scrim: dark at the foot where the type is, clear at the head where the medallion
+        carries its own fill.
+
+        **The stops are positioned, not spread evenly**, and that is the difference between a
+        scrim and a tint. A plain three-colour gradient puts its midpoint at 50%, so the
+        darkness needed under the title is spent halfway up the photograph — the type gets
+        less than it needs and the picture gets more than it should. Front-loading it
+        (90% → 55% by 35% → clear by 72%) keeps the top third of the cover as the photograph
+        it is while guaranteeing the bottom third can carry white text over **any** upload,
+        including the bright price lists owners actually post.
+      */}
+      <div
+        className="from-obsidian/90 via-obsidian/55 absolute inset-0 bg-gradient-to-t from-0% via-35% to-transparent to-72%"
+        aria-hidden
+      />
+
+      {/* The specular pass: a skewed white strip travelling across the cover once, on
+          arrival. `-left-1/3` is where the keyframe starts it from, outside the clip. */}
+      <div
+        className="motion-safe:animate-offer-sheen pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+        aria-hidden
+      />
+
+      <div className="p-base tablet:p-lg relative flex h-full flex-col justify-between">
+        <div className="gap-sm flex items-start justify-between">
+          {o.discountPct != null ? (
+            /* The medallion. `bg-rausch-cta` with `text-on-primary` — 4.89:1 — and never
+               `bg-rausch`, which is 3.53:1 against white and fails AA. */
+            <span
+              className="motion-safe:animate-offer-stamp bg-rausch-cta text-on-primary shadow-card px-md py-xs flex shrink-0 flex-col items-center rounded-md"
+              style={
+                {
+                  "--i": index,
+                  animationDelay: "calc(var(--i) * 70ms + 220ms)",
+                } as React.CSSProperties
+              }
+            >
+              <span className="text-display-sm font-semibold">−{o.discountPct}%</span>
+              <span className="text-badge font-medium uppercase">off</span>
+            </span>
+          ) : (
+            /* An offer with no percentage still needs something in that corner, or the
+               banner's top half is an empty photograph. `discount_pct` is nullable and the
+               one live offer carries 30, so this branch has **no live example** — the same
+               footing as `queueLockState`'s `needs_scan`. Look at it by nulling the column,
+               not by trusting that it renders. */
+            <span className="bg-paper/92 text-ink text-badge gap-xs px-md py-xs inline-flex shrink-0 items-center rounded-full font-semibold uppercase backdrop-blur-sm">
+              <Icons.sparkle
+                className="text-rausch-cta shrink-0"
+                style={{ width: IconSize.xxs, height: IconSize.xxs }}
+                aria-hidden
+              />
+              Offer
+            </span>
+          )}
+
+          {/* Urgency, and only when there is any: `offerEndsLabel` is null for an open-ended
+              offer, and an empty pill would be worse than no pill. */}
+          {ends ? (
+            <span className="bg-obsidian/55 text-on-primary text-badge gap-xs px-sm py-xs inline-flex shrink-0 items-center rounded-full font-medium backdrop-blur-sm">
+              <Icons.timer
+                className="shrink-0"
+                style={{ width: IconSize.xxs, height: IconSize.xxs }}
+                aria-hidden
+              />
+              {ends}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="gap-xs flex flex-col">
+          {/* The size goes on this wrapper and the colour on the heading inside it. Two
+              `text-*` classes through one `cn` is what `lib/utils.ts` documents as remedy 1
+              — `twMerge` treats `text-display-sm` and `text-on-primary` as one family and
+              drops the loser, which is how a label on a photograph became a black box. */}
+          <div className={solo ? "text-display-md tablet:text-display-lg" : "text-display-sm"}>
+            <h3 className="text-on-primary line-clamp-2 font-semibold">
+              <Link
+                href={`/salon/${o.businessId}`}
+                className="after:absolute after:inset-0 after:content-['']"
+              >
+                {o.title}
+              </Link>
+            </h3>
+          </div>
+
+          <div className="gap-sm flex items-end justify-between">
+            {/* The salon, and **not** the countdown a second time. It read
+                "Norzin Salon & Spa · 6 days left" under a pill already saying "6 days left",
+                and on a phone the duplicate was what pushed the salon's own name into an
+                ellipsis — the one fact on the line a customer cannot get from anywhere else
+                on the banner. Caught by looking at it at 390px, not by reading the join. */}
+            {o.businessName ? (
+              <p className="text-caption text-on-primary/85 min-w-0 flex-1 truncate">
+                {o.businessName}
+              </p>
+            ) : null}
+            {/* The affordance. A pill rather than a bare word, because the whole banner is
+                the target and this is the only thing on it that says so. */}
+            <span
+              className={cn(
+                "bg-paper/92 text-ink text-caption gap-xs px-md py-sm inline-flex shrink-0 items-center rounded-full font-medium backdrop-blur-sm",
+                "group-hover:bg-paper transition-colors duration-[var(--duration-base)]",
+              )}
+            >
+              View
+              <Icons.forward
+                className="shrink-0 transition-transform duration-[var(--duration-base)] ease-[var(--ease-out-expo)] group-hover:translate-x-1"
+                style={{ width: IconSize.xxs, height: IconSize.xxs }}
+                aria-hidden
+              />
+            </span>
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -395,100 +640,5 @@ export function AvailableTodayRow({
         ),
       }))}
     />
-  );
-}
-
-/**
- * "Book again" — the same thing, at the same shop, without walking the whole flow.
- *
- * In a category people return to every few weeks, most sessions are a rebooking rather than
- * a shopping trip, which is why upstream put this above the browse rows. It is also what
- * buys back the tap the stepped flow costs, for exactly the customers who used to have the
- * short path.
- *
- * **A card is a button, not a link, and that is forced by what has to happen on press.**
- * The destination is not knowable in advance: `resolveRebook` has to read the salon's
- * *current* menu and roster first, because a service may have been retired or the stylist
- * may have left. So the press starts a fetch and the answer decides the step. A link would
- * have to guess.
- *
- * `busyBookingId` freezes **every** card while one is resolving, not just the pressed one.
- * That is the re-entrancy guard upstream added in `a25af1a`: an impatient second press would
- * otherwise start an overlapping fetch and push a second booking flow.
- */
-export function BookAgainRow({
-  bookings,
-  onRebook,
-  busyBookingId,
-}: {
-  /** Already narrowed by `rebookable` — completed, newest first, one per salon. */
-  bookings: Booking[];
-  onRebook: (booking: Booking) => void;
-  busyBookingId?: string | null;
-}) {
-  if (bookings.length === 0) return null;
-  const frozen = busyBookingId != null;
-
-  return (
-    <section>
-      <SectionHeader title="Book again" className="mb-base" />
-      <Carousel label="Book again">
-        {bookings.map((b, i) => (
-          <li
-            key={b.id}
-            className="w-[240px] shrink-0 snap-start motion-safe:animate-card-in tablet:w-[264px]"
-            style={{ "--i": i, animationDelay: "calc(var(--i) * 45ms)" } as React.CSSProperties}
-          >
-            <button
-              type="button"
-              disabled={frozen}
-              onClick={() => onRebook(b)}
-              aria-label={`Book ${rebookSubtitle(b) || "again"} at ${b.businessName ?? "this salon"}`}
-              className={cn(
-                "block w-full cursor-pointer text-left",
-                "focus-visible:outline-ink rounded-md focus-visible:outline-2 focus-visible:outline-offset-2",
-                frozen && "cursor-wait opacity-60",
-              )}
-            >
-              <BusinessCard
-                id={b.businessId ?? ""}
-                name={b.businessName ?? "Salon"}
-                subtitle={rebookSubtitle(b)}
-                meta={null}
-                imageUrl={b.businessCoverUrl ?? null}
-                avgRating={null}
-                reviewCount={0}
-                /* No `href`: the press has to resolve before it knows where to go. */
-                href={null}
-                chip={
-                  <MediaChip>
-                    {busyBookingId === b.id ? (
-                      <>
-                        <Icons.spinner
-                          className="shrink-0 animate-spin"
-                          style={{ width: IconSize.xxs, height: IconSize.xxs }}
-                          aria-hidden
-                        />
-                        Checking
-                      </>
-                    ) : (
-                      <>
-                        <Icons.bookingRescheduled
-                          className="shrink-0"
-                          style={{ width: IconSize.xxs, height: IconSize.xxs }}
-                          aria-hidden
-                        />
-                        Book again
-                      </>
-                    )}
-                  </MediaChip>
-                }
-                sizes="264px"
-              />
-            </button>
-          </li>
-        ))}
-      </Carousel>
-    </section>
   );
 }

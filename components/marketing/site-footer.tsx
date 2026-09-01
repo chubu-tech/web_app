@@ -3,6 +3,7 @@ import { Mail, MapPin, Phone } from "lucide-react";
 import { brand, footer } from "@/lib/marketing/content";
 import { cn } from "@/lib/marketing/utils";
 import { TextileRule } from "./ui/bhutan";
+import { DabtongCredit } from "./ui/dabtong-mark";
 import { Reveal, RevealGroup } from "./ui/reveal";
 import { Container } from "./ui/section";
 import { SOCIAL_ICONS, type SocialKey } from "./ui/social-icons";
@@ -148,6 +149,17 @@ export function SiteFooter() {
                   />
                 </li>
               </ul>
+
+              {/* The supporter credit closes the mast, under a hairline of its own.
+                  It belongs here rather than in the legal basement because it is part
+                  of who this is — the same block as the wordmark and the contact rows
+                  — and not a piece of small print. It is also the **only** place the
+                  credit appears on the five document routes, and the only place it
+                  appears at all without JavaScript: `SupportedBy` is a home-page band
+                  and starts at `opacity: 0` like every other reveal on the site. */}
+              <div className="border-hairline-soft mt-8 border-t pt-6">
+                <DabtongCredit />
+              </div>
             </div>
           </Reveal>
 

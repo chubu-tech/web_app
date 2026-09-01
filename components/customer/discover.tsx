@@ -10,15 +10,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Sheet } from "@/components/ui/sheet";
-import { fetchServices, fetchServiceStaff, fetchStaff } from "@/lib/api/salon";
 import { CUSTOMER_HOME } from "@/lib/auth";
 import { availableToday } from "@/lib/available-today";
 import { formatKm, kmTo, nearestSalons, withinDistance } from "@/lib/discover-logic";
 import { resolveLocation, type Fix } from "@/lib/geo";
 import { placeAt } from "@/lib/places";
-import { rebookable, resolveRebook } from "@/lib/rebook";
 import { rank, topRated } from "@/lib/recommendations";
-import { createClient } from "@/lib/supabase/client";
 import { salonPath } from "@/lib/slug";
 import {
   EMPTY_FILTERS,
@@ -44,7 +41,7 @@ import {
   type Product,
   type SalonAvailability,
 } from "@/lib/types/salon";
-import type { Booking, WorkingHour } from "@/lib/types/booking";
+import type { WorkingHour } from "@/lib/types/booking";
 import { cn } from "@/lib/utils";
 import { FavouriteButton } from "./favourite-button";
 import { FilterPanel } from "./filter-panel";
@@ -52,7 +49,6 @@ import { ProductFilterSheet } from "./product-filter-sheet";
 import { ProductsBrowse } from "./products-browse";
 import {
   AvailableTodayRow,
-  BookAgainRow,
   NearbyRow,
   OffersRow,
   RecommendedRow,
@@ -82,7 +78,6 @@ export function Discover({
   productFilter,
   tab,
   availability,
-  pastBookings,
   searchTerm,
 }: {
   businesses: Business[];
@@ -97,8 +92,6 @@ export function Discover({
    * visitor — the RPC is revoked from `anon` — so the row is absent rather than broken.
    */
   availability: SalonAvailability[];
-  /** The customer's own history, unfiltered. `rebookable` does the narrowing. */
-  pastBookings: Booking[];
   /** Every buyable product, across every salon — the Products segment's whole catalogue. */
   products: Product[];
   /** From `?sort=&min=&max=`, already reconciled against the loaded bounds by the page. */
@@ -134,14 +127,6 @@ export function Discover({
    */
   const [expanded, setExpanded] = useState(false);
   const [fix, setFix] = useState<Fix | null>(null);
-  /**
-   * The booking whose rebook is being resolved, if any.
-   *
-   * Non-null freezes **every** card in the Book again row, not just the pressed one. That is
-   * the re-entrancy guard: without it an impatient second press starts an overlapping fetch
-   * and pushes a second booking flow, which is the defect upstream fixed in `a25af1a`.
-   */
-  const [rebooking, setRebooking] = useState<string | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const location = fix?.coords ?? null;
 
@@ -290,56 +275,6 @@ export function Discover({
       }).length,
     [inRange, availability, location],
   );
-
-  const bookAgain = useMemo(() => rebookable(pastBookings), [pastBookings]);
-
-  /**
-   * Resolve a past booking against the salon's **current** menu, then open the flow there.
-   *
-   * The destination is not knowable before the press, which is why the card is a button:
-   * a service may have been retired or the stylist may have left, and the customer has to
-   * be told rather than dropped into a basket that quietly lost something.
-   *
-   * **It fails open.** If the salon's menu will not load there is nothing to resolve
-   * against, so it navigates with the booking's own service ids and lets the wizard sort it
-   * out — which it can, because the wizard already validates every id in the URL against the
-   * real menu and roster on render and lands on the furthest reachable step. Losing the
-   * *sentence* is a much smaller cost than refusing the rebook over a failed read.
-   */
-  async function startRebook(booking: Booking) {
-    if (rebooking != null || !booking.businessId) return;
-    const businessId = booking.businessId;
-    setRebooking(booking.id);
-
-    const bookedIds = (booking.items ?? [])
-      .map((i) => i.serviceId)
-      .filter((id): id is string => id != null);
-
-    try {
-      const supabase = createClient();
-      const [menu, staff, staffByService] = await Promise.all([
-        fetchServices(supabase, businessId),
-        fetchStaff(supabase, businessId),
-        fetchServiceStaff(supabase, businessId).catch(() => ({})),
-      ]);
-
-      const r = resolveRebook({ booking, menu, staff, staffByService });
-      const params = new URLSearchParams();
-      params.set("step", r.step);
-      for (const s of r.services) params.append("service", s.id);
-      if (r.staff) params.set("staff", r.staff.id);
-      if (r.changeNote) params.set("changed", "1");
-      router.push(`/salon/${businessId}/book?${params}`);
-    } catch {
-      const params = new URLSearchParams();
-      for (const id of bookedIds) params.append("service", id);
-      router.push(`/salon/${businessId}/book?${params}`);
-    } finally {
-      // Not cleared on success: the push is in flight and re-enabling the row mid-navigation
-      // is exactly the second press this guard exists to stop. The component unmounts.
-      setRebooking((current) => (current === booking.id ? null : current));
-    }
-  }
 
   /**
    * "0.4 km" per salon for the card's distance chip.
@@ -609,34 +544,35 @@ export function Discover({
                larger than the gap *inside* a row for the eye to group them, and
                `gap-lg` (24px) is now the gap between cards. */
             <div className="gap-xxl mb-xxl flex flex-col">
+              {/*
+                Offers, at the top of the page.
+
+                It sat fifth, between Nearby and Top rated, which is where a *browse* row
+                belongs and not where a promotion does: an offer is the one thing on Discover
+                with an expiry on it, so anything that pushes it below the fold is spending
+                the part of it that is perishable. It also renders **nothing at all** when no
+                salon has one — which is the majority state, 1 live offer platform-wide — so a
+                visitor with nothing on sale sees the browse open on Services exactly as
+                before, with no gap and no empty heading where this would have been.
+
+                The banner is the section's own file; see `OffersRow` for why it is a banner
+                rather than a card and what each of its four animations is answering.
+              */}
+              <OffersRow offers={offers} priority />
               <ServicesRow
                 categories={categories}
                 selectedId={filters.categoryId}
                 onSelect={(id) => apply({ ...filters, categoryId: id })}
               />
               {/*
-                Book again, first of the salon rows and above the browse.
-
-                Most sessions in this category are a rebooking rather than a shopping trip,
-                which is what earns it the position — and it renders nothing at all for a
-                customer with no completed booking, so a first-time visitor sees the browse
-                exactly as before.
-
-                **The app's 2026-08-08 rework put this above the category row too**; here it
-                stays below, because the two rows answer different questions and Services is
-                how somebody with no history starts. That is the one place this deliberately
-                keeps tho_web's order rather than adopting the app's.
+                The LCP element is whichever of these two draws first, so the eager flag
+                moves rather than being held by both — two preloaded covers compete for one
+                connection and neither arrives sooner. Offers takes it when there is an offer
+                to draw, because it is then the largest thing above the fold; Recommended
+                keeps it on every other load, which is most of them.
               */}
-              <BookAgainRow
-                bookings={bookAgain}
-                onRebook={startRebook}
-                busyBookingId={rebooking}
-              />
-              {/* The first row on the page, so its first cover is the LCP element —
-                  see `priority` on `SalonScroller`. */}
-              <RecommendedRow ranked={ranked} priority />
+              <RecommendedRow ranked={ranked} priority={offers.length === 0} />
               <NearbyRow nearby={nearby} />
-              <OffersRow offers={offers} />
               {/* `total` is every rated salon in the current set, so the row knows whether
                   its 5 are all of them — `topRated`'s own filter, applied twice rather than
                   guessed at from a length. */}

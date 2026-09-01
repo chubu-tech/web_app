@@ -10,10 +10,8 @@ import { formatNu } from "@/lib/utils";
 /**
  * Whether the bar is on screen — the three conditions, in one place.
  *
- * `GuideLauncher` has to lift clear of this bar, so it needs the same answer the bar gives
- * itself. It used to re-derive the rule and got two of the three: it missed `/cart`, and so
- * lifted the button 64px above a bar that is deliberately not rendered there. A predicate the
- * bar itself uses cannot drift from the bar.
+ * A predicate the bar itself uses cannot drift from the bar, which is why anything that needs
+ * to know whether the bottom edge is occupied asks this rather than re-deriving the rule.
  */
 export function cartBarVisible({
   cart,

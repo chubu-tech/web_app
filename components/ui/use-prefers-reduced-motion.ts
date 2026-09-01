@@ -6,7 +6,7 @@ import { useSyncExternalStore } from "react";
  * `prefers-reduced-motion`, read the way React 19 wants an external source read.
  *
  * **Extracted from `confetti-burst.tsx` rather than reimplemented**, the same move
- * `useDialogOverlay` records: the burst had this hook inline, the guide player needs the
+ * `useDialogOverlay` records: the burst had this hook inline, other surfaces need the
  * identical answer, and a second copy is how two components end up disagreeing about
  * whether somebody asked for less motion.
  *

@@ -232,144 +232,12 @@ product will never use.
 
 ## Design
 
-`app/globals.css` ports `../tho/app/lib/ui/tokens.dart` for colour, radii and motion. Add a
-token there rather than hardcoding a hex, radius or duration in a component.
+**Moved to [`docs/design.md`](docs/design.md).**
 
-**The type scale is no longer that port**, and deliberately so. `theme.dart`'s `AppText` is
-14px titles, 12px secondary text, 11px captions and leading from 1.18 to 1.29 — the numbers
-THO-57 arrived at for a phone at arm's length, and the wrong numbers for a browser window.
-The web scale is 16px prose at 1.6, a 15px UI voice, 13px captions and per-step tracking;
-`--text-badge` is the one step that held its size. Same class of divergence as the
-breakpoints and the editorial canvas: the Flutter screens are phone-only, so their metrics
-are not the web's. All 762 call sites resolve through the ten tokens, so the scale exists in
-exactly one place and re-tuning it changes no class strings.
-
-Two rules that are decisions, not styling:
-
-1. **`--color-rausch-cta` (#E00B41) for filled buttons with white text.** White on
-   `--color-rausch` (#FF385C) is 3.53:1 and fails WCAG AA; the deeper hue is
-   4.89:1. Using rausch for a filled CTA reintroduces a bug that was already
-   fixed once.
-2. **One shadow tier** (`shadow-card`). A surface has it or nothing — there are no
-   progressive elevation tiers.
-
-Stars are **always** `--color-star`, ratings only. Light mode only; there is no
-dark mode in DESIGN.md and the canvas is always pure white.
-
-### Two token systems, one file, and a rule
-
-This used to say *"do not borrow from `../landing_page`"*. **That changed deliberately, for the
-customer side only.** The 25 customer routes render in the marketing site's editorial layer —
-cream `#f6f3ee` canvas, slab radii — so a visitor arriving from the marketing site sees one
-continuous product. The 26 owner routes keep the product tokens, because a dense operational
-console loses legibility on an editorial canvas.
-
-**The typeface is no longer part of that split.** Both shells are Inter, and so are
-`../landing_page` and the Flutter app, so the only thing `[data-shell="customer"]` still
-decides is colour. What the two shells disagree about is the canvas, not the letters.
-
-The mechanism is a scoped variable override: `[data-shell="customer"]` on the customer group's
-wrapper re-points three variables, and because **every generated colour utility resolves through
-`var()`** (verified in the compiled stylesheet: `.bg-canvas { background-color:
-var(--color-canvas) }`) that re-skins 86 call sites — 62 customer, **24 in the shared
-`components/ui` kit** — with no class strings changed, and the kit adapts to whichever shell
-renders it. Three traps, all load-bearing:
-
-- **`--font-sans` is the typeface, and it is deliberately NOT in this scope.** This bullet
-  used to say the opposite — *"`font-family`, not `--font-sans`"* — because the scope block
-  set DM Sans directly. Preflight declares `font-family: var(--default-font-family)` on
-  `html, :host` **only**, and that resolves `--font-sans` at `:root`, so a descendant
-  override does nothing. The old note read that correctly and drew the wrong conclusion:
-  it made the typeface a property of one shell, which is why the console spent its whole
-  life on the visitor's OS font. `--font-sans` is now set in `@theme` and reaches every
-  route; this scope is colour only.
-- **`body:has([data-shell="customer"])` is what makes the viewport cream**, because
-  `body { background: var(--color-canvas) }` resolves the variable *on body*. Without it iOS
-  overscroll shows white.
-- **Never `@theme inline`.** It substitutes declared values into utilities instead of `var()`,
-  which would make the whole scope block a silent no-op.
-
-> **The rule for adding a token:** override a shared name only when both shells mean the same
-> *role* and differ only in *value*. When they mean different *sizes*, add a new name.
-
-`--radius-slab` versus `--radius-md` is the live example: 2rem and 14px are different
-*sizes*, not one value in two flavours, so they are two names and each element opts into the
-one it wants.
-
-The rule also settled an argument that no longer exists. There used to be four
-`--text-editorial-*` clamps here, kept out of `--text-display-*` because the latter was a
-19px section title in the product and a 30–48px headline on the marketing site — genuinely
-different roles, so genuinely different names. Both sides of that are gone: the editorial
-clamps were never referenced by any component, and the product scale has been rebuilt for
-the web. The rule stands; that illustration of it does not.
-
-Also: `@theme` output is **usage-pruned**. A token no utility and no rule references is not
-emitted at all, which is why the chrome heights live outside it.
-
-**A comment is not invisible to Tailwind, and neither is this file.** The scanner is
-content-based and does not parse JS or Markdown — it matches candidates in *any* non-ignored
-source, so a class-shaped string in prose gets compiled. A `pb-` arbitrary value wrapping
-`env(` + an ellipsis + `)` — written in a doc comment as shorthand for the real utility —
-generated an invalid rule and took the dev server down with *"Unexpected token Delim('.')"*,
-while `npm run build` passed.
-
-It happened **twice**: first in `chat-thread.tsx`, then in the sentence you are reading, which
-described the hazard by quoting it and so reproduced it. Two rules, not one:
-
-- Keep bracket utilities out of code comments.
-- In prose, never write a utility prefix immediately followed by `[`. Describe the shape in
-  words, as above, or quote only the part inside the brackets. An ellipsis is not a safe
-  placeholder — `.` is what the CSS parser chokes on.
-
-**A route group is not a `not-found` boundary.** Layouts resolve *through* route groups;
-`not-found.tsx` resolves by **URL path**, and `(customer)` contributes no path segment. So
-`app/(customer)/not-found.tsx` never rendered once — for `/salon/[id]` the boundary lookup
-walks `app` → `salon` → `[id]`, skips the group, finds nothing, and falls back to Next's
-built-in page. It was written, it looked right, and it was dead code. The RSC payload is what
-proved it, naming `"pagePath":"__next_builtin__not-found.js"` with an inline `system-ui` stack
-and `background:#fff`.
-
-The 404s therefore live at **`app/not-found.tsx`** (root) and **`app/business/not-found.tsx`**
-(`business` *is* a real segment, so that one resolves normally and renders inside
-`OwnerLayout`, keeping the console's chrome). Two consequences worth knowing:
-
-- The root boundary renders in `app/layout.tsx` **only** — the `(customer)` layout is not in
-  the tree, so it carries its own `data-shell="customer"` wrapper and wordmark. Without them a
-  404 is a dead end with no navigation.
-- **Only a root boundary can answer an unmatched URL**, which has no segment to look up — and
-  on a website that is the *common* 404, not the rare one.
-
-Do not verify a `notFound()` page with `curl`: Next ships it as a client-rendered error
-fallback, so the markup is in the RSC payload and `data-shell` appears only as escaped
-`data-shell\":\"customer\"` until React hydrates. The computed style of the live DOM is the
-only honest check.
-
-**Inter, on every route — and it took two tries to get there.** The first attempt declared
-`--font-inter` in `app/layout.tsx` with a comment claiming `globals.css` owned the stack;
-nothing referenced the variable, so `--default-font-family` resolved to Tailwind's system
-stack and **tho_web rendered in the OS font on all 51 routes**. That loader was deleted,
-DM Sans was added, and it was applied in the `[data-shell="customer"]` block — which fixed
-the 25 customer routes and left the 26 console routes exactly where they were.
-
-Both failures are the same failure: the typeface was never set where the cascade actually
-reads it. `--font-sans` in `@theme` is that place, because it resolves at `:root`, the same
-element `inter.variable` lands on. Two consequences worth keeping:
-
-- **Never set `font-family` in a shell scope again.** It looks like it works, because the
-  shell you are testing goes right.
-- **If `inter.variable` ever moves off `<html>`** onto a layout's `<div>`, `--font-sans`
-  resolves to nothing at `:root` and the whole app falls back to the system stack — the
-  original bug, silently. Measure `getComputedStyle(document.documentElement).fontFamily`
-  on a console route, not a customer one.
-
-Bricolage Grotesque and Instrument Serif went with the rewrite. `--font-display`,
-`--font-serif` and the four `--text-editorial-*` clamps were declared and **no component
-ever referenced any of them**, so two webfonts were loading for call sites that never
-existed.
-
-**Desktop is new design work**, not a port. The Flutter screens are phone-only.
-`../tho/DESIGN.md:518-537` gives the breakpoints (`tablet` 744 / `desktop` 1128 /
-`wide` 1440) and the rule: *always reduce columns, never reflow rows*.
+Colour and radius tokens ported from `tokens.dart`; a web-only type scale; the two-token-system
+split between the editorial customer shell and the product console; the `--font-sans` and
+`@theme inline` traps; why a route group is not a `not-found` boundary; and the rule for adding
+a token. **Read before touching `globals.css`, a colour, a radius or a shell scope.**
 
 ## Ported logic
 
@@ -468,6 +336,79 @@ lives.
 
 Adding a walk-in is deliberately not a destination in either client: it is something you do *to*
 a day, and it is reached from the calendar.
+
+## Discover leads with the offer
+
+The row order is **Offers · Services · Recommended · Nearby · Top rated · Available today**, and
+two things about it are decisions rather than an accident of the port.
+
+**Offers is first, and it used to be fifth.** It sat between Nearby and Top rated, which is where
+a *browse* row belongs and not where a promotion does: an offer is the only thing on this page
+with an expiry on it, so anything that pushes it below the fold spends the part of it that is
+perishable. The row renders **nothing at all** when no salon has one — which is the majority
+state, 1 live offer against 14 approved salons — so a visitor with nothing on sale still opens on
+Services, with no gap and no empty heading where this would have been.
+
+**The eager cover moves with it rather than being held twice.** `priority` marks the LCP
+candidate, and two preloaded covers compete for one connection so neither arrives sooner. Offers
+takes the flag whenever there is an offer to draw, because it is then the largest thing above the
+fold; `RecommendedRow` keeps it on every other load, which is most of them. That is what
+`priority={offers.length === 0}` in `discover.tsx` is doing, and it is the whole reason the two
+rows know about each other at all.
+
+### The offer is a banner, and the four animations each answer something
+
+`OffersRow` was a 260px salon card with a 92px cover strip, which made the discount the smallest
+element on it and put the salon's photograph where the price should have been. It is now a banner:
+the cover is the **ground**, behind a scrim, with the discount as a stamped medallion and the
+title set over the top. It is the only surface in the customer shell where text sits on a
+photograph — which is exactly what makes it read as a promotion rather than as another row of
+salons.
+
+- **One offer fills the row; two or more become a rail.** A width is the *only* difference — same
+  banner, same markup, same animations — so there is no second component to keep in step, and the
+  second offer a salon publishes turns this into a carousel with nothing to change. A 464px card
+  parked in a 915px column reads as a rail whose other cards failed to load, which is what the
+  live single-offer case actually looked like.
+- **The scrim's stops are positioned, and that is the difference between a scrim and a tint.** An
+  evenly-spread gradient puts its midpoint at 50%, so the darkness the title needs is spent
+  halfway up the photograph. Front-loading it (90% → 55% by 35% → clear by 72%) keeps the top
+  third as the photograph it is while guaranteeing the bottom third can carry white text over
+  **any** upload — the file is owner-supplied and is as often a bright price list as a dark
+  interior. Worst case measured against a pure-white cover: 5.3:1 under the title.
+- **The four keyframes are in `globals.css`, not inline**, and three of them are one-shot
+  entrances with `both` fill so the app-wide reduced-motion rule resolves each to its finished
+  state. `offer-drift` is the only infinite one and is safe to truncate, because the end of a pan
+  is still a filled box.
+- **The overscan lives in the keyframe and nowhere else.** A `scale-` utility carrying an
+  arbitrary 1.06 on the same element would not be belt and braces: Tailwind 4 emits that as the
+  CSS `scale` property — the compiled declaration is `scale:1.06`, not a `transform` — and a
+  `scale` property *composes* with a keyframe's `transform: scale(...)` rather than being
+  overridden by it, so the pan would silently run 1.12 → 1.19. Read off the compiled sheet, not
+  assumed. (Written without the bracket, on purpose: the scanner reads this file.)
+- **The sheen travels in units of its own width, not the banner's.** The strip is `w-1/3`, so
+  `translateX(440%)` clears the right edge and the 240% that looked right on paper stalled it at
+  80% — a bright band parked over the type. Recompute it if that width changes.
+- **The countdown is in the pill or in the meta line, never both.** It shipped in both for one
+  build and read *"Norzin Salon & Spa · 6 days left"* under a pill already saying *"6 days left"*
+  — and at 390px the duplicate was what pushed the salon's own name into an ellipsis, the one
+  fact on that line a customer cannot get from anywhere else on the banner. Caught by looking at
+  it at 390, not by reading the join.
+
+### "Book again" is gone, and it is not coming back by accident
+
+The row resolved a past booking against the salon's **current** menu and opened the flow at the
+right step. It was removed on 2026-08-19 by product decision, so the app has it and this does not
+— the **ninth** deliberate divergence from `../tho`, and the first that *withdraws* something
+already ported rather than adding something the app lacks.
+
+`lib/rebook.ts` and its 22 tests are deliberately **kept**: the resolver is the expensive half and
+it is still correct, so restoring the row is a component plus a prop rather than a re-port. What
+went with it is `BookAgainRow`, `startRebook`, Discover's `pastBookings` prop and the
+`fetchMyBookings` read in `app/(customer)/discover/page.tsx` — that last one matters, because it
+was a per-request round trip for every signed-in customer and nothing else on the page wanted it.
+So `lib/rebook.ts` is currently a module with no caller; do not "clean it up" without checking
+this paragraph, and do not read its presence as evidence the row exists.
 
 ## Booking
 
@@ -627,176 +568,11 @@ is booking-scoped so it is unambiguous, but do not merge the two tables.
 
 ## The owner console
 
-`/business` is a **second role-scoped shell**, not a section of the customer app.
-`lib/owner/context.ts` is the one gate and the one read it shares — wrapped in React's
-`cache`, so the layout's salon switcher and the page inside it resolve the same salon from a
-single query.
+**Moved to [`docs/owner-console.md`](docs/owner-console.md).**
 
-**Role decides where you land; `owner_id` decides what you can touch.** Nothing in the console
-treats `profiles.role` as permission: `private.is_business_owner(b)` is
-`businesses.owner_id = auth.uid()`, every read filters on `owner_id`, and every write is an RPC
-that checks `private.is_business_member` itself. `role = 'owner'` with no salon gets an honest
-empty state, never a crash.
-
-**An owner lands here; public pages stay public.** The Flutter app is a hard role switch
-(`auth_gate.dart` → one shell per role, no way across) but it has no URLs. So `/` redirects an
-owner to `/business` and the nav offers owner destinations only — while `/salon/<id>`,
-`/q/<id>` and `/stylist/<id>` still render for them, because those are pages any anonymous
-visitor can already read and an owner's own printed QR is one of them. `/` is the **only**
-customer route that turns an owner away, because it is the only one they are *sent* to.
-
-### An OR-matched policy is never a scope
-
-The single most repeated bug in this repo, and 3a found the third and fourth instances:
-
-| Read | Policy | What an unfiltered read returns to an owner |
-| --- | --- | --- |
-| `fetchMyBookings` | `customer_profile_id = auth.uid() OR is_business_member(...)` | **their salons' 78 bookings** under "My bookings" |
-| `/bookings/[id]` | same | a customer's name, phone and note as if it were the owner's own appointment, with a Cancel that works |
-| `fetchMyConversations` | `conversations_select` OR-matches | (fixed in 2d) |
-| `fetchMyActiveEntries` | `queue_select_*` | (fixed in 2c) |
-
-Both new ones are fixed the same way — an explicit `.eq()` and, on the detail page, the same
-`notFound()` refusal `/messages/[id]` already had. **Check the policy before trusting a
-`fetchMy…` name**, and pass the id in rather than leaning on RLS.
-
-### `businesses` had the same hole `profiles` did
-
-`authenticated` held table-wide INSERT and UPDATE on **all 35 columns** of `businesses`, no
-trigger, gated only by `private.is_business_owner(id)` — which is true for your own salon. So
-an owner could run `set plan = 'pro'` (every paid feature, unpaid) or `set status = 'approved'`
-(listed publicly, past operator review), and `businesses_insert` checks only `owner_id`, so a
-create-salon form could mint an already-approved Pro salon. Demonstrated live, then closed by
-`20260804000004_business_owner_updatable_columns` in `../tho`: revoke both verbs, grant back the
-21 columns an owner legitimately edits. `plan`, `status`, `is_active`, `suspended_at`, the four
-review columns, `timezone` and `late_fee_amount` are out of reach; `owner_id` is insertable and
-not updatable. The withheld columns' **defaults are the safe values** (`basic`, `pending`),
-which is what makes an INSERT grant sufficient. 50 assertions in
-`supabase/tests/business_privilege_test.sql`.
-
-### The owner queue board
-
-- **A direct table read, not `queue_active_line`.** That RPC is what a *customer* polls and its
-  projection is PII-free by design — no name, no phone, no avatar, no `called_at` — so a board
-  whose whole job is to say who is in the chair cannot be built on it. `fetchBusinessQueue`
-  reads `queue_entries` and joins `profiles`, which `profiles_select` permits because a member
-  may read a customer **in their queue**, not merely one who has booked.
-- **`full_name` is in that join and is not in the app's.** Both clients label a row
-  `customerName ?? 'Walk-in'`, but `queue_entries.customer_name` is populated *only* for a
-  walk-in typed in at the counter — so the Flutter board shows **"Walk-in"** for every customer
-  who joined the line themselves, avatar and phone beside the wrong name. Found by putting a
-  real customer in the line and looking at the board.
-- **Always send a name when adding a walk-in.** `join_queue` files an entry as anonymous only
-  when the caller is a member **and** `p_name` is non-blank; with a blank name it sets
-  `customer_profile_id` to the *caller*. The app's Name field is optional, so an owner who
-  leaves it empty puts **themselves** in their own queue, and a second blank add raises `P0003`
-  "you are already in this queue". Proved both shapes against the live RPC.
-- **The board gates on `runsQueue`, not the plan.** `queueEnabled && hasFeature(plan,
-  'walkInQueue')` — the app checks only the plan, so a Growth salon that switched the queue off
-  still gets a live polling board with a working Call next while `join_queue` refuses its
-  customers. Every live salon has `queue_enabled = true`, so the switched-off case has **no live
-  example** and `lib/types/salon.test.ts` is its only coverage.
-- **Polling is forced, not chosen.** The `supabase_realtime` publication contains **zero
-  tables**, so a Postgres-Changes subscription would connect, succeed, and deliver nothing for
-  ever. 4s, matching the app. A locked board polls nothing at all.
-- Optimistic Call-next is safe **only** because `orderedFor` reproduces
-  `private.queue_claim_front`'s ordering exactly — priority-then-FIFO. It is not a guess about
-  which row is next; it is the same rule.
-- **There is no "close the line" and no un-call.** No bulk RPC exists, `serving` can only go to
-  `done`/`no_show`, and closing means `queue_enabled = false` (which blocks only *new* joins)
-  plus one `set_queue_status` per row. Real gaps, not omissions.
-
-### The booking lifecycle
-
-`set_booking_status` accepts **only** `confirmed`, `completed` and `no_show`, and refuses any
-booking already outside `pending`/`confirmed`. So a finished booking gets no buttons rather than
-buttons that raise. Cancelling is its own RPC, and Undo is a third — `reconcile_booking` is the
-only call with **no transition validation**, which is exactly why it can put a terminal booking
-back and why nothing else uses it.
-
-**`pending` is unreachable on this platform.** `create_booking` hard-codes `'confirmed'` and
-there are zero `pending` rows, so the Confirm button is ported because the app has it and the
-enum allows it — but the only way to reach it is `reconcile_booking`. Do not go looking for the
-bug that "Confirm never shows".
-
-**Completing a booking is not a display change.** `handle_booking_status_event` awards loyalty
-points (growth/pro, deduped by a unique index) and queues a review request; `no_show` and
-`cancelled` cancel pending reminders. Verified by reading the ledger, not the pill.
-
-### Two divergences worth knowing
-
-- **`/business` is the Calendar, not Insights.** The app's tab 0 is Insights because a phone
-  shell needs a landing tab; an owner opening a browser at nine wants the day. Insights takes
-  `/business/insights` in 3c and this stays the calendar.
-- **The selected day, view and list segment live in the URL.** The app loses all three on a tab
-  switch; here `?d=&view=&seg=` is reloadable, shareable and back-button-correct.
-  `salon-filters.ts`'s `fromParams`/`toParams` is the pattern.
-
-Plan gating is `lib/entitlements.ts` — **gate on a `Feature`, never a plan string.** Prices and
-per-feature paywall copy live in `lib/plans.ts`, the one place pricing exists, so the sheet and
-`/business/plans` cannot quote different numbers at the same owner. The sheet stays an explanation
-and points at the price list; the **request** lives on `/business/plans`, where the tiers are side
-by side (see `components/owner/plan-cards.tsx` for the 3.1.1 story and the three things the
-request has to get right).
-
-**Those two files are a published claim, so re-check them against `entitlements.dart` when the app
-moves.** They went four days out of step in August 2026 in the worst direction: `Feature.priorityPlacement`
-was deleted upstream as a claim with no implementation behind it (audit A3-04 — nothing ever called
-`has()` on it, and there is no plan term in the recommender), and **this repo went on selling
-"Priority placement"** in the console's paywall *and* on `/for-salons`, which renders `PLAN_TIERS`
-bullets on an indexable page. A build, a lint and 639 green tests did not notice, because nothing
-asserted what the tier sets *contain*. `lib/entitlements.test.ts` now does, in both directions —
-including that no feature exists here which the app does not have.
-
-Two consequences worth keeping:
-
-- **A feature list is not documentation, it is a price.** Payment is off-app and an operator flips
-  `businesses.plan`, so there is no refund path; a wrong bullet is a wrong charge.
-- **`lib/plans.ts` deliberately diverges from `plans_config.dart` in one label.** The app's Pro card
-  still says "Deposits & no-show cover"; no-show cover is not built (`late_fee_amount` defaults to 0
-  and is referenced by no function), so this says "Deposits & payments on a booking". Divergences
-  from upstream copy are normally forbidden — this one is documented at the call site because the
-  alternative is publishing something untrue.
-
-**Not every gate is real, and this paragraph was wrong about which.** It used to say the Insights
-paywall was client-side only, on the measured grounds that `analytics_dashboard` and
-`analytics_peak_heatmap` never read `businesses.plan`. **`20260807000005_analytics_plan_gate`
-added that read to both** — in the very batch Phase 5 absorbed — so they now raise `P0001` below
-growth in the same auth → authz → plan order every sibling uses. No client change was needed
-(`app/business/insights/page.tsx` skips the call on Basic anyway), but do not repeat the old
-claim.
-
-So: **five of the six locked surfaces are gated in SQL** — `client_book`, `payroll_report`,
-`tax_estimate` and now both analytics RPCs. The remaining one is **Loyalty, and only partly**:
-`loyalty_programs_write_owner` checks ownership and stops, and `loyalty_programs_select_public`
-publishes any active program regardless of tier — but the feature *is* gated at the point of use,
-because `request_redemption` refuses unless the programme is active **and** the plan is
-growth/pro (`20260729000003_loyalty_rpcs.sql:88`). A customer cannot redeem at a Basic salon.
-
-The upstream batch added four more server-side gates, all following the same pattern and none with
-a surface here yet: `upsert_promo_code` / `expire_promo_code` / `record_order_payment` /
-`product_analytics` re-check growth+, and the seven pack RPCs re-derive `businesses.plan = 'pro'`.
-The rule they all confirm is the one this section exists for: **the client check is never the
-gate**, so a locked surface is safe to *draw* wrong and never safe to *rely* on.
-
-### `staff_members` had it too — the third instance
-
-Same shape a third time (3b): table-wide INSERT and UPDATE on all 12 columns, gated only by
-`is_business_owner`. Two RPCs exist to control two of those columns and both were bypassable —
-`set_staff_pay` refuses any salon that is not `pro` ("payroll requires Pro"), and
-`link_staff_member` requires an email that resolves to a real `auth.users` row and sets
-`profiles.role = 'staff'`. Demonstrated live on a **growth** salon: the direct writes landed
-while the RPC refused the same pay in the same session. `profile_id` is the worse of the two —
-`is_business_member` admits an active `staff_members.profile_id`, so writing it hands a third
-party read access to every booking and phone number in the salon.
-
-Closed by `20260805000001_staff_owner_updatable_columns`: UPDATE is `display_name`, `is_active`,
-`photo_url`, `updated_at` and nothing else; INSERT adds `business_id` and `role` because
-`Api.createStaff` names them. 35 assertions in `supabase/tests/staff_privilege_test.sql`.
-
-**Three tables, one lesson: RLS constrains the row, never the column.** Before putting a form
-on a table, check `has_table_privilege` — not `has_column_privilege`, which answers true either
-way while the table-level grant is held.
+`/business` as a second role-scoped shell: `lib/owner/context.ts` as the one gate, the OR-matched
+policy table, the `businesses` column-grant hole, the queue board, the booking lifecycle, and
+plan gating through `lib/entitlements.ts`. **Read before adding a console route or a write.**
 
 ## Owner setup — services, staff, hours, the salon
 
@@ -904,243 +680,17 @@ column with no UPDATE policy.
 
 ## The owner back office — insights, clients, orders, offers, loyalty, money
 
-### Charts, with no charting library
+**Moved to [`docs/owner-back-office.md`](docs/owner-back-office.md).**
 
-Six visualisations and 3c adds no dependency. Each is built from the primitive that suits it:
-`trend-chart.tsx` is an inline SVG path (Catmull-Rom → cubic at the app's own `curveSmoothness`
-0.3, a coral→transparent gradient fill, a ringed dot on the **latest** bucket only), the gauge and
-donut are `stroke-dasharray` arcs, the heatmap and waffle are CSS grids, the leaderboard and
-breakdown table are flex rows with a share bar behind them. All server components, so every figure
-is in the first paint.
-
-The tooltip is a `<title>` inside each hover target — no listener, no state, and a screen reader
-reads the values as a list, which `fl_chart`'s gesture tooltip cannot offer at all.
-
-Two palette rules carry over from `chart_theme.dart` and are load-bearing:
-
-- **A bad outcome never wears the brand coral.** Completed is `success-text`, no-shows
-  `error-text`, cancelled `border-strong`. Coral is the one accent, for the trend line, the gauge
-  arc, share bars and the hot end of the heatmap.
-- **A zero heat cell stays canvas white, not the cold end of the ramp.** On a single-hue ramp "no
-  bookings ever" and "one booking" would be two barely-different pinks, and a salon closed on
-  Sunday would look faintly busy.
-
-### Do not mix a period's figures with the month's
-
-The goal card is always about the **calendar month** — `goal.monthToDateRevenue` and
-`monthly_goal` both are, whatever the period pills say — but `kpis.avgTicket` is scoped to the
-*selected* period. Dividing a monthly shortfall by a weekly average ticket is how the app arrives
-at *"258 more bookings closes the gap"*, measured on Norzin's weekly view. So the ticket
-restatement is offered **only** at monthly granularity; every other period states the shortfall
-plainly.
-
-### `offerHiddenReason` compares Thimphu days, not UTC ones
-
-`offers_public_read` filters on `(now() at time zone 'Asia/Thimphu')::date`, so anything deciding
-whether an offer has lapsed has to as well. Comparing UTC calendar days makes the owner's page and
-the customer's disagree for the six hours of every Thimphu day that fall on the previous UTC one —
-measured: an offer that had ended still read **"Live"** at 04:20 Thimphu while customers had
-already stopped seeing it. Use `thimphuToday(now)`; there is a test pinning the boundary.
-
-### The owner's notifications are addressed to a person, not a salon
-
-`notifications.recipient_profile_id` is the only routing there is, and
-`private.enqueue_order_notification` sends the salon's copies to `business_owner_profile(...)`.
-So the owner's feed spans **every** salon they run, switching salons changes nothing, and a linked
-stylist receives none of it. The page says so.
-
-**And the payload holds `start_ts` and nothing else** — often not even that
-(`booking_cancelled` and `order_placed` arrive as `{}`). No `private.enqueue_*` function writes a
-customer name. An earlier draft of `ownerNotificationText` read `payload.customer_name` so a row
-could say *"New booking — Pema, Fri 11:30"*, which is **the same mistake this repo criticises the
-app for** at `notifications_screen.dart` (it renders `payload['message']`, a key the server has
-never written). Say only what the row can support.
-
-### Orders are forward-only, so there is no Undo — and there are two lifecycles
-
-Still forward-only, and **more** so than this section used to say. `20260814000006` split the tail
-of the lifecycle in two and gated each half on the order's own `fulfilment`:
-
-```
-pickup:    new → ready → collected
-delivery:  new → ready → out_for_delivery → delivered
-either:    new|ready → declined      (owner, reason required)
-           new       → cancelled     (customer)
-```
-
-Every case is one-directional or terminal, so `canOwnerTransition` is never true for a reverse move
-and an Undo button could only ever fail. A decline **requires a reason**, the customer reads it in
-their `order_declined` notification, and a decline is **refused once the order is out for
-delivery** — the goods have left the shop.
-
-**`fulfilment` is a required argument to `canOwnerTransition`, not an optional hint.** The server
-refuses `ready → collected` on a delivery order and `ready → out_for_delivery` on a pickup one, so a
-signature a caller could forget is a signature that offers a button which always raises. Read it
-through `orderFulfilment(order)`, the one named place that decides.
-
-**And the four checkout columns are `not null`, which this paragraph used to deny.** It said a null
-`fulfilment` meant an order placed before the checkout migration — the sentence was repeated into
-`Order`'s doc comments, into `OrderLines`' `!= null` guard and its `!` assertion, and into
-`toOrder`'s choice of `numOrNull`. It was never true:
-`20260814000003_orders_checkout_columns.sql` adds `subtotal_nu`, `discount_nu` and
-`delivery_fee_nu` as `int not null default 0`, adds `fulfilment` as `text not null default
-'pickup'`, and then backfills `subtotal_nu` from `total_nu` on the grounds that before the slice a
-total *was* a subtotal. Measured on the live database 2026-08-18: `is_nullable = NO` on all four,
-and of 10 orders, 0 hold a null, 0 hold a zero subtotal, 0 have a subtotal differing from the
-total. A pre-checkout row is an exact pickup order with no discount and no fee — which is what it
-always was. **The rule this cost:** a claim about a column is checked against
-`information_schema`, not against the sentence next to it.
-
-**Every `OrderStatus` must be in exactly one `ORDER_SEGMENTS` entry.** The owner's inbox filters
-`.in("status", segment.statuses)`, so a status in no segment is an order in **no list** — which is
-exactly what happened to the two new values for four days: live rows, invisible in the console,
-nothing on screen to suggest they existed. `orderSegmentCoverage()` and its test are the guard.
-
-**And the total is not the sum of the lines.** `place_order` computes `subtotal − discount +
-delivery fee`, where the discount is a promo code, points spent at checkout, or both. `OrderLines`
-renders the breakdown when there is one to render; `discount_nu` is a **positive magnitude**, so the
-minus sign belongs to the display — the same rule, and the same trap, as `payments`.
-
-Restoring an order during verification needs direct SQL: nothing in the schema can move a status
-backwards.
-
-### A walk-in has no client page
-
-`client_book` returns a null `customer_profile_id` for anyone the salon knows only from the
-counter, grouped by `walkin:<name>:<phone>`. There is nothing to open — `client_history` takes a
-profile id and `client_notes.customer_profile_id` is `not null` — so those rows are rendered as
-plain rows rather than links. The app pushes a detail screen and then hides both of its sections.
-
-**"Lapsed" is the salon's own rebooking window** (`businesses.rebooking_days`), never a constant.
-Verified by moving Norzin's from 42 to 10 to 3 and watching the same two clients cross the line
-and back.
-
-### `plan_change_requests` can never be withdrawn
-
-INSERT and SELECT policies, and nothing else — so the table-wide UPDATE and DELETE grants are
-dead. **Not with an error, either:** measured, an owner's `update … set status='cancelled'`
-succeeds having affected **0 rows**, because with no policy for the command the rows are not
-visible to it. A "withdraw" button would report success and change nothing, which is why none is
-offered and why the writer de-duplicates *before* inserting. Norzin already carries two pending
-`pro` requests and a pending `growth` request for the plan it is already on, all left by the old
-app flow.
-
-`status` is in the insert grant and `pcr_insert`'s WITH CHECK does not constrain it, so an owner
-*can* file a request already marked `done` and hide it from the operator's queue. Never write that
-column; the default is `pending`.
-
-### Offers are writable by staff, not just the owner
-
-`offers_member_write` is `ALL using private.is_business_member` — every other owner-configured
-table uses `is_business_owner`. Measured: Norzin's linked stylist can insert, edit **and
-hard-delete** offers, while the same account is refused on `products` and `loyalty_rewards` with
-`42501`. Since `offers_public_read` puts them on the salon page and in the customer feed, a
-stylist can publish a discount in the salon's name. Reported upstream; the console only ever acts
-as the owner.
+Insights (charts with no charting library, and the period-vs-month rule), the client book, the
+two order lifecycles, offers, loyalty, `plan_change_requests`, and owner notification payloads.
 
 ## The customer shop — products, cart, orders, loyalty
 
-### The cart is persistent, so it must re-price
+**Moved to [`docs/shop.md`](docs/shop.md).**
 
-The app's cart lives for minutes in memory and reconciles with the catalogue only *after*
-`place_order` refuses. This one is in `localStorage`, so it can be days old — and `place_order`
-computes `total_nu` from `products.price_nu` **server-side**, so a stale subtotal would promise a
-number the order does not charge. `/cart` therefore reads the salon's live shelf and runs
-`repriceCart` before it paints, then says what moved: *"Matte Hair Wax is sold out — removed from
-your cart"*, *"Argan Hair Oil is now Nu 500, was Nu 450"*. Silently changing a total would be worse
-than either. Proved on live data at all three timings: a sell-out and a price change caught on open,
-and a sell-out that lands *after* the re-price caught by `P0002` on the press — which re-prices
-rather than showing a bare error.
-
-`repriceCart` returning `{cart, dropped, repriced}` rather than just a cart is what makes those
-sentences possible. A function that quietly fixed the cart would be the same bug with better
-manners.
-
-### The idempotency token belongs to the cart, not the button
-
-`place_order` de-duplicates on `(business, customer, client_token)`, so **one token per cart, held
-across every retry**, is what makes a double-press or a timeout-then-retry safe. It lives in
-`localStorage` beside the cart, not in a ref, because a reload of `/cart` must not mint a new one —
-a ref would, and the customer would pay twice for one basket. `clear()` retires it, which is why it
-is only called after a confirmed success. Measured: two presses on a held token → **one** row;
-re-adding after success (which mints the next token) → a genuine second order.
-
-Same rule, same reason, in `LoyaltyCard`: one token per reward for the life of the mount. **This is
-the call the Flutter app gets wrong** — `Api.requestRedemption` passes `clientToken ?? _uuid.v4()`
-and its only caller passes nothing, so every attempt mints a fresh token and a retry after an
-ambiguous failure creates a *second* pending redemption holding the points twice. Replaying the
-held token against the live RPC returns the same row and adds none.
-
-### `fetchMyOrders` filters — the third instance of the OR-policy leak
-
-`orders_select_owner` admits `is_business_owner(business_id)`, so an unfiltered `select orders` hands
-an owner their salon's orders under **"My orders"**. Measured on the live database as **3 rows vs
-0** for the same account, and that is exactly what `Api.myOrders()` does today. `/orders/[id]`
-refuses a member the same way `/messages/[id]` does. Check the policy before trusting a `fetchMy…`
-name; this is the third time.
-
-### Three server-side gates, none of them the client's business
-
-All measured through the MCP, because no UI can reach the first two:
-
-- **The plan.** `products_select_public` requires `growth`/`pro`, so a Basic salon's products are
-  invisible and `fetchProducts` needs no plan filter. `place_order` against one raises *"this salon
-  is not taking product orders"*.
-- **Stock.** `Beard Grooming Kit` is `in_stock = false`, so it is absent from the browse and the
-  Shop tab; ordering it by id raises `P0002` *"a product is no longer available"*.
-- **A real account.** `place_order` and `request_redemption` both require
-  `private.is_real_user()` — which reads `is_anonymous` straight off the JWT — and raise `P0010`
-  *"create an account to order"* / *"…to redeem rewards"*. A guest still browses and still fills the
-  cart, and because the cart is local it is **still there** after the sign-up round trip.
-
-**The wall is at Place order and Redeem, never at Add to cart.** Asking for an account before
-showing why one is worth having is the one thing this app deliberately protects against.
-
-### `in_stock` is a boolean, so there is no "2 left"
-
-And there is no payment: cash on collection is the whole model, `payments` is Pro-gated with 0 rows,
-and nothing in the shop takes a card — including delivery, where the cash changes hands at the door.
-
-**The rest of this paragraph described a shop the app no longer has, so read it as history.** Every
-sentence below was true on 2026-08-11 and was rewritten upstream by the four shop slices; none of
-that has been ported, and `PARITY.md` §5.1 is the list.
-
-- *"Neither `reviews` nor `favourites` has a product column, so products have neither."* Both exist
-  now, in their own tables: `product_reviews` (verified purchase only, writable **solely** through
-  `submit_product_review`) and `product_saves` (the wishlist).
-- *"`Api.products` loads everything and there are 4 live, so there is no pagination."*
-  `Api.products` was **deleted** upstream (`ec8b8ce`) in favour of paginated `browseProducts` over
-  the `product_cards` view. `fetchProducts` here is now the last unbounded catalogue read on any
-  platform. Still harmless at 4 products; it is the first thing to replace when the shop is ported,
-  not the last.
-- Products also gained a taxonomy (`product_categories`, `product_brands`), galleries
-  (`product_photos`), markdowns (`compare_at_nu`), and six description columns. This repo reads
-  none of them.
-
-### Orders and rewards are one flat list each
-
-No segments, matching the app: a customer's own history is small where the owner's inbox needed
-New / Ready / Done. And `my_loyalty_summary` lists a salon only when the balance is **non-zero** or
-a redemption is pending, so a spent-out customer sees the empty state rather than a row of zeroes —
-which means *"no points yet"* also means *"no points left"*, and `/rewards` says so.
-
-The redemption counter on the owner's side is `fetchPendingRedemptions` — a **queue, not a history**.
-It lists what is waiting to be honoured and nothing else, which is right for somebody working
-through it at the till, and it means a confirmed or cancelled claim vanishes rather than being
-filed. Do not "fix" it into a log.
-
-**The Settings hub does not count waiting claims.** `loyaltyLine` states the programme and its
-reward count where the orders row states *"1 new order"* — measured, and left alone, because
-`private.enqueue_order_notification` files a `loyalty_redemption_requested` to the **owner** for
-every claim, and the bell is the path that actually reaches them.
-
-### One owner payload does carry something
-
-`order_placed` and `order_cancelled` arrive as `{}`, as the inbox section says. But
-`loyalty_redemption_requested` carries **`reward` and `code`** — only observable once 2f made it
-possible to create a redemption at all, since `loyalty_redemptions` had 0 rows platform-wide. So the
-owner's bell quotes the code the customer is holding up rather than pointing at the page that would
-show it. Still the same rule: say what the row can support, and nothing else.
+Products, the persistent cart and why it must re-price, the idempotency token, `fetchMyOrders`'s
+leak, the three server-side gates, and where the sign-in wall goes (Place order, never Add to cart).
 
 ## Safety, consent and moderation
 
@@ -1488,159 +1038,11 @@ that the console must not *appear* to have switched.
 
 ## Live data is messier than it looks
 
-**Counted 2026-08-11, spot-checked 2026-08-18.** The database is shared and
-has other people on it, so re-count rather than trusting a figure here that a decision depends
-on. Check assumptions against it before trusting a column.
+**Moved to [`docs/live-data.md`](docs/live-data.md).**
 
-**Two figures below moved during a single hour on 2026-08-18** — `devices` 15 → 17, push sends
-6 → 7 — because the app is now on real handsets and in use. For most of this repo's life the
-database only changed when this repo changed it; that is over. `PARITY.md` §6 carries the
-2026-08-18 counts.
-
-- **17 businesses, 14 approved — but only 10 approved *and* active *and* not soft-deleted.** Plans
-  across all 17: **basic 13 · growth 3 · pro 1**. The four `Test`-named rows are now `deleted_at`
-  and inactive (one of them by `25aa9dcd` upstream, so a store reviewer could not tap into an empty
-  salon), so a count of "approved" is no longer a count of what a visitor sees. Every public read
-  here already filters all three columns.
-- **Push notifications deliver.** 17 registered devices (14 android · 3 ios) and 7 `notifications`
-  rows `sent` over the `push` channel, including a `queue_your_turn`. Several paragraphs in this
-  file said push had never delivered a single message; each is corrected in place.
-- **`offers` has its first row**, after being 0 platform-wide through every previous audit. The
-  offers surfaces are no longer tests-only.
-- **Every `notifications` row carries server-composed `title` and `body`** — 93 of 93, and the SQL
-  branches on audience, so the same `booking_created` reads *"Booking confirmed / Your appointment
-  is set for Fri 7 Aug, 09:00"* for the customer and *"New booking / A customer booked Fri 7 Aug,
-  09:00"* for the salon. `20260807000020`/`…21` did that by trigger and backfilled. It is why
-  `lib/notification-copy.ts` is a **fallback** now rather than the source — and why the note in it
-  about the app rendering a `payload.message` key nothing writes describes history, not the
-  present.
-- **`payments` is 0 rows and that is deliberate.** Batch C's verification created a deposit and a
-  refund on Norzin's no-show booking, proved both sides of the ledger, and removed them. The
-  `record_payment` writer is live; the table is empty.
-- **`businesses.city` contradicts `address_text` on 12 of the 14 approved salons**
-  ("Norzin Lam, Thimphu" filed under Paro). `addressText` is the field owners
-  actually maintain; the mapper deliberately omits `city`.
-- 24 of 34 services have no `gender`; 5 approved salons have no cover; 1 has a gallery;
-  **1 has an offer** (0 until 2026-08-18); 0 are `home_based`/`mobile`, so the coverage-line
-  branch has no live example and is covered by unit tests instead.
-- ~~Two rows named `Test 01`/`Test 2` are live and approved.~~ **All four `Test` rows are
-  soft-deleted as of 2026-08-14** and no longer reach any public surface. The cleanup happened in
-  the admin console, as this note asked. `PLACEHOLDER_NAME` in `lib/marketing/salons.ts` stays as
-  the belt to that braces — an operator can approve anything, and the site is public.
-- **Norzin lists 5 services but its stylists perform 3.** `service_staff` is the
-  authority on what is bookable, not `services`.
-- **One salon is on Pro** — Norzin — so the Pro-gated hairstyle picker, payroll, the tax
-  estimate and staff pay all have exactly one live example each, and the locked branch is still
-  what the other sixteen render. See **Exactly one salon is on Pro** above.
-- **Only Norzin can actually run a queue**, and it is no longer one of the Growth salons. Three
-  salons are on Growth, but `Test 01` and `Zhiwaling Spa & Hair` have 0 staff and 0 services, so
-  their join form has nothing to pick — it says so rather than offering an unsubmittable form.
-  And every salon is `queue_join_mode = 'anywhere'`, so `queueLockState`'s `needs_scan` branch
-  has no live example either; unit tests are its only coverage.
-- **The inbox is the best-seeded surface in the app.** `customer@bhutansalons.test` has **39
-  notifications across 9 event types with 7 unread**, and 3 conversations — one of which was
-  opened and never written in, which is the live example for "an empty thread is never
-  unread". Two of the notifications are `booking_no_show`, the rows the app mislabels. The count
-  grows whenever a booking is completed during verification; 92 notifications exist platform-wide.
-- **`payments` is still 0 rows; `offers` has 1 as of 2026-08-18; `review_photos` has 1.** So the
-  receipt's payments block still has no live example and rests on unit tests, while the offers
-  section and the review photo strip each have one real row (both created by another client — see
-  *The database has other people on it* below). Payments rows created during verification were
-  removed with the rest of that run's state; do not assume one is there.
-- **Only Norzin has a storefront, and it is unusually well seeded for it.** 4 products, one
-  (`Beard Grooming Kit`) **sold out**, prices 280/320/450 so a price-range filter has three
-  distinguishable values; 3 orders, one **`new`** (cancellable) and one **`ready`** (not) side by
-  side, plus a third belonging to `as@gmail.com` — which is what makes the `/orders` leak check
-  meaningful. `customer@` holds **20 points** against the only reward, which costs **50**, so
-  `progressToNext` has a real target and *"30 more pts"* is the live state rather than a contrived
-  one. Nothing about the shop needed inventing.
-- **`loyalty_redemptions` starts at 0 rows and only the customer can create one.** So the owner's
-  redemption counter had no live example until 2f, and its payload (`code`, `reward`) was
-  unobservable — which is why `ownerNotificationText` could not use it before.
-- **12 of the 14 approved salons have coordinates.** The two without are on Discover and
-  absent from the map, which is what its "once they add a location" copy is for. `Test 01`
-  and `Test 2` are **6 m apart**, so their bubbles overlap at every zoom and they are the
-  live example of `nearestTo`'s tie-break.
-- **The specialist surfaces are the thinnest data in the product**: 21 visible staff but
-  `staff_photos` has **2 rows platform-wide** and `follows` has **3**, so both empty states
-  are the normal path. `Sonam Dorji` at Norzin is the only full example — 3 reviews, 1
-  follower, 1 photo.
-- **2 of 29 profiles have an avatar and 2 have a phone.** The app cannot set a
-  phone at all, which is why every notification fails with "no deliverable channel".
-- **The local `../tho` checkout can drift behind the live schema.** Two migrations were applied
-  on 2026-08-03 (`register_device_rpc`, `booking_reminder_mute`) before either had a file
-  locally. Both are now on `main` and present, and the 9 previously-untracked files are
-  committed. Fetch before concluding something is missing upstream. Of the three things that
-  fetch brought, the old note here was wrong about two:
-  - **Final launch pricing is already mirrored** — `lib/plans.ts` carries Nu 399 / 699 / 1,499
-    and the no-free-tier rule, matching `plans_config.dart`.
-  - **Multi-service bookings are mirrored on both sides now.**
-    `components/owner/walk-in-form.tsx` builds a basket, and so does the customer wizard — four
-    steps, URL-persisted, with an `ANY_STAFF` option the app lacks. (Not
-    `add-walk-in-sheet.tsx`, which is the *queue* walk-in and single-service by design, because
-    `join_queue` takes one `p_service_id`.) This bullet used to name the customer flow as the
-    next slice; it shipped.
-  - **FCM push is upstream and absent here**, deliberately — see the Web Push note.
-- **`services.category` is filled on 3 of 34 rows**, so it cannot carry a taxonomy;
-  `business_categories` has 16 rows across 9 salons and is the only populated one. Anything
-  grouping services by category on live data would file everything under "Other".
-- **`services_select` says nothing about the business** — it is
-  `(is_active and deleted_at is null) or is_business_member(...)`, so a cross-salon
-  `select services` returns services belonging to **pending and inactive** salons. Join
-  `businesses!inner` and filter it. Second instance of this shape after `staff_select` on
-  `/stylist/[id]`.
-- **The customer's four active bookings now straddle the reminder gate** — three at Basic salons
-  and one at Norzin, which is Pro. This bullet used to say the toggle had *no* live example,
-  because every active booking sat on a Basic salon; it now has both answers **on one page**,
-  which is what makes `canRemind` falsifiable rather than merely absent. Measured: the switch
-  renders on the Norzin card only, and `set_booking_reminders(basic, true)` raises P0001 while
-  muting the same booking is accepted.
-- **`owner@bhutansalons.test` owns NINE salons**, not one — Norzin Salon & Spa on **pro** and
-  eight on **basic**. That is a live example on both sides of every plan gate, and it is
-  what makes the salon switcher load-bearing rather than theoretical.
-- **Norzin now has a present as well as a past**, and this bullet used to say otherwise. 2 staff,
-  5 services, 6 `business_hours` rows, and **56 bookings: completed 42 · cancelled 7 · no_show 5
-  · confirmed 2**. The "0 confirmed" it reported was true when written. The owner calendar still
-  has to be checked across two salons — week view unlocked on Norzin against May–June history,
-  and a live day on a Basic salon where week is locked — but Norzin is no longer the salon with
-  nothing live in it.
-- **Sunday is how "closed" is spelled.** `business_hours` has no `is_closed` flag and no row for
-  Norzin's Sunday, so `openMinutesForWeekday` returns null and `% booked` is *omitted* rather
-  than shown as 0.
-- **Norzin has 5 active services and only 3 are mapped to any staff.** `Blow Dry & Style` and
-  `Hair Coloring` are mapped to nobody, so `compute_availability` rejects them — the live
-  negative case for "the walk-in picker is deliberately not narrowed by `service_staff`".
-- **The queue's live default is empty.** All **11** `queue_entries` on the platform are terminal
-  (done 9 · left 1 · no_show 1) and belong to Norzin, and **not one has ever had a
-  `booking_id`** — so check-in has never been exercised by anything. The two added since this was
-  first written are verification entries that were run through to `done` rather than deleted.
-- **`staff_time_off` has 0 rows platform-wide and no Dart file references it**, though
-  `compute_availability` honours it. An owner cannot mark a holiday on any platform.
-- **The money surface has exactly one live example, and it did not before.** Norzin is Pro, so
-  `payroll_report`, `tax_estimate` and `set_staff_pay` succeed there and raise `P0001` on the
-  other sixteen salons. `record_payment` is the exception: it still has **0 `payments` rows** and
-  no writer in `tho_web`, so the ledger is read-only here and the only way to see a row is to
-  create one. This bullet used to read *"No salon is on Pro… unverifiable without an admin
-  flipping a plan first"* — that flip has happened.
-- **Every public route 500s for `anon`, and it is a missing GRANT, not a policy.**
-  `has_table_privilege('anon', …, 'SELECT')` is **false** for `public.businesses` **and**
-  `public.staff_members`; it is true for `services`, `reviews`, `review_photos`, `business_hours`,
-  `business_categories`, `categories`, `products` and `offers`. The error surfaces as
-  `42501 permission denied for table businesses`, so earlier notes named only that one — fixing it
-  alone would move the failure to `/stylist/[id]` and the salon page's team tab. **No signed-out
-  path can be exercised until both are granted**, which means the anonymous account state, the
-  guest wall's "before" side and the report control's guest refusal are all unverified. Needs a
-  `GRANT` upstream; **never write SQL here.**
-- **The database has other people on it.** During 3a's verification someone else created and
-  cancelled a booking through another client, adding rows to `bookings`,
-  `booking_status_events`, `booking_items` and `notifications` mid-run. Capture a `now()` marker
-  before writing and scope every cleanup by it **and** by id — a count-based baseline will read
-  as drift that is not yours.
-- Seeded logins exist and are email-confirmed — `customer@bhutansalons.test` and
-  friends, password in `../tho/supabase/seed.sql`. Useful for verification; the app's
-  dev quick-login chips are deliberately **not** ported to the web.
-  `owner@bhutansalons.test` is also the counterparty on the customer's thread, which makes it
-  the right account to check the owner-inbox leak with in 3c.
+What is actually in the shared `bsalons` database — counts, seeded logins, and the places live data
+contradicts what the schema suggests. **Re-count rather than trusting a figure here that a decision
+depends on; the database has other people on it.**
 
 ## A failed read must never render as empty
 
@@ -1915,56 +1317,6 @@ the page, then wait for `document.body` before reading it; the URL commits befor
 document has parsed.
 
 
-## The in-product guide is made of real screenshots, and that is the whole feature
-
-`components/guide/` is a floating "How it works" button and a player behind it: sixteen
-frames per audience, each a highlight and two sentences. There are two guides —
-`CUSTOMER_GUIDE` and `OWNER_GUIDE` in `lib/guide/steps.ts` — and the shell picks: the
-customer layout mounts one, the console mounts the other, and `(marketing)` picks by route
-because nobody out there has signed in and `/for-salons` is the one public page addressed to
-salons.
-
-**Every frame in `public/guide/**` is a capture of this app running**, taken by
-`scripts/capture-guide-frames.py` against `npm run dev` as the seeded customer and owner. A
-drawn tour starts lying the first time a button moves; this one is re-runnable, so when a
-screen changes the fix is to re-run the script rather than to redraw anything. Its docstring
-carries the five things that make it work — hydration before sign-in, the raw uuid on
-`/salon/<id>/book`, a slot being a `button[aria-pressed]` and not a radio, today usually
-having no free slot, and hiding `nextjs-portal` and the guide's own launcher before each
-shot.
-
-Five things that are decisions rather than styling:
-
-- **The launcher lifts rather than hides.** `lib/guide/placement.ts` is the list of surfaces
-  that pin a control to the bottom edge — the salon page's Book bar, the wizard's total, the
-  reschedule footer, a chat composer either side, the owner's walk-in footer, and `CartBar`
-  whenever it is up — and it clears them by a lane. `/map` is the one route where it is not
-  drawn at all, and that is a licensing constraint, not taste: OpenStreetMap's attribution is
-  bottom-right and the tile policy requires it visible. **Add a fixed footer to a route and
-  this file needs a case**, or the button lands on it; `placement.test.ts` is the list as it
-  stood.
-- **The launcher is paper and hairline, not coral.** A brand-filled pill in the corner of
-  every page competes with the actual call to action on the pages that have one, and a help
-  button must never look more important than *Book · Nu 350*. The coral is in the glyph.
-- **`prefers-reduced-motion` changes three things**, not one: no crossfade, no progress fill,
-  and **autoplay starts paused**. The fill has to go rather than be clamped — the app-wide
-  rule at the foot of `globals.css` would snap it to full and hold it there, i.e. a bar
-  claiming the frame is over while it is still on screen.
-- **Playback is one `setTimeout` per frame and the bar is CSS**, so nothing re-renders
-  between steps and the two cannot drift apart. Three frames are mounted (current, previous,
-  next) so the arrows are instant; the other thirteen are not in the DOM.
-- **`cn` ate this feature's label once.** The hotspot label was `bg-ink text-on-primary
-  text-caption-sm` in one `cn`, and `twMerge` dropped the colour — white text became
-  inherited ink on an ink pill, an unreadable black box, with the class in the source and the
-  build green. Both call sites now put the size on a parent with no colour class, which is
-  remedy 1 in `lib/utils.ts`. **Read that doc comment before passing two `text-*` classes
-  through `cn`.**
-
-The copy has one rule: **it may only claim what the frame shows.** Where something matters
-but sits below the captured fold the body says "further down"; and no `alt` quotes a number
-the database owns, because the shared seed moves under you — an `alt` reading "All 44, two
-unread" was measured true and became false at the next capture without anyone touching it.
-
 ## Verify
 
 ```bash
@@ -1972,12 +1324,11 @@ npm run dev
 npm run build     # also typechecks
 npm run lint
 npm run test      # ported pure logic
-
-python scripts/capture-guide-frames.py   # only when a screen in the guide changes shape
 ```
 
-A clean build, lint and test run is the bar — currently **805 tests across 39 files** and **79
-route entries** in the build tree (2026-08-18). Count routes with the tree itself
+A clean build, lint and test run is the bar — currently **789 tests across 37 files** and **80
+route entries** in the build tree (re-measured 2026-09-01, when the walkthrough feature was
+removed; the route count is unchanged, because the guide never added a route). Count routes with the tree itself
 (`npm run build | sed -n '/^Route (app)/,/(Dynamic)/p'` piped to `grep -c "^[├└]"`) rather than by
 eye: a loose grep over that output has produced 66, 69 and 70 for the same build.
 

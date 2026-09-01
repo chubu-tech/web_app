@@ -3,7 +3,6 @@ import { CartBar } from "@/components/customer/cart-bar";
 import { CustomerHeader } from "@/components/customer/customer-nav";
 import { InLineBar } from "@/components/customer/in-line-bar";
 import { SiteFooter } from "@/components/customer/site-footer";
-import { CustomerGuideLauncher } from "@/components/customer/customer-guide-launcher";
 import { requireLiveAccount } from "@/lib/session";
 
 /**
@@ -62,7 +61,9 @@ export default async function CustomerLayout({
           entire product half the first thing a keyboard or screen-reader user reached was
           a link that went nowhere.
         */}
-        <main id="main" className="flex-1">{children}</main>
+      <main id="main" className="flex-1">
+        {children}
+      </main>
       {/*
         `main` is `flex-1` inside a `min-h-full` column, so on a short page — an empty
         `/saved`, a 404 — the footer is pushed to the bottom of the viewport rather than
@@ -84,18 +85,6 @@ export default async function CustomerLayout({
         itself when the cart is empty and on `/cart` — see `CartBar`.
       */}
       <CartBar />
-      {/*
-        The floating "How it works" button, and the customer walkthrough behind it. In the
-        shell rather than on a page because a first-time visitor can arrive on any of these
-        25 routes — from a search result, a shared salon link, a printed QR — and the guide
-        is only useful where somebody is already lost.
-
-        It places itself: `lib/guide/placement.ts` lifts it clear of the five surfaces here
-        that pin a control to the bottom edge (this bar included) and declines to draw at all
-        on `/map`, where the tile attribution owns the corner. The player is loaded on press,
-        so this costs one button until somebody wants it.
-      */}
-      <CustomerGuideLauncher />
     </div>
   );
 }

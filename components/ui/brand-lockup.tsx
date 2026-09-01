@@ -33,7 +33,14 @@ export function BrandLockup({
   priority = false,
   className,
 }: {
-  /** Where the logo goes. `/business` for the console: `/` only redirects an owner there. */
+  /**
+   * Where the logo goes. `/business` for the console.
+   *
+   * The reason is not that `/` bounces back — it does not. `landAfterAuth` sends an owner to
+   * `/business` when they *sign in*, and `/` is the **marketing home**, which renders for
+   * anybody: an owner who clicked the logo mid-shift would land on a sales page, outside the
+   * console, with no way back that is not the browser's own history.
+   */
   href?: string;
   /** The link's accessible name. */
   label?: string;

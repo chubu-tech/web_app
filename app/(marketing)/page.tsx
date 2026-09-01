@@ -10,6 +10,7 @@ import { QueueLive } from "@/components/marketing/queue-live";
 import { ServiceMarquee } from "@/components/marketing/service-marquee";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteHeader } from "@/components/marketing/site-header";
+import { SupportedBy } from "@/components/marketing/supported-by";
 import { TwoWays } from "@/components/marketing/two-ways";
 import { MotifDivider } from "@/components/marketing/ui/bhutan";
 import { brand, faq, hero, pricing } from "@/lib/marketing/content";
@@ -249,7 +250,14 @@ export default async function Home() {
             purpose because the ones it had were invented. See `proof` in
             `lib/marketing/content.ts`. Renders nothing when the index is empty. */}
         <Proof index={salonIndex} />
-        {/* 7. Who pays what, 8. questions, 9. download. */}
+        {/* 7. Who is behind it. Directly under the proof figures because the two
+            answer one question in two halves — is anybody using this, and is anybody
+            backing it — and both are context for the price list rather than an
+            afterthought to it. Unlike `Proof` this always renders: the credit does not
+            depend on the salon index, so a build that could not reach the database
+            still carries it. */}
+        <SupportedBy />
+        {/* 8. Who pays what, 9. questions, 10. download. */}
         <Pricing />
         <MotifDivider />
         <Faq />

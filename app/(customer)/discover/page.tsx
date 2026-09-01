@@ -10,7 +10,6 @@ import {
   fetchCategories,
   fetchSalonsAvailableToday,
 } from "@/lib/api/discovery";
-import { fetchMyBookings } from "@/lib/api/booking";
 import { fetchMyFavouriteIds } from "@/lib/api/favourites";
 import { fetchLiveOffers } from "@/lib/api/salon";
 import { fetchProducts } from "@/lib/api/shop";
@@ -143,7 +142,6 @@ export default async function DiscoverPage({
     products,
     staffInvites,
     availability,
-    pastBookings,
   ] = await Promise.all([
       fetchBusinesses(supabase, {
         categoryId: filters.categoryId,
@@ -205,21 +203,6 @@ export default async function DiscoverPage({
         honest rendering of "we cannot tell you".
       */
       fetchSalonsAvailableToday(supabase).catch(() => []),
-      /*
-        The customer's own history, for "Book again".
-
-        The user id is **passed in**, not left to RLS: `bookings_select` OR-matches
-        `is_business_member`, so an unfiltered read hands a salon member their salons'
-        bookings. That is the repeated bug this repo has now fixed six times, and it would be
-        especially bad here — a "Book again" row offering an owner their customers'
-        appointments.
-
-        `account.user` is null for a visitor and for a guest with no session, and neither has
-        a history, so the read is skipped rather than sent and failed.
-      */
-      account.user
-        ? fetchMyBookings(supabase, account.user.id).catch(() => [])
-        : Promise.resolve([]),
     ]);
 
   // Reconciled against the loaded bounds here rather than in the component: a bound that does not
@@ -247,7 +230,6 @@ export default async function DiscoverPage({
         categoriesByBusiness={categoriesByBusiness}
         offers={offers}
         availability={availability}
-        pastBookings={pastBookings}
         favouriteIds={[...favouriteIds]}
         filters={filters}
         products={products}
