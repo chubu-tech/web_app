@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="en-BT">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tho guide stage</title>
+
+    <!--
+      The render surface for the walkthrough MP4s. **This page is never served by the
+      site** — it lives under `scripts/` precisely so it cannot be imported by anything in
+      `app/` or `components/`, and it is opened only by `scripts/render-guide.py` through a
+      static server rooted at `web/`.
+
+      It is a fixed 1920x1080 canvas. No media queries, no responsive behaviour: the only
+      viewer is a headless Chromium at exactly that size, and every length below is in
+      video pixels.
+
+      The design follows the reference the brief names — Spaceti's product film: a quiet
+      light ground, one device, and the words held still beside it rather than flying over
+      it. Motion comes from `stateAt(t)` alone; nothing here animates on its own, because a
+      CSS transition would make the picture depend on *when* it was screenshotted rather
+      than on `t`.
+    -->
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      Inter, because it is what actually renders. See `--sans` below: the stack asks for
+      SF Pro first, but SF Pro is not a webfont and cannot be linked, so this is the face
+      the film is really set in unless SF Pro is installed on the rendering machine.
+    -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /*
+        Tokens lifted from `app/globals.css` and `app/marketing-tokens.css` rather than
+        re-chosen, so the film and the site are the same brand. Only the values actually
+        used here are copied; this is a render surface, not a second design system.
+      */
+      :root {
+        --rausch: #ff385c;
+        --rausch-cta: #e00b41;
+        --ink: #222222;
+        --body: #3f3f3f;
+        --muted: #6a6a6a;
+        --hairline: #dddddd;
+        --canvas: #ffffff;
+        --cream: #f6f3ee;
+
+        /*
+          **One family for the whole film.**
+
+          SF Pro is asked for first and is used on any machine that has it. It is not a
+          webfont — Apple distributes it as a desktop install, and its licence covers
+          designing and mocking up interfaces for Apple platforms — so it cannot be linked
+          here, and on a machine without it this resolves to Inter.
+
+          Inter is not an arbitrary stopgap: it is the typeface the Tho app itself is set in
+          (`tho/app/lib/ui/tokens.dart`) and the one the website loads, and it was drawn to
+          occupy the same space as SF. The fallback is the product's own face.
+        */
+        --sans:
+          "SF Pro Display", "SF Pro Text", "SF Pro", -apple-system, BlinkMacSystemFont,
+          Inter, "Segoe UI", system-ui, sans-serif;
+
+        --stage-w: 1920px;
+        --stage-h: 1080px;
+
+        /*
+          **The device is sized so the frame breathes on all four sides.**
+
+          The captures are 1080x2400 — 9:20 — so the device is the tall element and the
+          stage is a landscape one. The first cut filled the height: a 966px device in a
+          1080px frame left 57px above and below against 272px left and right, a 4.8x
+          imbalance that read exactly as it was — a phone jammed vertically while floating
+          horizontally.
+
+          387 x 860 is chosen because both are whole numbers at the source aspect
+          (387 * 2400 / 1080 = 860 exactly), so a screenshot never lands on a half pixel.
+          It leaves 97px above and below. Those are not equal to the horizontal 260 and
+          should not be: a 16:9 frame has far less height to spend, and matching them would
+          mean a 560px device whose app text nobody could read.
+        */
+        --screen-w: 387px;
+        --screen-h: 860px;
+        --bezel: 13px;
+        --device-w: calc(var(--screen-w) + var(--bezel) * 2); /* 413 */
+        --device-h: calc(var(--screen-h) + var(--bezel) * 2); /* 886 */
+
+        /*
+          **One horizontal margin, and everything derives from it.**
+
+          This was four numbers that had drifted apart: the frame marks 96px in, the device
+          245.5px from the left, the text column ending 150px from the right, and the body
+          copy capped 220px short of its own column. Nothing aligned with anything.
+
+          The device and the text now form one group whose outer margins are equal by
+          construction — the text column takes whatever is left, so the two sides cannot
+          disagree again.
+        */
+        --margin: 260px;
+        --col-gap: 120px;
+        --text-w: calc(
+          var(--stage-w) - var(--margin) * 2 - var(--device-w) - var(--col-gap)
+        );
+
+        /*
+          The frame marks sit on their own inset, symmetric to each other but tighter than
+          the content margin — they are the edge of the film, not part of the composition.
+          They cannot share `--margin`: the device starts exactly there, so a wordmark at
+          the content margin lands *behind* the phone.
+        */
+        --chrome-inset: 72px;
+
+        /* Overridden per layout. */
+        --title-size: 60px;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: var(--stage-w);
+        height: var(--stage-h);
+        overflow: hidden;
+      }
+
+      body {
+        font-family: var(--sans);
+        color: var(--ink);
+        /* Warm, and barely there. A flat white ground makes the phone look pasted on; a
+           gradient this shallow reads as light in a room. */
+        background:
+          radial-gradient(1200px 900px at 18% 12%, #ffffff 0%, rgba(255, 255, 255, 0) 62%),
+          radial-gradient(900px 700px at 78% 92%, rgba(255, 56, 92, 0.05) 0%, rgba(255, 56, 92, 0) 60%),
+          linear-gradient(158deg, #fdfcfa 0%, var(--cream) 100%);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      #stage {
+        position: relative;
+        width: var(--stage-w);
+        height: var(--stage-h);
+        /* Far enough back that a 9deg turn is a turn and not a funhouse mirror. The
+           reference sits its devices in space; without this they only skew. */
+        perspective: 2400px;
+        perspective-origin: 50% 50%;
+      }
+
+      /* ---- layouts -------------------------------------------------------------
+
+         Three arrangements, chosen per chapter in `lib/guide/layouts.ts`. Each keeps 260px
+         clear on both sides; the numbers are written out rather than derived so the
+         arithmetic can be checked by eye:
+
+           split-left    device  260..673     words  793..1660
+           split-right   words   260..1127    device 1247..1660
+           statement     device  285..648     words  768..1660    (device at 88%)
+
+         The change between them always happens behind a section card, which is opaque for
+         two seconds — so a different arrangement appears on the other side of every card,
+         and the move itself is never seen.
+      ------------------------------------------------------------------------- */
+
+      #stage[data-layout="split-left"] {
+        --slot-left: var(--margin);
+        --panel-left: calc(var(--margin) + var(--device-w) + var(--col-gap));
+        --panel-w: var(--text-w);
+      }
+
+      #stage[data-layout="split-right"] {
+        --slot-left: calc(var(--stage-w) - var(--margin) - var(--device-w));
+        --panel-left: var(--margin);
+        --panel-w: var(--text-w);
+      }
+
+      /*
+        The fan. A centred device with the chapter's other screens receding on both sides,
+        flattened and faded — the reference's section-opening shot. It carries the chapter's
+        name at the top and the step's title beneath it, and no body copy: it is a breath
+        between the card and the instruction, not a place to read a sentence.
+      */
+      #stage[data-layout="gallery"] {
+        --slot-left: calc((var(--stage-w) - var(--device-w)) / 2);
+        --panel-left: var(--margin);
+        --panel-w: var(--text-w);
+      }
+
+      /*
+        The cluster. Headline left, three devices tumbling off the bottom-right corner.
+        The most decorative shot in the film, so it is used once per walkthrough — it is
+        deliberately not readable, and everything it needs to say is in the headline.
+      */
+      #stage[data-layout="cluster"] {
+        --slot-left: 1010px;
+        --panel-left: var(--margin);
+        --panel-w: 660px;
+        --title-size: 68px;
+      }
+
+      #stage[data-layout="statement"] {
+        --slot-left: var(--margin);
+        --panel-left: 768px;
+        --panel-w: 892px;
+        --title-size: 72px;
+      }
+
+      /* ---- chrome ------------------------------------------------------------- */
+
+      .wordmark {
+        position: absolute;
+        top: 54px;
+        left: var(--chrome-inset);
+        font-weight: 600;
+        font-size: 22px;
+        letter-spacing: 0.16em;
+        color: var(--ink);
+      }
+      .wordmark span {
+        color: var(--rausch);
+      }
+
+      /*
+        The fan's caption: the chapter's name, centred at the top. Only that layout shows
+        it — everywhere else the eyebrow in the text column already says it, and two labels
+        for one thing is one too many.
+      */
+      .toplabel {
+        position: absolute;
+        top: 52px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        display: none;
+      }
+      #stage[data-layout="gallery"] .toplabel { display: block; }
+      .toplabel .tl-chapter {
+        display: block;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--rausch-cta);
+      }
+      .toplabel .tl-title {
+        display: block;
+        margin-top: 12px;
+        line-height: 1.15;
+        font-size: 36px;
+        font-weight: 700;
+        letter-spacing: -0.028em;
+        color: var(--ink);
+      }
+
+      /* The fan says its piece at the top; a second column of copy would fight it. */
+      #stage[data-layout="gallery"] .panel { display: none; }
+
+      .counter {
+        position: absolute;
+        top: 56px;
+        right: var(--chrome-inset);
+        font-size: 17px;
+        font-weight: 500;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ---- the device --------------------------------------------------------- */
+
+      /*
+        Two nested transforms, deliberately on two elements:
+
+          .slot  — where the layout puts the device, and how big that layout wants it.
+                   Scales about its own centre.
+          .phone — the camera push, scaled about the highlighted control.
+
+        Nesting keeps them independent. Multiplied onto one element, a layout's 88% would
+        be applied about the hotspot too, shoving the device sideways whenever a chapter
+        changed its size.
+      */
+      .slot {
+        position: absolute;
+        top: 50%;
+        left: var(--slot-left);
+        width: var(--device-w);
+        height: var(--device-h);
+        transform-style: preserve-3d;
+        will-change: transform;
+        /* The transform itself is written by `stage.ts` every frame: layout scale, tilt,
+           and the float. Nothing here, because none of it is constant. */
+      }
+
+      .phone {
+        width: 100%;
+        height: 100%;
+        background: #101013;
+        border-radius: 52px;
+        padding: var(--bezel);
+        /* Two shadows: a tight one that seats the device, and a wide soft one that gives
+           the ground some depth. Both are cheap and neither animates. */
+        box-shadow:
+          0 2px 6px rgba(16, 16, 19, 0.18),
+          0 44px 90px -30px rgba(16, 16, 19, 0.42);
+      }
+
+      .screen {
+        position: relative;
+        width: var(--screen-w);
+        height: var(--screen-h);
+        border-radius: 40px;
+        overflow: hidden;
+        background: #ffffff;
+      }
+
+      /*
+        The transformed layer. `transform-origin` is set per frame to the centre of the
+        highlighted control, which is what makes the ring and the tap track the zoom for
+        free — see the geometry note at the top of `lib/guide/timeline.ts`.
+      */
+      .layer {
+        position: absolute;
+        inset: 0;
+        will-change: transform, opacity;
+      }
+      .layer img {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      /* Inside the layer, so it scales with the screenshot it is covering. */
+      .layer .mask {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+      }
+
+      /*
+        The overlay is a sibling of the transformed layers, not a child. Keeping it out
+        means the ring's stroke stays one pixel and the tap stays a circle at any zoom;
+        only the ring's width and height need scaling, which `stateAt` does analytically.
+      */
+      .overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      /*
+        Four rings, because the thing being highlighted is very often a **coral button** —
+        Book Appointment, Confirm booking, Apply, Create account are all `--rausch` fills,
+        and the first render drew a coral stroke onto one of them and vanished.
+
+        So the stroke is fenced by white on both sides: an inset hairline that separates it
+        from a coloured fill, and an outer one that separates it from a white screen. Only
+        then the coral glow and a soft drop shadow. The result reads on any surface the app
+        can put underneath it, which is the only requirement a highlight really has.
+      */
+      .ring {
+        position: absolute;
+        border: 3px solid var(--rausch);
+        border-radius: 12px;
+        box-shadow:
+          inset 0 0 0 2px rgba(255, 255, 255, 0.92),
+          0 0 0 3px rgba(255, 255, 255, 0.95),
+          0 0 0 5px rgba(255, 56, 92, 0.28),
+          0 6px 20px rgba(16, 16, 19, 0.22);
+        will-change: transform, opacity;
+      }
+
+      .tap {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 0;
+        height: 0;
+      }
+      .tap i {
+        position: absolute;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+      }
+      .tap .dot {
+        width: 22px;
+        height: 22px;
+        background: rgba(255, 56, 92, 0.9);
+        box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.85);
+      }
+      .tap .ripple {
+        border: 2px solid var(--rausch);
+      }
+
+      /* ---- floating components -------------------------------------------------
+
+         Shown on the two shots whose job is to say what a chapter is about. On the split
+         layouts somebody is being shown which control to press, and a card drifting past
+         while they look for it is decoration charged to the viewer's attention.
+
+         Positions are per layout; the drift is per component, written by `stage.ts` so each
+         piece moves at its own rate. Uniform motion would read as one flat plane sliding,
+         which is the opposite of the depth this is for.
+      ------------------------------------------------------------------------- */
+
+      .floaters {
+        position: absolute;
+        inset: 0;
+        z-index: 3;
+        pointer-events: none;
+      }
+      .floater {
+        position: absolute;
+        display: none;
+        will-change: transform, opacity;
+        filter: drop-shadow(0 18px 34px rgba(16, 16, 19, 0.16));
+      }
+      .floater img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      #stage[data-layout="statement"] .floater,
+      #stage[data-layout="cluster"] .floater {
+        display: block;
+      }
+
+      /*
+        Only `left` and `top` here. **Width is set by `stage.ts` from each component's own
+        captured size**, and it has to be: these range from a 61px rating chip to a 380px
+        booking card, and a fixed slot width blew the chip up to 250px while squashing the
+        Book button to 190x34 with an illegible label.
+
+        Overlapping the *device* is wanted — that is the depth. Overlapping the *words* is
+        not, so every slot's left edge is chosen to keep the piece clear of the text column,
+        which starts at 768px.
+      */
+      /* Overlapping the device's *edge* reads as depth; overlapping its *face* reads as a
+         mistake. At 372px this card sat on the centre of a device spanning 285-648 and hid
+         the top third of the screen, status bar included — the screen being the subject. */
+      #stage[data-layout="statement"] #flt0 { left: 48px;  top: 168px; }
+      #stage[data-layout="statement"] #flt1 { left: 84px;  top: 700px; }
+      /* Offset from the device's own bottom edge on purpose: sitting flush with it, a
+         full-width button read as part of the screen rather than a piece lifted off it. */
+      #stage[data-layout="statement"] #flt2 { left: 146px; top: 902px; }
+
+      /* The cluster's devices own the right, so these ride the band beside them and one
+         sits under the headline where the frame is otherwise empty. */
+      #stage[data-layout="cluster"] #flt0 { left: 688px; top: 128px; }
+      #stage[data-layout="cluster"] #flt1 { left: 612px; top: 852px; }
+      #stage[data-layout="cluster"] #flt2 { left: 966px; top: 726px; }
+
+      /* ---- satellites --------------------------------------------------------- */
+
+      .satellites {
+        position: absolute;
+        inset: 0;
+        /* Behind the device, in front of the ground. */
+        z-index: 0;
+      }
+      .sat {
+        position: absolute;
+        top: 50%;
+        width: var(--device-w);
+        height: var(--device-h);
+        border-radius: 34px;
+        overflow: hidden;
+        background: #fff;
+        display: none;
+        will-change: transform, opacity;
+      }
+      .sat img {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      /*
+        A stacking order, written out because introducing one member of it silently changed
+        the rest. `.slot` was given `z-index: 1` so the device would sit in front of the
+        satellites — and that lifted it in front of the **section card** as well, which
+        paints an empty phone straight over the middle of every chapter transition.
+
+        So all four layers are named here rather than left to document order:
+      */
+      .satellites { z-index: 0; }
+      .slot { z-index: 1; }
+      .panel, .wordmark, .counter, .toplabel { z-index: 2; }
+      /* Opaque and full bleed: it has to cover the device, not compete with it. */
+      .card { z-index: 5; }
+      /* Above even the card, so the film never hides how far through it you are. */
+      .rail { z-index: 6; }
+
+      /*
+        In the fan they are flat screenshots, not devices — no bezel, softened, and dropping
+        away in pairs so the eye reads depth rather than a row. The two outer ones are faint
+        enough to be texture.
+      */
+      #stage[data-layout="gallery"] .sat {
+        display: block;
+        box-shadow: 0 18px 44px -22px rgba(16, 16, 19, 0.3);
+      }
+      #stage[data-layout="gallery"] #sat0 {
+        left: 430px;
+        transform: translateY(-50%) scale(0.84);
+        opacity: 0.5;
+      }
+      #stage[data-layout="gallery"] #sat1 {
+        left: 150px;
+        transform: translateY(-50%) scale(0.74);
+        opacity: 0.26;
+      }
+      #stage[data-layout="gallery"] #sat2 {
+        left: 1077px;
+        transform: translateY(-50%) scale(0.84);
+        opacity: 0.5;
+      }
+      #stage[data-layout="gallery"] #sat3 {
+        left: 1357px;
+        transform: translateY(-50%) scale(0.74);
+        opacity: 0.26;
+      }
+
+      /*
+        In the cluster they are devices, bezel and all, turned hard and running off the
+        frame. Bleeding off the edge is the point: it is what makes a frame read as a
+        photograph of a scene rather than a diagram laid out inside a box.
+      */
+      #stage[data-layout="cluster"] .sat {
+        display: block;
+        border-radius: 46px;
+        border: 13px solid #101013;
+        box-shadow:
+          0 2px 6px rgba(16, 16, 19, 0.18),
+          0 44px 90px -34px rgba(16, 16, 19, 0.44);
+      }
+      #stage[data-layout="cluster"] #sat0 {
+        left: 1330px;
+        transform: translateY(-72%) rotate(-24deg) scale(0.9);
+      }
+      #stage[data-layout="cluster"] #sat1 {
+        left: 1520px;
+        transform: translateY(-16%) rotate(-17deg) scale(0.86);
+      }
+      #stage[data-layout="cluster"] #sat2,
+      #stage[data-layout="cluster"] #sat3 {
+        display: none;
+      }
+
+      /* ---- the words ---------------------------------------------------------- */
+
+      .panel {
+        position: absolute;
+        left: var(--panel-left);
+        top: 50%;
+        transform: translateY(-50%);
+        width: var(--panel-w);
+      }
+
+      /* The only part that moves between steps. */
+      .callout {
+        will-change: transform, opacity;
+      }
+
+      /* Holds the column's height steady as sentences of different lengths swap in, so
+         the eyebrow above and the dots below do not shuffle up and down all film. */
+      .callout .body {
+        min-height: 126px;
+      }
+
+      .eyebrow {
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--rausch-cta);
+        margin-bottom: 22px;
+      }
+
+      /*
+        Each word is its own inline-block so it can arrive on its own beat, and each sits in
+        a `span` that clips it — the word rises out of the mask rather than fading in place.
+        The reference builds its headlines a word at a time, and that is most of why its
+        type feels alive while a whole line fading in feels like a slide.
+      */
+      .title i {
+        display: inline-block;
+        overflow: hidden;
+        vertical-align: bottom;
+        font-style: normal;
+      }
+      .title i > b {
+        display: inline-block;
+        font-weight: inherit;
+        will-change: transform, opacity;
+      }
+
+      .title {
+        font-weight: 700;
+        font-size: var(--title-size);
+        line-height: 1.06;
+        letter-spacing: -0.032em;
+        color: var(--ink);
+      }
+
+      .rule {
+        width: 76px;
+        height: 3px;
+        background: var(--rausch);
+        border-radius: 2px;
+        margin: 30px 0 28px;
+      }
+
+      .body {
+        font-size: 27px;
+        line-height: 1.55;
+        color: var(--body);
+      }
+
+      /* One dot per step in the chapter — "where am I", without a second progress bar. */
+      .dots {
+        display: flex;
+        gap: 10px;
+        margin-top: 46px;
+      }
+      .dots i {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: rgba(34, 34, 34, 0.16);
+      }
+      .dots i.on {
+        background: var(--rausch);
+        width: 30px;
+        border-radius: 5px;
+      }
+
+      /* ---- section card ------------------------------------------------------- */
+
+      /*
+        Opaque, full bleed, and it covers everything — which is why `stateAt` fades the
+        frame beneath it up during the card's own exit rather than after it.
+      */
+      .card {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 26px;
+        /*
+          White, not coral. The reference sets its statements in black on the same white
+          the rest of the film sits on, and the effect is that a sentence simply *arrives*
+          rather than a coloured slide being pushed in front of the camera.
+
+          The brand still moves: a coral band rides the leading edge of the wipe, so the
+          colour is in the motion instead of in a flat field.
+        */
+        background: #ffffff;
+        color: var(--ink);
+        will-change: clip-path;
+      }
+      .card .edge {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 10px;
+        background: linear-gradient(180deg, #ff4d6d 0%, var(--rausch-cta) 100%);
+      }
+      .card .mark {
+        width: 132px;
+        height: 132px;
+        display: none;
+        margin-bottom: 6px;
+      }
+      .card .inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 26px;
+        will-change: transform, opacity;
+      }
+      .card .num {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        color: var(--rausch-cta);
+      }
+      .card .name {
+        font-weight: 700;
+        font-size: 92px;
+        line-height: 1.02;
+        letter-spacing: -0.035em;
+        text-align: center;
+        max-width: 1500px;
+      }
+      /* Words build one at a time here too — the masks are the same as the headings'. */
+      .card .name i {
+        display: inline-block;
+        overflow: hidden;
+        vertical-align: bottom;
+        font-style: normal;
+      }
+      .card .name i > b {
+        display: inline-block;
+        font-weight: inherit;
+        will-change: transform, opacity;
+      }
+      .card .bar {
+        width: 116px;
+        height: 4px;
+        background: var(--rausch);
+        border-radius: 2px;
+      }
+
+      /* ---- progress ----------------------------------------------------------- */
+
+      .rail {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 5px;
+        background: rgba(34, 34, 34, 0.08);
+      }
+      .rail i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: linear-gradient(90deg, var(--rausch) 0%, var(--rausch-cta) 100%);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="stage" data-layout="split-left">
+      <div class="wordmark">TH<span>O</span></div>
+      <div class="counter" id="counter"></div>
+      <!-- The fan's caption. Centred at the top, the way the reference names a section. -->
+      <div class="toplabel" id="topLabel"></div>
+
+      <!--
+        The other screens of the same chapter, standing behind the one being explained.
+
+        Two of the reference film's shots need them: the fan, where a centred device is
+        flanked by flattened screens receding left and right, and the cluster, where two
+        more devices sit behind the main one and run off the edge of the frame. Both are
+        filled by `stage.ts` from real steps of the same chapter — never a placeholder, and
+        never a screen from somewhere else in the app.
+      -->
+      <!--
+        The app's own components, drifting at their own rates around the device.
+
+        Each is a real widget rendered alone on a transparent ground by
+        `../tho/app/test/guide_components_test.dart` — not a crop of a screenshot, which is
+        why they can overlap the ground and each other without carrying a white rectangle.
+      -->
+      <div class="floaters" id="floaters">
+        <div class="floater" id="flt0"><img id="fltImg0" alt="" /></div>
+        <div class="floater" id="flt1"><img id="fltImg1" alt="" /></div>
+        <div class="floater" id="flt2"><img id="fltImg2" alt="" /></div>
+      </div>
+
+      <div class="satellites" id="sats">
+        <div class="sat" id="sat0"><img id="satImg0" alt="" /></div>
+        <div class="sat" id="sat1"><img id="satImg1" alt="" /></div>
+        <div class="sat" id="sat2"><img id="satImg2" alt="" /></div>
+        <div class="sat" id="sat3"><img id="satImg3" alt="" /></div>
+      </div>
+
+      <div class="slot" id="slot">
+        <div class="phone" id="phone">
+          <div class="screen">
+            <div class="layer" id="prev"><img id="prevImg" alt="" /><div class="mask" id="prevMask"></div></div>
+            <div class="layer" id="cur"><img id="curImg" alt="" /><div class="mask" id="curMask"></div></div>
+            <div class="overlay">
+              <div class="ring" id="ring"></div>
+              <div class="tap" id="tap"><i class="ripple" id="ripple"></i><i class="dot" id="dot"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!--
+        The chapter's own furniture — its name and its step dots — sits OUTSIDE the block
+        that fades. Only the sentence changes between steps; where you are in the chapter
+        does not, and blinking it out for the 0.3s of every cross-fade made the right-hand
+        column flicker once per step.
+      -->
+      <div class="panel">
+        <div class="eyebrow" id="eyebrow"></div>
+        <div class="callout" id="callout">
+          <div class="title" id="title"></div>
+          <div class="rule"></div>
+          <div class="body" id="body"></div>
+        </div>
+        <div class="dots" id="dots"></div>
+      </div>
+
+      <div class="card" id="card">
+        <i class="edge" id="cardEdge"></i>
+        <div class="inner" id="cardInner">
+          <!--
+            The app's own mark, drawn from `app/icon.svg` rather than cropped out of a
+            screenshot, so it stays sharp at any size. Shown on the film's opening card
+            only; every later card is type alone.
+          -->
+          <svg class="mark" id="cardMark" viewBox="0 0 32 32" aria-hidden="true">
+            <rect width="32" height="32" rx="7.6" fill="#ff385c" />
+            <g fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="22" r="2.6" />
+              <circle cx="21" cy="22" r="2.6" />
+              <path d="M12.9 20.1 22 8" />
+              <path d="M19.1 20.1 10 8" />
+            </g>
+          </svg>
+          <div class="num" id="cardNum"></div>
+          <div class="name" id="cardName"></div>
+          <div class="bar"></div>
+        </div>
+      </div>
+
+      <div class="rail"><i id="railFill"></i></div>
+    </div>
+
+    <script type="module" src="./stage.js"></script>
+  </body>
+</html>

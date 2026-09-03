@@ -55,7 +55,9 @@ import {
   MapPin,
   Map as MapIcon,
   MessageCircle,
+  MonitorPlay,
   Navigation,
+  RotateCcw,
   Package,
   Phone,
   QrCode,
@@ -324,6 +326,27 @@ export const Icons = {
   addPhoto: ImagePlus,
   /** `AppIcons.photos` — a set of them, for the gallery section header. */
   photos: Images,
+  /**
+   * The walkthrough film, on the button that opens it.
+   *
+   * A screen with a play badge, which says both halves of what the button does: it plays
+   * something, and what it plays is *this product*. Not `video` (the glyph is about the
+   * subject, not the format) and not `help` — there is no help glyph here and no help centre
+   * to send anyone to.
+   *
+   * The transport icons that used to sit beside this one are gone with the slideshow that
+   * needed them. The film is a `<video controls>`, so play, pause, scrub, volume and
+   * fullscreen are the browser's, drawn in the idiom each platform's users already know.
+   */
+  guide: MonitorPlay,
+  /**
+   * Back to the start of the walkthrough once it has run out. Never a generic "refresh".
+   *
+   * The only transport glyph left. The film's play, pause, scrub, volume and fullscreen are
+   * the browser's; this one exists because at the end of five minutes the thing somebody
+   * wants is one button, and hunting for the left edge of a scrubber is not it.
+   */
+  restart: RotateCcw,
 
   // ------------------------------------------------------------- the places --
   location: MapPin,

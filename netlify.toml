@@ -37,3 +37,32 @@
   for = "/.well-known/apple-app-site-association"
   [headers.values]
     Content-Type = "application/json"
+
+# The walkthrough films, cached forever.
+#
+# Two 27-34 MB MP4s and their posters and caption tracks. They are immutable in the strict
+# sense the directive means: a change to either film is a re-render, and a re-render produces
+# a new file that replaces this one at the same URL. That is the case `immutable` is wrong
+# for — so the real justification is the second half of the pair. `max-age=31536000` on a
+# file the CDN serves means a visitor who opens the guide twice downloads 34 MB once, and the
+# alternative is a revalidation round-trip before a video that is already playing.
+#
+# If a film is ever re-cut, bust it by changing the path rather than by waiting a year:
+# `/guide/video/customer-v2.mp4`, and `components/guide/guide-player.tsx` is the one place
+# that builds these URLs.
+#
+# Here rather than in `next.config.ts` for the reason the block above spells out: files under
+# `public/` are served straight from Netlify's CDN and never reach the Next.js server, so its
+# `headers()` never runs for them.
+[[headers]]
+  for = "/guide/video/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# WebVTT has its own type and Netlify does not infer it from the extension. Without this the
+# track element gets `text/plain`, and the browser drops it silently - the CC button simply
+# never appears, which looks exactly like a video that has no captions.
+[[headers]]
+  for = "/guide/video/*.vtt"
+  [headers.values]
+    Content-Type = "text/vtt; charset=utf-8"

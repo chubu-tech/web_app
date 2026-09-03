@@ -1,4 +1,5 @@
 import type { Viewport } from "next";
+import { MarketingGuideLauncher } from "@/components/guide/marketing-guide-launcher";
 import { WaitlistProvider } from "@/components/marketing/waitlist-provider";
 
 /**
@@ -73,6 +74,11 @@ export default function MarketingLayout({
         className="bg-canvas flex min-h-full flex-col"
       >
         {children}
+        {/*
+          Out here nobody has signed in, so the route is the only evidence of who is reading
+          — see `MarketingGuideLauncher`, which is where that guess is made and explained.
+        */}
+        <MarketingGuideLauncher />
       </div>
     </WaitlistProvider>
   );

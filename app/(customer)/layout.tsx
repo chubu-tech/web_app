@@ -1,5 +1,6 @@
 import type { Viewport } from "next";
 import { CartBar } from "@/components/customer/cart-bar";
+import { CustomerGuideLauncher } from "@/components/customer/customer-guide-launcher";
 import { CustomerHeader } from "@/components/customer/customer-nav";
 import { InLineBar } from "@/components/customer/in-line-bar";
 import { SiteFooter } from "@/components/customer/site-footer";
@@ -85,6 +86,13 @@ export default async function CustomerLayout({
         itself when the cart is empty and on `/cart` — see `CartBar`.
       */}
       <CartBar />
+      {/*
+        The walkthrough button, in the shell for the same reason `CartBar` is: it is offered
+        on every customer page rather than on the one page somebody might be lost on. This is
+        the wrapper that passes `cartVisible`, because this is the one shell where a bar can
+        be underneath it.
+      */}
+      <CustomerGuideLauncher />
     </div>
   );
 }

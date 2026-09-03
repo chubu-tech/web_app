@@ -42,3 +42,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Build output of the guide render stage. `scripts/render-guide.py` regenerates it from
+# `stage.ts` on every run, so a committed copy could only ever be a stale duplicate.
+/scripts/guide-stage/stage.js
+
+# The guide's intermediate films: the silent picture and the picture-plus-voice, one of each
+# per audience. `scripts/{render,voice,music}-guide.py` produce them in that order and only
+# the last output ships, so these are derived, large (110 MB) and deliberately not committed.
+# They live outside `public/` because everything under it is uploaded to the CDN.
+/.guide-masters/
+
+# Python bytecode from the guide render scripts. `voice-guide.py` and `captions-guide.py`
+# import `render-guide.py` through `importlib`, which writes one of these next to it.
+__pycache__/

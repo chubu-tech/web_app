@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { GuideLauncher } from "@/components/guide/guide-launcher";
 import { OwnerHeader } from "@/components/owner/owner-nav";
 import { SalonSwitcher } from "@/components/owner/salon-switcher";
 import { IdleTimeout } from "@/components/ui/idle-timeout";
@@ -109,6 +110,17 @@ export default async function OwnerLayout({
         carries the full reasoning, including why `../tho` has no equivalent.
       */}
       <IdleTimeout />
+
+      {/*
+        The owner walkthrough, on every console route. `audience` is settled here rather than
+        by any page: this shell has already refused anyone who is not an owner, so the thing
+        that authorised the page is also the thing that knows which film to offer — and no
+        page has to choose, or default wrong by omission.
+
+        No `cartVisible`: the console does not mount `CartBar`, so the answer is structurally
+        false and reading the cart to be told so would subscribe 26 routes to `localStorage`.
+      */}
+      <GuideLauncher audience="owner" />
     </div>
   );
 }
