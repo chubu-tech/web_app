@@ -42,9 +42,10 @@ import {
 import { fetchLoyaltyBalance } from "@/lib/api/owner-back-office";
 import { fetchPublicLoyaltyProgram, fetchPublicRewards } from "@/lib/api/shop";
 import { fetchActiveLine } from "@/lib/api/queue";
+import { brand } from "@/lib/marketing/content";
 import { placeOf, townOf } from "@/lib/places";
 import { coverageLine, dayName, hhmm, todayHoursLine } from "@/lib/salon-copy";
-import { breadcrumbSchema, jsonLdScript, salonSchema } from "@/lib/seo";
+import { breadcrumbSchema, jsonLdScript, salonSchema, shareCard } from "@/lib/seo";
 import { isCanonicalParam, parseEntityId, salonPath, stylistPath } from "@/lib/slug";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -178,16 +179,31 @@ export async function generateMetadata({
       via `metadataBase`, which the root layout now sets.
     */
     alternates: { canonical: path },
-    openGraph: {
-      type: "website",
+    /*
+      The salon's own cover, so a link pasted into WhatsApp — which is how this product
+      is shared in Bhutan — unfurls as the shop rather than as a bare URL. `next/image`
+      is not involved: an unfurler fetches this URL directly, which is why it has to be
+      the storage URL and not a `/_next/image` transform.
+
+      **A salon with no cover now falls back to the branded card rather than to nothing.**
+      This used to spread `{}` when `coverUrl` was null, which left `openGraph` with no
+      `images` — and because a page-level `openGraph` replaces the root layout's whole
+      block, the `opengraph-image.tsx` fallback went with it. So an uncovered salon's
+      link unfurled as a bare URL. All 10 live salons happen to have a seeded cover
+      today, so this is latent rather than visible; `MARKETING.md` is explicit that real
+      salons routinely have none, which is the day it would have started showing.
+
+      `alt` is the salon, not the card: an unfurler that renders alt text should say
+      whose shop this is.
+    */
+    ...shareCard({
       title,
       description,
       url: path,
-      // The salon's own cover, so a link pasted into WhatsApp — which is how this
-      // product is shared in Bhutan — unfurls as the shop rather than as a bare URL.
-      // `next/image` is not involved: an unfurler fetches this directly.
-      ...(business.coverUrl ? { images: [{ url: business.coverUrl }] } : {}),
-    },
+      images: business.coverUrl
+        ? [{ url: business.coverUrl, alt: `${business.name} on ${brand.name}` }]
+        : undefined,
+    }),
   };
 }
 

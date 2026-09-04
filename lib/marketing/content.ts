@@ -112,8 +112,55 @@ export const brand = {
    * Store listings, empty until the apps are published. Paste the real URLs here and the
    * badges point at them; while both are blank they fall back to the on-page download
    * section, which is a working destination rather than a dead link.
+   *
+   * **This is a launch switch, not an address book.** Filling it in flips every download
+   * call to action on the site — the header CTA, both hero badges, the pricing panel and
+   * the closing band — from "Coming soon to / join the waitlist" to a real store link, and
+   * `MARKETING.md` names the two copy constants (`download.body`, `download.eyebrow`) that
+   * have to change in the same commit. That is why the iOS listing below is **not** pasted
+   * in here: see `appListing`.
    */
   stores: { ios: "", android: "" },
+  /**
+   * The App Store listing's address, for the one surface that needs to reach it while
+   * `stores.ios` is still empty: `/app`, the branded share link.
+   *
+   * ## Why this is separate from `stores.ios`
+   *
+   * They answer different questions. `stores.ios` is *"has the site launched?"* — the
+   * switch above, with copy consequences across nine components. This is *"where does the
+   * listing live?"*, which has one consumer and no copy attached. The app is live on the
+   * Bhutan storefront (v1.1.0, released 2026-08-24) while the site still says "coming
+   * soon", so the two genuinely have different answers right now, and collapsing them
+   * into one constant would mean the share link could not exist until the whole site's
+   * launch copy changed.
+   *
+   * ## The URL, and why this exact form
+   *
+   * `url` is the canonical address Apple itself reports as `trackViewUrl` (minus the
+   * `?uo=4` analytics parameter). **The country segment is not optional.** Verified
+   * against Apple, not assumed:
+   *
+   * | URL                                          | Status |
+   * | -------------------------------------------- | ------ |
+   * | `apps.apple.com/bt/app/id6801982891`         | 200    |
+   * | `apps.apple.com/app/id6801982891`            | 404    |
+   * | `apps.apple.com/us/app/id6801982891`         | 404    |
+   * | `itunes.apple.com/app/id6801982891`          | 404    |
+   *
+   * The app is published to the **Bhutan storefront only**, and the storefront-less form
+   * that usually redirects does not exist for it. So a link without `/bt/` is a 404 that
+   * unfurls as nothing — which is what was being shared before this was written down.
+   *
+   * `id` is kept beside the URL because it is the stable identity: the `tho-bt` slug is
+   * generated from the listing's name and Apple changes it if the name changes, while
+   * `id6801982891` never moves. Anything that has to construct a store URL should build
+   * it from `id`.
+   */
+  appListing: {
+    id: "6801982891",
+    url: "https://apps.apple.com/bt/app/tho-bt/id6801982891",
+  },
   /**
    * Social profiles, for the footer's Follow us row.
    *
@@ -416,7 +463,8 @@ export const proof = {
 } as const;
 
 /**
- * The supporter credit, immediately below the proof band.
+ * The supporter credit — a byline under the hero's store badges, and a line in the
+ * footer mast.
  *
  * ## The copy says almost nothing, and that is the decision
  *
@@ -427,10 +475,11 @@ export const proof = {
  * partner's behalf is the same failure in a nicer suit: it puts words in the mouth of
  * a named third party who has not seen them.
  *
- * So `body` is one sentence that is true whatever the arrangement turns out to be.
- * **Widen it only with something Dabtong House has actually agreed to**, and when that
- * happens the band has room for it — `SupportedBy` renders `body` as a block and the
- * column it sits in is half the grid.
+ * There **was** a `body` here — *"Tho is built in Bhutan, with the support of Dabtong
+ * House."* — and it is gone with the band that rendered it. Both surfaces now set the
+ * label beside the mark and nothing else, so a sentence nobody draws is a sentence
+ * this file is only claiming to have. If a blurb is ever agreed with Dabtong House it
+ * comes back with a renderer, not before.
  *
  * ## The spelling is `Dabtong`, from the artwork
  *
@@ -444,20 +493,19 @@ export const proof = {
  *
  * Same convention as `brand.stores` and `brand.social`: an unset URL renders the
  * lockup as a plain lockup rather than as a link to nowhere. Paste the address here
- * and both the band and the footer credit become links, with no other edit —
- * `SupportedBy` and `DabtongCredit` each branch on `length > 0`. A dead link under a
- * supporter's name is worse than no link at all.
+ * and both the hero byline and the footer credit become links, with no other edit —
+ * `SupporterCredit` and `DabtongCredit` each branch on `length > 0`. A dead link under
+ * a supporter's name is worse than no link at all.
  */
 export const supporter = {
   /**
-   * Rendered as the band's `<h2>` in the footer's tracked-caps style rather than
-   * through `Eyebrow`. `ui/section.tsx` caps the site at two eyebrows and says to cut
-   * one before adding a third; this band has no display heading for an eyebrow to sit
-   * above anyway, so the label *is* the heading and takes no accent dot.
+   * The hero byline's tracked-caps label, set as a `<span>` rather than through
+   * `Eyebrow` or as a heading. `ui/section.tsx` caps the site at two eyebrows, and the
+   * hero's only heading is the `<h1>` — see `SupporterCredit` for why this takes
+   * neither.
    */
   label: "Supported by",
   name: "Dabtong House",
-  body: "Tho is built in Bhutan, with the support of Dabtong House.",
   /** Paste the website here to turn the lockup into a link. See the note above. */
   href: "",
   /**

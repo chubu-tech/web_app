@@ -1,9 +1,19 @@
 import { ImageResponse } from "next/og";
 import { brand, hero } from "@/lib/marketing/content";
+import { SHARE_CARD, SHARE_CARD_ALT } from "@/lib/seo";
 
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
-export const alt = `${brand.name} — ${brand.tagline}`;
+/*
+  Declared once in `lib/seo.ts` and read here, rather than written here and copied there.
+
+  `shareCard()` has to emit `og:image:width` and `og:image:height` explicitly — the file
+  convention only fills those in for pages that override nothing — and Facebook and
+  WhatsApp crop against the declared ratio. So if these two numbers and that helper's
+  ever disagreed, every share card on the domain would be cropped to a size this image
+  is not. One constant means they cannot.
+*/
+export const size = { width: SHARE_CARD.width, height: SHARE_CARD.height };
+export const contentType = SHARE_CARD.contentType;
+export const alt = SHARE_CARD_ALT;
 
 /**
  * Social share card, generated at build time. Text-only so it never depends on

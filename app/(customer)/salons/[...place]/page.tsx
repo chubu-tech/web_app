@@ -12,12 +12,7 @@ import {
 import { fetchMyFavouriteIds } from "@/lib/api/favourites";
 import { emptyPlaceCopy, placeCopy, placeLabel } from "@/lib/place-copy";
 import { areasOf, placeBySlug, salonsIn, type Place } from "@/lib/places";
-import {
-  breadcrumbSchema,
-  faqSchema,
-  jsonLdScript,
-  salonListSchema,
-} from "@/lib/seo";
+import { breadcrumbSchema, faqSchema, jsonLdScript, salonListSchema, shareCard } from "@/lib/seo";
 import { createClient } from "@/lib/supabase/server";
 import type { Business } from "@/lib/types/salon";
 
@@ -163,12 +158,11 @@ export async function generateMetadata({
     title: copy.title,
     description: copy.description,
     alternates: { canonical: resolved.canonical },
-    openGraph: {
-      type: "website",
+    ...shareCard({
       url: resolved.canonical,
       title: copy.title,
       description: copy.description,
-    },
+    }),
   };
 }
 

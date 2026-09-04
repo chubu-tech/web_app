@@ -3,7 +3,7 @@ import Link from "next/link";
 import { brand } from "@/lib/marketing/content";
 import { PLAN_TIERS } from "@/lib/plans";
 import { absoluteUrl } from "@/lib/site";
-import { breadcrumbSchema, faqSchema, jsonLdScript } from "@/lib/seo";
+import { breadcrumbSchema, faqSchema, jsonLdScript, shareCard } from "@/lib/seo";
 
 /**
  * The owner-side landing page — `/for-salons`.
@@ -155,14 +155,20 @@ export const metadata: Metadata = {
   title: "Salon Management & Booking Software in Bhutan",
   description:
     "THO is salon booking and management software for Bhutan. Take online appointments, run a live walk-in queue by QR code, and manage staff, services, prices and clients from one screen. From Nu 399 a month.",
+  keywords: [
+    "salon software Bhutan",
+    "salon booking software",
+    "salon management software",
+    "walk-in queue by QR code",
+    "barbershop software Bhutan",
+  ],
   alternates: { canonical: "/for-salons" },
-  openGraph: {
-    type: "website",
+  ...shareCard({
     url: "/for-salons",
     title: "Salon Management & Booking Software in Bhutan",
     description:
       "Take online bookings, run a live walk-in queue, and manage staff, services and clients from one screen. From Nu 399 a month.",
-  },
+  }),
 };
 
 export default function ForSalonsPage() {

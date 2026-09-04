@@ -2,18 +2,25 @@ import type { Metadata } from "next";
 import { MapView } from "@/components/customer/map-view";
 import { fetchBusinesses } from "@/lib/api/discovery";
 import { createClient } from "@/lib/supabase/server";
+import { shareCard } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Salon Map — Find Salons Near You in Bhutan",
   description:
     "See salons and barbershops across Bhutan on a map and find the ones nearest you. Open a shop to compare services and prices, then book online or join its walk-in queue.",
+  keywords: [
+    "salons near me Bhutan",
+    "salon map Bhutan",
+    "barbershops in Bhutan",
+    "salons nearest you",
+  ],
   alternates: { canonical: "/map" },
-  openGraph: {
-    type: "website",
+  ...shareCard({
     url: "/map",
     title: "Salon Map — Find Salons Near You in Bhutan",
-    description: "Salons and barbershops across Bhutan on a map, with the nearest to you first.",
-  },
+    description:
+      "Salons and barbershops across Bhutan on a map, with the nearest to you first.",
+  }),
 };
 
 /**

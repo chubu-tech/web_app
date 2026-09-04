@@ -9,9 +9,9 @@ import { cn } from "@/lib/marketing/utils";
 /**
  * The Dabtong House lattice, on its own. **A server component with no motion in it.**
  *
- * That is the point of it existing separately from `SupportedBy`. The animated band is
- * on the home page only, and like every `Reveal` on this site it starts at
- * `opacity: 0` — so with scripting off the credit would be a blank rectangle. This
+ * That is the point of it existing separately from `SupporterCredit`. The animated
+ * lockup is in the home page's hero only, and like every entrance on this site it starts
+ * at `opacity: 0` — so with scripting off the credit would be a blank rectangle. This
  * renders in the HTML, on all six marketing routes, with nothing to hydrate.
  */
 export function DabtongMark({ className }: { className?: string }) {

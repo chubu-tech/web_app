@@ -2,20 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { CUSTOMER_HOME } from "@/lib/auth";
-import { breadcrumbSchema, faqSchema, jsonLdScript } from "@/lib/seo";
+import { breadcrumbSchema, faqSchema, jsonLdScript, shareCard } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Help — Booking, Queues, Payment & Rewards",
   description:
     "How to change or cancel a booking, join a salon’s walk-in queue, pay, earn and spend loyalty points, report something, and delete your account on THO.",
   alternates: { canonical: "/help" },
-  openGraph: {
-    type: "website",
+  ...shareCard({
     url: "/help",
     title: "Help — Booking, Queues, Payment & Rewards on THO",
     description:
       "How booking changes, the walk-in queue, payment, loyalty points and account deletion work on THO.",
-  },
+  }),
 };
 
 /**

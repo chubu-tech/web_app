@@ -5,6 +5,9 @@ import {
   jsonLdScript,
   salonListSchema,
   salonSchema,
+  sameAsBlock,
+  SHARE_CARD,
+  shareCard,
   stylistSchema,
 } from "./seo";
 import type { WorkingHour } from "./types/booking";
@@ -336,5 +339,152 @@ describe("faqSchema", () => {
     const entities = s.mainEntity as Record<string, unknown>[];
     expect(entities[0].name).toBe(items[0].q);
     expect((entities[0].acceptedAnswer as Record<string, unknown>).text).toBe(items[0].a);
+  });
+});
+
+/*
+  Next models `Metadata["openGraph"]` as a discriminated union that also admits `null`,
+  so a test cannot read `type` or `images` off it without narrowing first. These two
+  views are that narrowing, done once, so the assertions below stay about values rather
+  than about TypeScript. The production return type is deliberately the `Metadata` one —
+  that is what makes the nine `...shareCard(...)` spreads typecheck.
+*/
+type OgView = {
+  type: string;
+  siteName: string;
+  locale: string;
+  title: string;
+  description: string;
+  images: { url: string; width?: number; height?: number; alt?: string }[];
+};
+
+type TwView = {
+  card: string;
+  title: string;
+  description: string;
+  images: { url: string }[];
+};
+
+function view(args: Parameters<typeof shareCard>[0]) {
+  const { openGraph, twitter } = shareCard(args);
+  return {
+    og: openGraph as unknown as OgView,
+    tw: twitter as unknown as TwView,
+  };
+}
+
+describe("sameAsBlock", () => {
+  it("omits the key entirely when nothing is real", () => {
+    const node = { "@type": "Organization", ...sameAsBlock(["", "  ", null, undefined]) };
+    /*
+      `"sameAs" in node`, not `toEqual({})`, and the distinction is the whole point of the
+      test: `toEqual` ignores properties whose value is `undefined`, so `{ sameAs: undefined }`
+      would satisfy it while still putting the key into the emitted JSON-LD. `in` is the
+      assertion that actually pins the requirement.
+    */
+    expect("sameAs" in node).toBe(false);
+  });
+
+  it("keeps only the non-empty members, trimmed", () => {
+    expect(
+      sameAsBlock([
+        "",
+        " https://www.facebook.com/tho ",
+        "",
+        "https://apps.apple.com/bt/app/tho-bt/id6801982891",
+      ]),
+    ).toEqual({
+      sameAs: [
+        "https://www.facebook.com/tho",
+        "https://apps.apple.com/bt/app/tho-bt/id6801982891",
+      ],
+    });
+  });
+
+  it("does not repeat a URL pasted twice", () => {
+    expect(sameAsBlock(["https://x.test/tho", "https://x.test/tho"])).toEqual({
+      sameAs: ["https://x.test/tho"],
+    });
+  });
+});
+
+describe("shareCard", () => {
+  const copy = {
+    title: "Norzin Salon — Salon in Thimphu",
+    description: "Book a chair at Norzin Salon.",
+    url: "/salon/norzin-b1",
+  };
+
+  it("always yields an image, even with none supplied", () => {
+    /*
+      This is the whole reason the helper exists. Nine pages exported an `openGraph`
+      without `images` and lost the `opengraph-image.tsx` fallback to Next's shallow
+      merge, so the homepage unfurled on WhatsApp with no picture at all. If this
+      assertion ever fails, that bug is back.
+    */
+    const { og, tw } = view(copy);
+
+    expect(og.images).toHaveLength(1);
+    expect(tw.images).toHaveLength(1);
+  });
+
+  it("points the fallback image at the branded card, absolutely", () => {
+    // Absolute, not a bare path: an unfurler has no origin to resolve one against.
+    expect(view(copy).og.images[0].url).toMatch(/^https?:\/\/.+\/opengraph-image$/);
+  });
+
+  it("declares the dimensions the card is actually rendered at", () => {
+    // `app/opengraph-image.tsx` reads the same constant for its `size` export, so this
+    // guards the pair rather than restating one half of it.
+    const [image] = view(copy).og.images;
+
+    expect(image.width).toBe(SHARE_CARD.width);
+    expect(image.height).toBe(SHARE_CARD.height);
+    // Facebook's documented large-format minimum, which X and LinkedIn also clear.
+    expect(SHARE_CARD.width).toBeGreaterThanOrEqual(600);
+    expect(SHARE_CARD.height).toBeGreaterThanOrEqual(315);
+    // 1200×630 is 1.905:1 — the ratio everyone writes as "1.91:1". One decimal, because
+    // asserting 1.91 to two would be asserting a number this card does not have.
+    expect(SHARE_CARD.width / SHARE_CARD.height).toBeCloseTo(1.9, 1);
+  });
+
+  it("prefers a supplied photo over the branded card", () => {
+    const cover = "https://cdn.test/norzin.jpg";
+    const { og, tw } = view({ ...copy, images: [{ url: cover }] });
+
+    expect(og.images).toEqual([{ url: cover }]);
+    // Both blocks take the same picture — they cannot drift.
+    expect(tw.images).toEqual(og.images);
+  });
+
+  it("treats an empty array as no photo", () => {
+    // `coverUrl ? [...] : undefined` is the caller's shape, but a `.filter()` upstream
+    // could hand this an empty array; that must fall back rather than emit `images: []`.
+    expect(view({ ...copy, images: [] }).og.images[0].url).toContain(SHARE_CARD.path);
+  });
+
+  it("keeps the Twitter card copy identical to the Open Graph copy", () => {
+    /*
+      The second half of the original bug: no page declared a `twitter` block, so every
+      route served the root layout's generic title to X — and to LinkedIn and Slack,
+      which read `twitter:*` when they prefer it.
+    */
+    const { og, tw } = view(copy);
+
+    expect(tw.title).toBe(og.title);
+    expect(tw.description).toBe(og.description);
+    expect(tw.card).toBe("summary_large_image");
+  });
+
+  it("carries site name and locale that a page override used to drop", () => {
+    const { og } = view(copy);
+
+    expect(og.siteName).toBe("THO");
+    expect(og.locale).toBe("en_BT");
+  });
+
+  it("defaults to website and passes a profile through", () => {
+    expect(view(copy).og.type).toBe("website");
+    expect(view({ ...copy, type: "profile" }).og.type).toBe("profile");
   });
 });

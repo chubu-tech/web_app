@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { brand } from "./marketing/content";
 import type { WorkingHour } from "./types/booking";
 import { placeOf } from "./places";
 import { salonPath, stylistPath } from "./slug";
@@ -368,5 +370,150 @@ export function faqSchema(
       name: item.q,
       acceptedAnswer: { "@type": "Answer", text: item.a },
     })),
+  };
+}
+
+/**
+ * `sameAs` for the `Organization` node — the profiles that corroborate this entity, and
+ * nothing else.
+ *
+ * The rule encoded here is the one the homepage graph used to state as its reason for
+ * having no `sameAs` at all: an empty string is invalid structured data, and an array
+ * filtered to nothing is a field claiming *"no corroborating profiles"* rather than saying
+ * nothing. So this returns a **spreadable fragment** — `{ sameAs: [...] }` when something is
+ * real, `{}` when nothing is — and the key disappears from the graph rather than appearing
+ * empty.
+ *
+ * Trimmed and de-duplicated, because the call site is a list of hand-pasted URLs and a
+ * repeated entry is the same claim made twice.
+ *
+ * A single readonly array rather than a rest parameter: a `readonly` rest parameter is a
+ * type error, and the array form keeps the call site's intent visible.
+ */
+export function sameAsBlock(
+  urls: readonly (string | null | undefined)[],
+): { sameAs?: string[] } {
+  const real = [
+    ...new Set(urls.map((url) => url?.trim() ?? "").filter((url) => url.length > 0)),
+  ];
+  return real.length > 0 ? { sameAs: real } : {};
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Share cards — the Open Graph and Twitter metadata a link unfurls into.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The branded share card's route, and its dimensions.
+ *
+ * `app/opengraph-image.tsx` imports these rather than declaring its own, so the numbers
+ * a platform is *told* in `og:image:width`/`height` and the numbers the PNG actually has
+ * come from one place and cannot drift. Facebook and WhatsApp both crop against the
+ * declared aspect ratio, so a card that lies about its own size is a card with somebody's
+ * headline sliced in half.
+ *
+ * **1200×630 is not a preference.** It is Facebook's documented minimum for the large
+ * format (600×315) at 2×, it is the ratio LinkedIn and X's `summary_large_image` both
+ * expect, and it is comfortably under WhatsApp's ~600 KB ceiling at 53 KB. Do not change
+ * it without checking all four.
+ */
+export const SHARE_CARD = {
+  path: "/opengraph-image",
+  width: 1200,
+  height: 630,
+  contentType: "image/png",
+} as const;
+
+/** The share card's alt text. Read by `app/opengraph-image.tsx` and by `shareCard`. */
+export const SHARE_CARD_ALT = `${brand.name} — ${brand.tagline}`;
+
+/** One image in a share card, as both Open Graph and Twitter want it. */
+type ShareImage = { url: string; alt?: string; width?: number; height?: number };
+
+/**
+ * The branded card, absolute. Every page falls back to this when it has no photo of
+ * its own, which is the whole point of the function below.
+ */
+const BRANDED_IMAGE: ShareImage = {
+  url: absoluteUrl(SHARE_CARD.path),
+  width: SHARE_CARD.width,
+  height: SHARE_CARD.height,
+  alt: SHARE_CARD_ALT,
+};
+
+/**
+ * Build a page's `openGraph` **and** `twitter` metadata together, from one set of copy.
+ *
+ * ## The bug this exists to make impossible
+ *
+ * Next merges metadata **shallowly**, one field at a time. A page that exports
+ * `openGraph: { title, description, url }` therefore does not *extend* the root layout's
+ * `openGraph` — it **replaces** it, and takes `siteName`, `locale` and, decisively, the
+ * `opengraph-image.tsx` file convention's `images` down with it.
+ *
+ * Nine pages did exactly that, so the nine most valuable URLs on the domain — the
+ * homepage, `/for-salons`, `/help`, Discover, `/salons`, `/top-rated`, `/map`, and every
+ * salon and stylist without a photo — unfurled on WhatsApp with **no image at all**,
+ * while `/privacy`, which overrides nothing, unfurled correctly. Measured against the
+ * live site, not reasoned about: `curl https://bhutansalons.com/ | grep og:image` matched
+ * nothing, and the same grep on `/privacy` matched five tags.
+ *
+ * Twitter was the same failure a second time. Not one page declared a `twitter` block, so
+ * every route on the domain inherited the root layout's generic title and description —
+ * `/for-salons` told X it was about booking a haircut. And because `twitter:*` is what
+ * LinkedIn and Slack read when they prefer it, that is not an X-only cost.
+ *
+ * A helper rather than a convention to remember: the two blocks are built from the same
+ * three arguments, so they cannot disagree, and there is no way to set a title here
+ * without also getting an image.
+ *
+ * ## `images` is a fallback, not a default
+ *
+ * Pass a salon's cover or a stylist's photo and the card is the shop. Pass nothing — or
+ * an empty array, which is what `coverUrl ?? undefined` yields for the salons that have
+ * no photo — and it is the branded card. That branch is the normal path, not an edge
+ * case: `MARKETING.md` records that real salons routinely have no cover, and
+ * `staff_photos` holds 2 rows platform-wide.
+ *
+ * @param url A path this app serves, starting with `/`. Resolved against `metadataBase`.
+ */
+export function shareCard({
+  title,
+  description,
+  url,
+  type = "website",
+  images,
+}: {
+  title: string;
+  description: string;
+  url: string;
+  /** `profile` for a person, `article` for a document. Anything else is a `website`. */
+  type?: "website" | "profile" | "article";
+  /** The page's own imagery. Empty or absent falls back to the branded card. */
+  images?: readonly ShareImage[];
+}): Required<Pick<Metadata, "openGraph" | "twitter">> {
+  const picture = images?.length ? [...images] : [BRANDED_IMAGE];
+
+  return {
+    openGraph: {
+      type,
+      siteName: brand.name,
+      locale: "en_BT",
+      title,
+      description,
+      url,
+      images: picture,
+    },
+    twitter: {
+      /*
+        `summary_large_image` on every page, matching the 1200×630 card. The small
+        `summary` card would letterbox it into a square thumbnail, and a photograph of a
+        salon interior does not survive that crop.
+      */
+      card: "summary_large_image",
+      title,
+      description,
+      images: picture,
+    },
   };
 }

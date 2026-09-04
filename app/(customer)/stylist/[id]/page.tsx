@@ -21,7 +21,7 @@ import {
   isFollowingStaff,
 } from "@/lib/api/staff";
 import { placeOf } from "@/lib/places";
-import { breadcrumbSchema, jsonLdScript, stylistSchema } from "@/lib/seo";
+import { breadcrumbSchema, jsonLdScript, shareCard, stylistSchema } from "@/lib/seo";
 import { isCanonicalParam, parseEntityId, salonPath, stylistPath } from "@/lib/slug";
 import { createClient } from "@/lib/supabase/server";
 import type { Review } from "@/lib/types/salon";
@@ -123,18 +123,24 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: path },
-    openGraph: {
+    /*
+      The stylist's own photo where there is one, else the salon's cover, else the
+      branded card — a share card with no image is a share card nobody clicks.
+      `staff_photos` has 2 rows platform-wide, so the *second* rung is the normal path
+      and the third is reachable for any stylist at a salon with no cover either. That
+      last case used to spread `{}` and leave the page with no `og:image` at all, since
+      overriding `openGraph` also drops the `opengraph-image.tsx` fallback.
+    */
+    ...shareCard({
       type: "profile",
       title,
       description,
       url: path,
-      // The stylist's own photo where there is one, else the salon's cover — a share
-      // card with no image is a share card nobody clicks. `staff_photos` has 2 rows
-      // platform-wide, so the fallback is the normal path.
-      ...(data.staff.photoUrl || data.business.coverUrl
-        ? { images: [{ url: (data.staff.photoUrl ?? data.business.coverUrl)! }] }
-        : {}),
-    },
+      images: (() => {
+        const photo = data.staff.photoUrl ?? data.business.coverUrl;
+        return photo ? [{ url: photo, alt: title }] : undefined;
+      })(),
+    }),
   };
 }
 

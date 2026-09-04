@@ -10,11 +10,11 @@ import { QueueLive } from "@/components/marketing/queue-live";
 import { ServiceMarquee } from "@/components/marketing/service-marquee";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteHeader } from "@/components/marketing/site-header";
-import { SupportedBy } from "@/components/marketing/supported-by";
 import { TwoWays } from "@/components/marketing/two-ways";
 import { MotifDivider } from "@/components/marketing/ui/bhutan";
 import { brand, faq, hero, pricing } from "@/lib/marketing/content";
 import { getSalonIndex } from "@/lib/marketing/salons";
+import { sameAsBlock, shareCard } from "@/lib/seo";
 import { absoluteUrl, SITE_URL } from "@/lib/site";
 
 /**
@@ -73,14 +73,41 @@ export const metadata: Metadata = {
   title: { absolute: `${brand.name} — Salon & Barber Booking in Bhutan` },
   description:
     "Book a salon or barber appointment anywhere in Bhutan, or join a shop’s walk-in queue from your phone and watch your place in line. Free for customers — no booking fee, no card needed.",
+  /*
+    `keywords`, and an honest note about it: **Google has ignored `<meta name="keywords">`
+    since 2009**, and Bing's guidance has described it as a signal for spotting spam rather
+    than for ranking. No AI retrieval crawler reads it either — GPTBot, ClaudeBot,
+    PerplexityBot and OAI-SearchBot all read rendered text, which is what `/llms.txt` and the
+    JSON-LD graph are for.
+
+    It is here because it was asked for and it is inert, not because it earns anything. Every
+    term below appears in this page's own title, description or body copy, so the tag cannot
+    drift into claiming something the page does not say — which is the only real cost a dead
+    tag carries. The pages that genuinely target *"salons in Thimphu"* are the place pages
+    under `/salons/<town>`; they are not given one, because it would be equally ignored there.
+  */
+  keywords: [
+    "salon booking Bhutan",
+    "barber Bhutan",
+    "book a salon appointment",
+    "walk-in queue",
+    "salon prices Bhutan",
+  ],
   alternates: { canonical: "/" },
-  openGraph: {
-    type: "website",
+  /*
+    **This page is the one that was worst off.** It declared its own `openGraph` and
+    therefore lost the root layout's — so the single highest-authority URL on the domain
+    unfurled on WhatsApp, Facebook and LinkedIn with no image, no `og:site_name` and no
+    `og:locale`, and told X the generic root-layout title instead of this one. Verified
+    against production before the fix: `og:image` was absent from `/` and present on
+    `/privacy`, which overrides nothing. See `shareCard`.
+  */
+  ...shareCard({
     url: "/",
     title: `${brand.name} — Salon & Barber Booking in Bhutan`,
     description:
       "Find salons and barbers across Bhutan, book a time or join the walk-in queue, and see prices before you go. Free for customers.",
-  },
+  }),
 };
 
 /**
@@ -122,14 +149,26 @@ const jsonLd = {
         availableLanguage: ["en", "dz"],
       },
       /*
-        `sameAs` is deliberately absent rather than empty.
+        `sameAs` — the profiles that corroborate this entity, built rather than written out.
 
-        It must list profiles that corroborate this entity, and `brand.social` is three
-        empty strings today — the accounts do not exist. An empty-string entry is invalid
-        structured data, and a filtered-to-nothing array is a field claiming "no
-        corroborating profiles" rather than saying nothing. Add the key here when the
-        accounts are real; a `wa.me` deep link is not a profile and does not belong in it.
+        This comment used to say the field was deliberately absent because `brand.social`
+        is three empty strings. Half of that is still true; the other half was never
+        checked. **`brand.appListing.url` is a real, live profile of this organisation** —
+        the App Store listing on the Bhutan storefront, v1.1.0, and the URL answers 200 —
+        and a third-party page that names the entity is exactly what `sameAs` is for.
+
+        `sameAsBlock` keeps the original rule rather than discarding it: an empty string is
+        invalid structured data, and an array filtered to nothing is a claim of "no
+        corroborating profiles", so the key is omitted entirely when nothing is real. Which
+        means pasting a Facebook or Instagram URL into `brand.social` adds it here with no
+        edit to this file, and the empty members cost nothing today.
+
+        `Object.values` rather than three named reads, so a fourth network flows in on its
+        own; the invariant that every member is a profile URL is what that constant's own
+        doc comment states. A `wa.me` deep link is still not a profile and still does not
+        belong in it.
       */
+      ...sameAsBlock([...Object.values(brand.social), brand.appListing.url]),
     },
     {
       "@type": "WebSite",
@@ -250,14 +289,17 @@ export default async function Home() {
             purpose because the ones it had were invented. See `proof` in
             `lib/marketing/content.ts`. Renders nothing when the index is empty. */}
         <Proof index={salonIndex} />
-        {/* 7. Who is behind it. Directly under the proof figures because the two
-            answer one question in two halves — is anybody using this, and is anybody
-            backing it — and both are context for the price list rather than an
-            afterthought to it. Unlike `Proof` this always renders: the credit does not
-            depend on the salon index, so a build that could not reach the database
-            still carries it. */}
-        <SupportedBy />
-        {/* 8. Who pays what, 9. questions, 10. download. */}
+        {/* 7. Who pays what, 8. questions, 9. download.
+
+            There is no supporter band here any more. It stood between the proof
+            figures and the price list, and a partner's mark on its own `bg-paper`
+            card — given a ninth of the page's vertical rhythm — read as the loudest
+            thing on a page that is meant to be selling chairs. The credit is owed;
+            that much prominence was not. It is now a byline under the hero's store
+            badges (`SupporterCredit`, same artwork and same animation at a fifth of
+            the size) and a line in the footer mast (`DabtongCredit`, which is a
+            server component and therefore the one that survives scripting being
+            off). Do not restore the band without moving one of those. */}
         <Pricing />
         <MotifDivider />
         <Faq />

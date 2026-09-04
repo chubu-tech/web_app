@@ -75,6 +75,43 @@ const nextConfig: NextConfig = {
         source: "/.well-known/apple-app-site-association",
         headers: [{ key: "Content-Type", value: "application/json" }],
       },
+
+      /*
+        The walkthrough films, cached for a year.
+
+        This rule lived in `netlify.toml` and therefore never ran: the site is served by
+        Vercel, and production was measured handing out a 32 MB and a 26 MB MP4 with
+        `Cache-Control: public, max-age=0, must-revalidate` — the default for a static asset
+        — so a visitor who opened the guide twice downloaded 58 MB twice.
+
+        **Here rather than in a new `vercel.json`, because Next's own headers do reach
+        `public/`**: "Headers are checked before the filesystem which includes pages and
+        `/public` files"
+        (`node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/headers.md`).
+        That is also why the rule above works on Vercel while its `netlify.toml` twin does
+        nothing, and it is the sentence `netlify.toml`'s comments get wrong. One config, every
+        host, and `next start` gets it too. A second config file that can disagree with this
+        one about the same path is the failure this bug already is.
+
+        The `Cache-Control` caveat in that doc does not bite: it covers only the SHA-hashed
+        assets under `/_next/static`, which these are not.
+
+        `immutable` is honest only while the URL changes when the film does — a re-cut is a new
+        file at a new path, `/guide/video/customer-v2.mp4`, and `components/guide/guide-player.tsx`
+        is the one place that builds these URLs. Do not re-cut in place and wait a year.
+
+        `:path*` rather than a regex: Next matches with path-to-regexp, and this catches
+        `customer.mp4`, `customer.vtt` and `customer-poster.webp` alike — all six files are
+        immutable on the same argument. The `.vtt` *content type* needs no rule here; Vercel
+        infers it from the extension, which is measured, and is the only reason `netlify.toml`'s
+        rule for it appeared to be working.
+      */
+      {
+        source: "/guide/video/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
     ];
   },
 };

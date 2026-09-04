@@ -14,6 +14,7 @@ import { fetchMyFavouriteIds } from "@/lib/api/favourites";
 import { fetchLiveOffers } from "@/lib/api/salon";
 import { fetchProducts } from "@/lib/api/shop";
 import { CUSTOMER_HOME, homeForRole } from "@/lib/auth";
+import { shareCard } from "@/lib/seo";
 import { priceBounds, productFilterFromParams } from "@/lib/product-filter";
 import { fromParams, hasPrice, serviceGenders } from "@/lib/salon-filters";
 import { getAccount } from "@/lib/session";
@@ -82,14 +83,21 @@ export const metadata: Metadata = {
   title: "Find & Book Salons and Barbers in Bhutan",
   description:
     "Browse every salon and barbershop on THO across Bhutan. Compare services, prices and reviews, book an appointment, or join a shop's walk-in queue from your phone. Free for customers.",
+  keywords: [
+    "find a salon in Bhutan",
+    "book a barber Bhutan",
+    "barbershop Bhutan",
+    "salon services and prices",
+    "walk-in queue",
+    "salon reviews Bhutan",
+  ],
   alternates: { canonical: CUSTOMER_HOME },
-  openGraph: {
-    type: "website",
+  ...shareCard({
     url: CUSTOMER_HOME,
     title: "Find & Book Salons and Barbers in Bhutan",
     description:
       "Browse every salon and barbershop on THO across Bhutan. Compare services, prices and reviews, then book or join the walk-in queue.",
-  },
+  }),
 };
 export default async function DiscoverPage({
   searchParams,

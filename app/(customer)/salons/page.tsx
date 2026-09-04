@@ -6,6 +6,7 @@ import { fetchBusinesses } from "@/lib/api/discovery";
 import { fetchMyFavouriteIds } from "@/lib/api/favourites";
 import { SALON_SORTS, type SalonSort } from "@/lib/recommendations";
 import { createClient } from "@/lib/supabase/server";
+import { shareCard } from "@/lib/seo";
 
 export const metadata: Metadata = {
   /*
@@ -17,14 +18,20 @@ export const metadata: Metadata = {
   title: "Salons & Barbershops in Bhutan — Book Online",
   description:
     "Every salon and barbershop on THO across Bhutan. Compare services, prices, ratings and opening hours, then book an appointment online or join a walk-in queue. Free for customers.",
+  keywords: [
+    "salons in Bhutan",
+    "barbershops in Bhutan",
+    "book salon online Bhutan",
+    "salon opening hours",
+    "salon prices Bhutan",
+  ],
   alternates: { canonical: "/salons" },
-  openGraph: {
-    type: "website",
+  ...shareCard({
     url: "/salons",
     title: "Salons & Barbershops in Bhutan — Book Online",
     description:
       "Every salon and barbershop on THO across Bhutan. Compare prices and ratings, then book online or join a walk-in queue.",
-  },
+  }),
 };
 
 /**

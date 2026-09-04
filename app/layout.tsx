@@ -1,7 +1,9 @@
+import { GoogleAnalytics } from "@next/third-parties/google";
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { brand } from "@/lib/marketing/content";
+import { shareCard } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -121,6 +123,50 @@ const description =
   "Book a salon or barber appointment anywhere in Bhutan, or join a shop's walk-in queue from your phone. Compare services, prices and reviews. Free for customers.";
 
 /**
+ * Google Search Console's HTML-tag verification, and **deliberately not `NEXT_PUBLIC_`.**
+ *
+ * This layout is a server component and `metadata` resolves on the server, so the token
+ * reaches the document `<head>` — the only place Google reads it — without ever entering a
+ * client bundle. `NEXT_PUBLIC_` would inline the same string into browser chunks for no
+ * gain. It is not a secret; it is simply not the browser's business.
+ *
+ * **Absent means absent.** The whole `verification` key is spread conditionally rather than
+ * handed an `undefined` value. Next's resolver happens to drop falsy keys — `resolveVerification`
+ * guards each one with `if (value)` — so the looser form works today, but that is an
+ * implementation detail, and a declared-but-blank `GOOGLE_SITE_VERIFICATION=` is the same CI
+ * accident `lib/site.ts` documents guarding against with `||` rather than `??`.
+ *
+ * **Set it before the build, not after.** Not being `NEXT_PUBLIC_` does not make it a
+ * runtime value here: the public pages are statically prerendered, so this `<head>` is
+ * generated at `next build` and the token is baked into the HTML then. Measured, not
+ * assumed — setting it only in the running server's environment left the tag absent, and a
+ * fresh build with it set emitted it. So it carries the same caveat `lib/site.ts` documents
+ * for `NEXT_PUBLIC_SITE_URL`: re-deploying existing build output does nothing.
+ *
+ * Verifying by **DNS TXT** instead needs no value here at all, and gives a Search Console
+ * *Domain* property covering apex and `www` together — which is the property type that can
+ * actually watch a `www`→apex consolidation. This is the escape hatch, not the expected path.
+ */
+const googleSiteVerification = process.env.GOOGLE_SITE_VERIFICATION;
+
+/**
+ * GA4, or nothing at all.
+ *
+ * `NEXT_PUBLIC_` **is** right here, unlike the verification token above: the measurement id
+ * travels in the `gtag.js` URL, so the browser needs it and there is nothing to withhold.
+ * Unset — which is every local run, and every preview unless you opt in — renders no
+ * component, so no script, no cookie, and no request to Google.
+ *
+ * **Client-side navigations are not counted by this code.** GA4's own Enhanced measurement
+ * ("page changes based on browser history events", on by default in a new web data stream)
+ * is what records them. Turn that off and only the first page of each visit is recorded.
+ *
+ * Inlined at `next build` like every other `NEXT_PUBLIC_` value, so setting it needs a
+ * rebuild rather than a redeploy of the same output.
+ */
+const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+
+/**
  * **`metadataBase` is the one that unlocks the rest.** Without it Next resolves every
  * relative `openGraph.images` and `alternates.canonical` against nothing and logs a
  * warning, so a canonical is a bare path — which a crawler reads as no canonical at all —
@@ -138,15 +184,22 @@ export const metadata: Metadata = {
   description,
   applicationName: brand.name,
   formatDetection: { telephone: false },
-  openGraph: {
-    type: "website",
-    siteName: brand.name,
-    locale: "en_BT",
-    title,
-    description,
-    url: "/",
-  },
-  twitter: { card: "summary_large_image", title, description },
+  /*
+    Through `shareCard` rather than written out, and the reason is not brevity.
+
+    This block used to declare `openGraph` without `images` and let
+    `app/opengraph-image.tsx`'s file convention supply them. That works — for the routes
+    that inherit this metadata untouched. It silently stops working for any route that
+    exports an `openGraph` of its own, because Next's merge is shallow and replaces the
+    whole object: nine pages, including this site's homepage, were serving no `og:image`
+    at all as a result. Declaring the image explicitly here, through the same helper those
+    nine now call, means the inherited card and the overridden card are built by one
+    function and there is no second code path to keep in step.
+  */
+  ...shareCard({ title, description, url: "/" }),
+  ...(googleSiteVerification
+    ? { verification: { google: googleSiteVerification } }
+    : {}),
 };
 
 export const viewport: Viewport = {
@@ -203,6 +256,14 @@ export default function RootLayout({
         </a>
         {children}
         <Toaster position="top-center" />
+        {/*
+          Inside `<body>`, last — not as a sibling of `<body>`, which is what the Next guide's
+          own example shows. The component renders through `next/script` at the default
+          `afterInteractive` strategy, which Next injects itself, so the mount point has no
+          bearing on behaviour; a non-`<body>` element directly under `<html>` would lean on
+          React 19 hoisting for no benefit.
+        */}
+        {gaMeasurementId ? <GoogleAnalytics gaId={gaMeasurementId} /> : null}
       </body>
     </html>
   );

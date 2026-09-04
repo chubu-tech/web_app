@@ -8,19 +8,25 @@ import { fetchBusinesses } from "@/lib/api/discovery";
 import { fetchMyFavouriteIds } from "@/lib/api/favourites";
 import { createClient } from "@/lib/supabase/server";
 import { topRated } from "@/lib/recommendations";
+import { shareCard } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Best-Rated Salons in Bhutan",
   description:
     "The highest-rated salons and barbershops in Bhutan on THO, ordered by customer rating. Every rating comes from a customer who booked through THO. Book online or join a walk-in queue.",
+  keywords: [
+    "best-rated salons in Bhutan",
+    "top rated barbershop Bhutan",
+    "salon reviews Bhutan",
+    "salon ratings Bhutan",
+  ],
   alternates: { canonical: "/top-rated" },
-  openGraph: {
-    type: "website",
+  ...shareCard({
     url: "/top-rated",
     title: "Best-Rated Salons in Bhutan",
     description:
       "The highest-rated salons and barbershops in Bhutan, ordered by customer rating.",
-  },
+  }),
 };
 
 /**

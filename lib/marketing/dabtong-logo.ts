@@ -18,7 +18,7 @@
  *
  * ## Why this lives in `lib/` and not beside the component that draws it
  *
- * `components/marketing/supported-by.tsx` is a client component, and
+ * `components/marketing/ui/supporter-credit.tsx` is a client component, and
  * `components/marketing/ui/dabtong-mark.tsx` — the footer's static lockup — is a
  * server one. A non-component export from a `"use client"` module arrives at a server
  * component as a client *reference* rather than as its value, which builds, lints and
@@ -68,7 +68,7 @@ export const MARK_PATH =
  * ## `ring`
  *
  * Manhattan distance from the centre square, so `0 · 1 · 2` is `1 · 4 · 8` squares —
- * a clean radial stagger outward from the middle. `supported-by.tsx` multiplies it
+ * a clean radial stagger outward from the middle. `supporter-credit.tsx` multiplies it
  * into a delay; nothing else reads it. The array is pre-sorted by ring so a consumer
  * can map straight down it.
  */

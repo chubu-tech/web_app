@@ -7,6 +7,7 @@ import { brand, hero } from "@/lib/marketing/content";
 import { CountUp } from "./ui/count-up";
 import { Container } from "./ui/section";
 import { StoreBadges } from "./ui/store-badges";
+import { SupporterCredit } from "./ui/supporter-credit";
 import { TextileRule } from "./ui/bhutan";
 import { TextReveal } from "./ui/text-reveal";
 
@@ -133,6 +134,16 @@ export function Hero() {
                 />
               </a>
             </motion.div>
+
+            {/*
+              Who is behind it, as a byline under the download — the credit that used
+              to be a full band of its own between the proof figures and the price
+              list. See `SupporterCredit` for why it moved and why the animation came
+              with it. `delay` is one beat after the badges' 0.7, so the row lands and
+              *then* the lattice starts weaving; overlapping the two had the logo
+              competing with the primary call to action for the same moment.
+            */}
+            <SupporterCredit delay={0.9} className="mt-7" />
           </div>
 
           {/* ── Photograph, with the product working on top of it ─────── */}

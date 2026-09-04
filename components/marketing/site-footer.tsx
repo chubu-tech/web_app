@@ -155,7 +155,7 @@ export function SiteFooter() {
                   of who this is — the same block as the wordmark and the contact rows
                   — and not a piece of small print. It is also the **only** place the
                   credit appears on the five document routes, and the only place it
-                  appears at all without JavaScript: `SupportedBy` is a home-page band
+                  appears at all without JavaScript: `SupporterCredit` is a hero byline
                   and starts at `opacity: 0` like every other reveal on the site. */}
               <div className="border-hairline-soft mt-8 border-t pt-6">
                 <DabtongCredit />
