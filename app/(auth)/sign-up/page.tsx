@@ -19,8 +19,11 @@ export default async function SignUpPage({
 
   return (
     <>
+      {/* The app says only "to book appointments" here, because on a phone the role cards
+          are the next thing your eye lands on. On the web this line is what a marketing-site
+          visitor reads before deciding the page is not for them, so it names both. */}
       <p className="text-body-md text-muted mb-lg text-center">
-        Create an account to book appointments.
+        Create an account to book appointments, or to run your salon.
       </p>
       <AuthForm mode="sign-up" next={target} />
     </>

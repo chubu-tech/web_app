@@ -186,10 +186,17 @@ nothing read, which is why the "note instead of a 404" that comment promised nev
 and an owner silently landed on Discover. `staff` still resolves to `/` until Phase 4, and
 that single line is what changes when it lands.
 
-Sign-up stays customer-only, and now for a better reason than "it isn't built": an owner is
-onboarded by an operator who creates the account *and* the salon together, and
-`businesses.status` defaults to `pending` review. A self-served owner would land on a console
-with no salon in it.
+**Sign-up carries the app's Customer/Business toggle** (`RolePicker` in
+`components/auth/auth-form.tsx`, from `_RoleToggle` in `email_sign_in_screen.dart`). It was
+customer-only while an operator creating the account *and* the salon together was the only
+way to be an owner — self-serving one would have landed them on a console with no salon in
+it. 3b made that false: `/business/new` and `NoSalonYet` walk them into adding the shop.
+
+Nothing is granted by choosing it. `handle_new_user` whitelists `customer | staff | owner`
+out of the signup metadata and its own comment calls role a UI-routing hint; authority is
+`businesses.owner_id` and RLS, and `businesses.status` still defaults to `pending` review, so
+a self-served owner gets a console and not a listing. `staff` and `admin` are deliberately not
+offered — a stylist is linked by an owner, an operator is promoted in SQL.
 
 ## The account model
 

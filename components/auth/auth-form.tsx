@@ -20,17 +20,22 @@ import { cn } from "@/lib/utils";
  * The guest wall stays a sheet because its job is the opposite — never lose the
  * half-finished booking behind it.
  *
- * Two things the app does that are deliberately **not** ported:
+ * **The dev quick-login chips** (`email_sign_in_screen.dart:396`) are the one thing
+ * deliberately not ported: they are `kDebugMode`-gated in Flutter, and a bundled seed
+ * password has no safe equivalent on a public website.
  *
- * - **The dev quick-login chips** (`email_sign_in_screen.dart:396`). They are
- *   `kDebugMode`-gated in Flutter; a bundled seed password has no safe equivalent on
- *   a public website.
- * - **The Customer/Business role toggle.** Sign-up stays customer-only even now that
- *   `/business` exists, and for a better reason than "it isn't built": an owner is
- *   onboarded by an operator, who creates the account *and* the salon together in the
- *   admin console. A self-served owner would land on a console with no salon in it,
- *   and `businesses.status` defaults to `pending` review anyway — so the toggle would
- *   promise a shop that nobody has agreed to list.
+ * **The Customer/Business toggle is ported** (`_RoleToggle`,
+ * `email_sign_in_screen.dart:384`). It was left out while the only way to be an owner
+ * here was for an operator to create the account *and* the salon together — a
+ * self-served owner would have landed on a console with no salon in it. 3b built
+ * `/business/new` and `NoSalonYet`, so that is no longer true: an owner who signs up
+ * here is walked straight into adding their shop.
+ *
+ * Choosing "Business" promises a console, never a listing, and nothing here grants
+ * anything. `handle_new_user` whitelists `customer | staff | owner` from the metadata
+ * before writing the profile and says in its own comment that role is a routing hint;
+ * authority is `businesses.owner_id` and RLS, and a salon created this way still opens
+ * `pending` review.
  */
 export function AuthForm({
   mode,
@@ -43,6 +48,7 @@ export function AuthForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState<SignUpRole>("customer");
   const [reveal, setReveal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +76,7 @@ export function AuthForm({
           options: {
             // `handle_new_user` reads these to provision the profile row, which is
             // why the role travels as auth metadata rather than being written after.
-            data: { full_name: fullName.trim() || null, role: "customer" },
+            data: { full_name: fullName.trim() || null, role },
             emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(target)}`,
           },
         });
@@ -81,7 +87,11 @@ export function AuthForm({
         // success and landing them somewhere that still treats them as a stranger.
         if (!data.session) {
           setBusy(false);
-          setInfo(`Account created. Check ${email.trim()} to confirm, then sign in.`);
+          // An owner's next step is not a customer's — they have a shop to add before
+          // the console has anything in it — and this note is the last thing they read
+          // before leaving for their inbox.
+          const then = role === "owner" ? " to add your salon" : "";
+          setInfo(`Account created. Check ${email.trim()} to confirm, then sign in${then}.`);
           return;
         }
       } else {
@@ -144,6 +154,8 @@ export function AuthForm({
           </button>
         }
       />
+
+      {signUp ? <RolePicker value={role} onChange={setRole} /> : null}
 
       {error ? <Note kind="error">{error}</Note> : null}
       {info ? <Note kind="success">{info}</Note> : null}
@@ -218,6 +230,88 @@ async function landAfterAuth(
 
   router.refresh();
   router.replace(destination);
+}
+
+/**
+ * The two roles sign-up can mint. **A subset of `Role`, not a parallel union**, so that
+ * `staff` and `admin` cannot leak in here: a stylist is linked to a salon by its owner
+ * and an operator is promoted in SQL, neither of which is a thing to choose on a form.
+ * `handle_new_user` whitelists the same way on the server.
+ */
+type SignUpRole = Extract<Role, "customer" | "owner">;
+
+const ROLE_CHOICES: {
+  value: SignUpRole;
+  label: string;
+  hint: string;
+  icon: typeof Icons.salon;
+}[] = [
+  { value: "customer", label: "Customer", hint: "Book appointments", icon: Icons.person },
+  { value: "owner", label: "Business", hint: "Run a salon", icon: Icons.salon },
+];
+
+/**
+ * What someone is signing up as — a port of `_RoleToggle`
+ * (`email_sign_in_screen.dart:384`), card for card: rausch outline and a pale tint on
+ * the chosen one.
+ *
+ * **Real radios in a `<fieldset>`** where the Dart uses tappable cards. That is the
+ * same departure `SelectTile` makes and for the same reason: arrow-key movement inside
+ * the group, and a screen reader that reads "I am a — Business, 2 of 2" instead of two
+ * unrelated controls. The input is `sr-only` rather than hidden so it still takes
+ * focus, and the card paints the ring itself with `has-focus-visible` — a keyboard
+ * user has to be able to see which card they are on.
+ *
+ * The one-line hints have no equivalent in the app, and are here because the audiences
+ * differ: somebody who installed a salon app knows which one they are, somebody who
+ * arrived from a search result may be reading the word "Business" cold.
+ */
+function RolePicker({
+  value,
+  onChange,
+}: {
+  value: SignUpRole;
+  onChange: (role: SignUpRole) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-caption text-muted">I am a</legend>
+      <div className="gap-md mt-sm flex">
+        {ROLE_CHOICES.map(({ value: choice, label, hint, icon: Icon }) => {
+          const selected = value === choice;
+          return (
+            <label
+              key={choice}
+              className={cn(
+                "py-base px-sm flex flex-1 cursor-pointer flex-col items-center rounded-md border text-center",
+                "transition-colors duration-[var(--duration-fast)]",
+                "has-focus-visible:outline-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2",
+                selected
+                  ? "border-rausch bg-[#FFF5F7] border-2"
+                  : "border-hairline hover:border-border-strong",
+              )}
+            >
+              <input
+                type="radio"
+                name="role"
+                value={choice}
+                checked={selected}
+                onChange={() => onChange(choice)}
+                className="sr-only"
+              />
+              <Icon
+                className={selected ? "text-rausch" : "text-muted"}
+                style={{ width: IconSize.md, height: IconSize.md }}
+                aria-hidden
+              />
+              <span className="text-title text-ink mt-xs font-medium">{label}</span>
+              <span className="text-caption-sm text-muted">{hint}</span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
 }
 
 function Field({
