@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { brand, hero } from "@/lib/marketing/content";
 import { SHARE_CARD, SHARE_CARD_ALT } from "@/lib/seo";
@@ -19,8 +21,8 @@ export const alt = SHARE_CARD_ALT;
 const px = (n: number) => n * SHARE_CARD.scale;
 
 /**
- * Social share card, generated at build time. Text-only so it never depends on
- * a remote fetch, and it uses the renderer's built-in font — satori cannot
+ * Social share card, generated at build time. Every input comes from the repo, so it never
+ * depends on a remote fetch, and it uses the renderer's built-in font — satori cannot
  * parse our variable Inter file.
  *
  * ## Every measurement below goes through `px()`
@@ -41,6 +43,29 @@ const px = (n: number) => n * SHARE_CARD.scale;
  * `borderRadius: 999` is a "fully round" sentinel that scaling would only make sillier.
  */
 export default async function Image() {
+  /*
+    The real brand mark, inlined.
+
+    **`assets/tho-logo.png` and not `public/tho-logo.webp`, which is the same artwork.**
+    Satori cannot decode WebP — pointing it at the `.webp` fails the prerender outright
+    with `TypeError: u2 is not iterable`, which is its image-size parser giving up, so the
+    build goes red rather than the card losing its logo quietly. PNG is what it reads.
+
+    It lives in `assets/` rather than `public/` because nothing serves it: it is a
+    build-time input to this one file, and a second logo in `public/` would look like a
+    second logo rather than a format conversion. `process.cwd()` is the project root during
+    the build, which is the pattern Next documents for exactly this.
+
+    Regenerate it from the WebP if the mark ever changes — they must not drift:
+
+        npx sharp -i public/tho-logo.webp -o assets/tho-logo.png
+
+    Read here and base64'd rather than fetched, keeping the promise in the note above: this
+    card renders from the repo and never depends on the network.
+  */
+  const logo = await readFile(join(process.cwd(), "assets", "tho-logo.png"));
+  const logoSrc = `data:image/png;base64,${logo.toString("base64")}`;
+
   return new ImageResponse(
     (
       <div
@@ -56,22 +81,16 @@ export default async function Image() {
       >
         {/* Brand row. */}
         <div style={{ display: "flex", alignItems: "center", gap: px(20) }}>
-          <div
-            style={{
-              width: px(64),
-              height: px(64),
-              // Half the box: a circle, matching every other rendering of the mark.
-              borderRadius: px(32),
-              background: "#ff385c",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#fff",
-              fontSize: px(34),
-            }}
-          >
-            ✂
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={logoSrc}
+            alt=""
+            width={px(64)}
+            height={px(64)}
+            // Half the box: a circle with the artwork cropped into it, which is exactly
+            // how `BrandLockup` and both headers render it (`rounded-full object-cover`).
+            style={{ borderRadius: px(32), objectFit: "cover" }}
+          />
           <div style={{ fontSize: px(34), color: "#222222", letterSpacing: px(-0.5) }}>
             {brand.name}
           </div>

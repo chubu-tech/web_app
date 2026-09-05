@@ -444,7 +444,7 @@ export const SHARE_CARD = {
    * file convention solves this by appending a build hash, which `shareCard` gives up by
    * constructing the URL itself; this is the explicit equivalent.
    */
-  version: 2,
+  version: 3,
   width: 1200 * 2,
   height: 630 * 2,
   contentType: "image/png",
