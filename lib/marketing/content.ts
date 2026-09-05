@@ -1135,8 +1135,13 @@ export const legal = {
    * details, prepaid packs, and self-service deletion named rather than only a mailbox. Six
    * material changes, so the date moves — a policy whose text changes while its date does not
    * is the one thing a reader cannot check.
+   *
+   * Moved to 5 September 2026 for Google Analytics: a new collected category on the website,
+   * the first cookie disclosure this policy has carried, and a third named processor. One
+   * change, but a material one — it is a new recipient of visitor data, which is exactly the
+   * kind of thing the store forms ask about and this page answers.
    */
-  lastUpdated: "18 August 2026",
+  lastUpdated: "5 September 2026",
   /** Days to honour a deletion request. A promise — keep it achievable. */
   deletionDays: 30,
 } as const;
@@ -1246,6 +1251,34 @@ export const privacy = {
           lead: "Crash and diagnostic reports",
           body: "when the mobile app crashes or misbehaves, a report is sent to Google Firebase Crashlytics so we can fix it. We do not attach your name, email or account to those reports.",
         },
+        {
+          /*
+            **Google Analytics, added 2026-09-05 with the tag itself.** `app/layout.tsx`
+            renders `<GoogleAnalytics>` whenever `NEXT_PUBLIC_GA_MEASUREMENT_ID` is set, and
+            it is now set in production — so this became a collected category the moment that
+            variable was filled in, not the moment anyone wrote it down. Measured, not
+            assumed: a browser loading `https://bhutansalons.com/` sends a
+            `google-analytics.com/g/collect` hit.
+
+            **"The website only" is the load-bearing half of this item.** This policy covers
+            the app and the site together, and the Flutter app has no analytics SDK at all —
+            the same shape as the notification-token item above, which has to say the website
+            does *not* send push. A reader cannot tell which surface a claim applies to unless
+            it says so.
+
+            Cookies are named because GA4 sets `_ga` and `_ga_<id>` in the browser, and this
+            policy had no cookie disclosure of any kind — the Cookie Policy was removed rather
+            than written.
+
+            **The footnote below depends on a setting in the GA4 property, not on this code.**
+            "No third-party advertising SDKs… no cross-app tracking" stays true only while
+            Google Signals and ads personalisation are OFF. Turning either on makes GA4 an
+            advertising integration and makes that sentence false. If they are ever enabled,
+            this item and that footnote both have to change.
+          */
+          lead: "Website analytics",
+          body: "when you browse the website, Google Analytics records which pages you visit, where you arrived from, an approximate location worked out from your IP address, and the kind of device and browser you use, so we can see which parts of the site people actually use. It sets cookies in your browser to recognise a returning visit. We do not use it for advertising, and the mobile app sends no analytics at all.",
+        },
       ],
       footnote:
         "We do not knowingly collect data from children, sell your data, or use third-party advertising SDKs. There is no advertising identifier and no cross-app tracking.",
@@ -1266,6 +1299,9 @@ export const privacy = {
         {
           body: "To find and fix crashes, so the app keeps working.",
         },
+        {
+          body: "To understand how the website is used — which pages people visit and where they arrive from — so we can improve it.",
+        },
       ],
     },
     {
@@ -1281,7 +1317,7 @@ export const privacy = {
             as service providers is also the declaration `DATA_DISCLOSURE.md` requires:
             "Declare both as service providers, not as data sales."
           */
-          body: "Two service providers process data on our behalf and for no purpose of their own: Supabase (the database, sign-in and file storage) and Google Firebase (delivering notifications, and crash reporting).",
+          body: "Three service providers process data on our behalf and for no purpose of their own: Supabase (the database, sign-in and file storage), Google Firebase (delivering notifications, and crash reporting), and Google Analytics (measuring how the website is used).",
         },
         {
           body: "Access is enforced by row-level security in the database: you see your own data; a salon’s owner and staff see the data for that salon’s bookings, orders and queue.",
