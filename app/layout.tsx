@@ -167,6 +167,26 @@ const googleSiteVerification = process.env.GOOGLE_SITE_VERIFICATION;
 const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 /**
+ * `fb:app_id`, and the honest framing: **this is optional, and the Sharing Debugger is
+ * wrong to call it required.**
+ *
+ * The debugger emits "The following required properties are missing: fb:app_id" on a page
+ * whose preview it has just rendered perfectly — which is the proof it is not required. The
+ * property tied a domain to a Meta app for Facebook Domain Insights, and Meta shut that
+ * product down on 30 June 2021. It is load-bearing today only for Facebook Login, the Share
+ * dialog's app attribution, and Messenger extensions, none of which this site uses. Stripe,
+ * Vercel and Airbnb all ship no `fb:app_id` and all unfurl correctly.
+ *
+ * It is wired here so that silencing the warning is one environment variable rather than a
+ * code change — not because anything is broken without it. Getting a value means creating a
+ * Meta app at developers.facebook.com, which is only worth doing if a Facebook presence is
+ * wanted for its own sake; `brand.social.facebook` is still an empty string.
+ *
+ * Build-time, like the two above, because these pages are prerendered.
+ */
+const facebookAppId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID;
+
+/**
  * **`metadataBase` is the one that unlocks the rest.** Without it Next resolves every
  * relative `openGraph.images` and `alternates.canonical` against nothing and logs a
  * warning, so a canonical is a bare path — which a crawler reads as no canonical at all —
@@ -200,6 +220,7 @@ export const metadata: Metadata = {
   ...(googleSiteVerification
     ? { verification: { google: googleSiteVerification } }
     : {}),
+  ...(facebookAppId ? { facebook: { appId: facebookAppId } } : {}),
 };
 
 export const viewport: Viewport = {
