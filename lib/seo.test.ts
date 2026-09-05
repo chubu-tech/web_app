@@ -430,7 +430,25 @@ describe("shareCard", () => {
 
   it("points the fallback image at the branded card, absolutely", () => {
     // Absolute, not a bare path: an unfurler has no origin to resolve one against.
-    expect(view(copy).og.images[0].url).toMatch(/^https?:\/\/.+\/opengraph-image$/);
+    expect(view(copy).og.images[0].url).toMatch(/^https?:\/\/.+\/opengraph-image\?v=\d+$/);
+  });
+
+  it("carries the card's version in the image URL, so a redraw beats the platform caches", () => {
+    /*
+      Facebook, WhatsApp and LinkedIn cache a share image against its URL. Redrawing the
+      card without moving the URL leaves every one of them unfurling the old pixels, which
+      is exactly what happened when the card went from 1200×630 to 2×. Asserting the two
+      are joined means bumping `SHARE_CARD.version` is the whole change.
+    */
+    expect(view(copy).og.images[0].url).toContain(`?v=${SHARE_CARD.version}`);
+  });
+
+  it("declares the dimensions the PNG actually has", () => {
+    // `og:image:width`/`height` are what Facebook and WhatsApp crop against, so a card that
+    // misreports its own size is a card with a headline sliced in half.
+    const image = view(copy).og.images[0];
+    expect(image.width).toBe(1200 * SHARE_CARD.scale);
+    expect(image.height).toBe(630 * SHARE_CARD.scale);
   });
 
   it("declares the dimensions the card is actually rendered at", () => {

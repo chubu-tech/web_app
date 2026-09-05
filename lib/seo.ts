@@ -404,7 +404,7 @@ export function sameAsBlock(
    ──────────────────────────────────────────────────────────────────────────── */
 
 /**
- * The branded share card's route, and its dimensions.
+ * The branded share card's route, its dimensions, and the density it is drawn at.
  *
  * `app/opengraph-image.tsx` imports these rather than declaring its own, so the numbers
  * a platform is *told* in `og:image:width`/`height` and the numbers the PNG actually has
@@ -412,15 +412,41 @@ export function sameAsBlock(
  * declared aspect ratio, so a card that lies about its own size is a card with somebody's
  * headline sliced in half.
  *
- * **1200×630 is not a preference.** It is Facebook's documented minimum for the large
- * format (600×315) at 2×, it is the ratio LinkedIn and X's `summary_large_image` both
- * expect, and it is comfortably under WhatsApp's ~600 KB ceiling at 53 KB. Do not change
- * it without checking all four.
+ * ## The ratio is fixed; the resolution is not
+ *
+ * **1.91:1 is not a preference.** It is the shape Facebook, LinkedIn and X's
+ * `summary_large_image` all expect, and 1200×630 is Facebook's documented minimum for the
+ * large format (600×315) at 2×. That ratio must not change.
+ *
+ * The *pixel count* is a separate question, and 1200×630 was only the floor. Every surface
+ * that shows this card downscales it — WhatsApp Web renders a ~100 px square crop, and a
+ * phone's large card is retina — so the source is resampled on the way to the screen, and
+ * resampling from more pixels is what keeps 30 px body copy from turning to mush. The card
+ * is therefore **drawn at 1200×630 and emitted at `scale`×**, which is why `scale` lives
+ * here rather than as a loose `2` in the route: the design's own numbers stay readable at
+ * their natural size and one constant moves all of them.
+ *
+ * **The binding constraint is WhatsApp, not Facebook.** Facebook allows 8 MB and LinkedIn
+ * and X allow 5 MB, so none of those are close. WhatsApp is the strict one — a large
+ * preview wants a few hundred KB, not megabytes — and it is the one to re-measure before
+ * raising `scale` again. At 2× this card is a flat-colour PNG well inside that.
  */
 export const SHARE_CARD = {
   path: "/opengraph-image",
-  width: 1200,
-  height: 630,
+  /** Emitted pixels per design pixel. Raise only after re-measuring the PNG's size. */
+  scale: 2,
+  /**
+   * Cache-buster for the image URL. **Bump this whenever the card's pixels change.**
+   *
+   * Facebook, WhatsApp and LinkedIn cache a share image against its URL and hold it for
+   * a long time — re-scraping the *page* does not re-fetch an image whose URL has not
+   * moved, so a redraw at a new resolution would keep unfurling as the old one. Next's own
+   * file convention solves this by appending a build hash, which `shareCard` gives up by
+   * constructing the URL itself; this is the explicit equivalent.
+   */
+  version: 2,
+  width: 1200 * 2,
+  height: 630 * 2,
   contentType: "image/png",
 } as const;
 
@@ -435,7 +461,9 @@ type ShareImage = { url: string; alt?: string; width?: number; height?: number }
  * its own, which is the whole point of the function below.
  */
 const BRANDED_IMAGE: ShareImage = {
-  url: absoluteUrl(SHARE_CARD.path),
+  // `?v=` is what makes a redraw reach a platform that already cached this URL — see
+  // `SHARE_CARD.version`. The route ignores the query; only the caches read it.
+  url: absoluteUrl(`${SHARE_CARD.path}?v=${SHARE_CARD.version}`),
   width: SHARE_CARD.width,
   height: SHARE_CARD.height,
   alt: SHARE_CARD_ALT,
