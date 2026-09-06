@@ -39,7 +39,7 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "en-BT",
     categories: ["lifestyle", "shopping", "business"],
     icons: [
-      { src: "/icon", sizes: "32x32", type: "image/png" },
+      { src: "/icon", sizes: "96x96", type: "image/png" },
       { src: "/apple-icon", sizes: "180x180", type: "image/png" },
     ],
   };

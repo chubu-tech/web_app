@@ -21,9 +21,21 @@ import { ImageResponse } from "next/og";
  * request `/favicon.ico` directly rather than reading the `<link>`. Regenerate the pair
  * together if the mark ever changes — see the note in `app/opengraph-image.tsx` for the
  * WebP → PNG step, then rebuild the `.ico` from `assets/tho-logo.png`.
+ *
+ * ## 96px, because Google Search will not take 32
+ *
+ * This was 32×32, which is the conventional favicon size and the wrong one here: Google
+ * requires the icon it shows beside a search result to be **square and a multiple of 48px**
+ * — 48, 96, 144, 192 — and silently declines anything else, falling back to whatever it
+ * cached before or to the default globe. The `.ico`'s 48px frame already qualified, but a
+ * site that also advertises a non-conforming `<link rel="icon">` is asking Google's picker
+ * to choose between them, and there is no reason to make that a coin flip.
+ *
+ * 96 rather than the minimum 48 so a hidpi tab has real pixels to render, and rather than
+ * the source's own 192 so the tab is not downloading a 60 KB image to draw at 16px.
  */
 
-export const size = { width: 32, height: 32 };
+export const size = { width: 96, height: 96 };
 export const contentType = "image/png";
 
 export default async function Icon() {
