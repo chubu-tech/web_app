@@ -1,45 +1,48 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 
 /**
- * The favicon, generated rather than shipped as a file.
+ * The favicon — the real THO mark, not a drawing of one.
  *
- * There was no icon of any kind — no `favicon.ico`, no `icon.png`, nothing in `public/`
- * that Next's file conventions pick up — so every browser tab, bookmark and search result
- * for this domain rendered the default globe. That is a small thing that shows up in a
- * large number of places, including beside the title in a Google result.
+ * This used to render a white `✂` on rausch, because when it was written the only copy of
+ * the logo was `public/tho-logo.webp` and Next's icon convention takes `.ico`, `.jpg`,
+ * `.png` and `.svg` but not WebP. That constraint is gone: `assets/tho-logo.png` exists for
+ * `app/opengraph-image.tsx`, which hit the same wall first and solved it by keeping one PNG
+ * re-encode in the repo. Reading the same file here costs no new binary and cannot drift
+ * from the share card, since both read the one asset.
  *
- * **Generated, because the one asset available cannot be used here.** `public/tho-logo.webp`
- * is the mark, and Next's icon convention accepts `.ico`, `.jpg`, `.png` and `.svg` — not
- * WebP. Re-encoding it to PNG would add a binary to the repo that has to be kept in step
- * with the WebP by hand; drawing it costs one file and stays in step by construction,
- * since both read the same brand colour.
+ * **Circle-cropped, because that is the only shape this mark is ever shown in** — both
+ * headers, both footers, `BrandLockup` and the OG card all render it `rounded-full
+ * object-cover`. The artwork itself is a fully opaque red square, so without the crop the
+ * tab would be the one place the mark had corners.
  *
- * The glyph matches `app/opengraph-image.tsx` — a white scissors on rausch — so the tab
- * icon and the share card are recognisably one product.
+ * `app/favicon.ico` carries the same artwork at 16/32/48 for the browsers and crawlers that
+ * request `/favicon.ico` directly rather than reading the `<link>`. Regenerate the pair
+ * together if the mark ever changes — see the note in `app/opengraph-image.tsx` for the
+ * WebP → PNG step, then rebuild the `.ico` from `assets/tho-logo.png`.
  */
 
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
-export default function Icon() {
+export default async function Icon() {
+  const logo = await readFile(join(process.cwd(), "assets", "tho-logo.png"));
+  const logoSrc = `data:image/png;base64,${logo.toString("base64")}`;
+
   return new ImageResponse(
     (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          // `--color-rausch`. Not the CTA variant: this is a mark, not text on a button,
-          // so the contrast rule that forces the deeper hue does not apply.
-          background: "#ff385c",
-          color: "#ffffff",
-          fontSize: 22,
-          borderRadius: 6,
-        }}
-      >
-        ✂
+      <div style={{ width: "100%", height: "100%", display: "flex" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoSrc}
+          alt=""
+          width={size.width}
+          height={size.height}
+          // Half the box, so the tile is a circle — the same crop `BrandLockup` and the
+          // OG card apply.
+          style={{ borderRadius: size.width / 2, objectFit: "cover" }}
+        />
       </div>
     ),
     size,
