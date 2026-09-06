@@ -11,7 +11,7 @@ import { fetchAvailability } from "@/lib/api/booking";
 import { createClient } from "@/lib/supabase/client";
 import {
   addDays,
-  formatMinutesOfDay,
+  formatMinutes12,
   thimphuDayBoundsUtc,
   thimphuMinutesOfDay,
   thimphuToday,
@@ -211,7 +211,7 @@ export function SlotPicker({
                           <SlotChip
                             name="slot"
                             value={key}
-                            label={formatMinutesOfDay(thimphuMinutesOfDay(slot.start))}
+                            label={formatMinutes12(thimphuMinutesOfDay(slot.start))}
                             selected={selected?.start.getTime() === slot.start.getTime()}
                             disabled={disabled}
                             onSelect={() => onSelect(slot)}

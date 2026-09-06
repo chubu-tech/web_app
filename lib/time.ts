@@ -108,3 +108,23 @@ export function formatMinutesOfDay(minutes: number): string {
   const m = minutes % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
+
+/**
+ * `9:00 am` from minutes-from-midnight — the **customer-facing** form.
+ *
+ * A port of `hours_model.dart:46 formatMinutes12`, down to the lowercase meridiem and
+ * the unpadded hour, so a slot reads the same in the web booking flow as it does in the
+ * app. Midnight and noon are `12:00 am` and `12:00 pm`; the `% 24` is what makes an end
+ * time carried past midnight (1440, 1470) wrap rather than print `24:30`.
+ *
+ * Display only, and only where a customer is reading a clock time. {@link formatMinutesOfDay}
+ * stays the 24-hour form and stays the one to use anywhere near `<input type="time">`,
+ * which both reads and writes 24-hour — see the note at the top of `lib/hours.ts`.
+ */
+export function formatMinutes12(minutes: number): string {
+  const h24 = Math.floor(minutes / 60) % 24;
+  const m = minutes % 60;
+  const meridiem = h24 < 12 ? "am" : "pm";
+  const h = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h}:${String(m).padStart(2, "0")} ${meridiem}`;
+}

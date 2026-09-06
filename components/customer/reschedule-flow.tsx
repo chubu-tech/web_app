@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { rescheduleBooking } from "@/lib/api/booking";
 import { bookingErrorMessage } from "@/lib/api/booking-errors";
 import { createClient } from "@/lib/supabase/client";
-import { formatMinutesOfDay, thimphuMinutesOfDay } from "@/lib/time";
+import { formatMinutes12, thimphuMinutesOfDay } from "@/lib/time";
 import type { Slot } from "@/lib/types/booking";
 import { SlotPicker } from "./slot-picker";
 
@@ -52,7 +52,7 @@ export function RescheduleFlow({
     try {
       await rescheduleBooking(createClient(), bookingId, slot.start);
       toast.success(
-        `Rescheduled to ${formatMinutesOfDay(thimphuMinutesOfDay(slot.start))}.`,
+        `Rescheduled to ${formatMinutes12(thimphuMinutesOfDay(slot.start))}.`,
       );
       router.refresh();
       router.replace(`/bookings/${bookingId}`);
@@ -84,7 +84,7 @@ export function RescheduleFlow({
         <div className="border-hairline bg-paper p-base pb-[calc(var(--spacing-base)+env(safe-area-inset-bottom))] fixed inset-x-0 bottom-0 z-20 border-t">
           <div className="mx-auto max-w-[720px]">
             <Button fullWidth busy={busy} onClick={confirm}>
-              Move to {formatMinutesOfDay(thimphuMinutesOfDay(slot.start))}
+              Move to {formatMinutes12(thimphuMinutesOfDay(slot.start))}
             </Button>
           </div>
         </div>

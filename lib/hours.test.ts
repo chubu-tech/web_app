@@ -24,18 +24,17 @@ import {
   withDay,
   type DayHours,
 } from "./hours";
-import { formatMinutesOfDay } from "./time";
+import { formatMinutes12, formatMinutesOfDay } from "./time";
 import type { Booking, WorkingHour } from "./types/booking";
 
 /**
  * A port of `../tho/app/test/working_hours_model_test.dart`, case for case.
  *
- * One group differs on purpose. The Dart's "12-hour display matches the mock" and
- * "1440 renders as 12:00 am" cases test `formatMinutes12`, which `lib/hours.ts`
- * deliberately does not port — every time in `tho_web` is 24-hour, because
- * `<input type="time">` reads and writes 24-hour and a mixed-clock row would be worse than
- * diverging from the mock. The same boundaries are asserted here against
- * `formatMinutesOfDay` instead, including 1440.
+ * The Dart's `formatMinutes12` cases port straight across — `lib/time.ts` has the function
+ * now, and the customer booking flow reads 12-hour. The 24-hour assertions beside them are
+ * the extra ones: this editor keeps `formatMinutesOfDay` because every time in it sits next
+ * to an `<input type="time">`, which reads and writes 24-hour, so the same boundaries are
+ * pinned in both clocks — 1440 included, where the two disagree by design.
  */
 
 const wh = (dow: number, start: string, end: string): WorkingHour => ({
@@ -79,12 +78,25 @@ describe("time conversion", () => {
     expect(formatMinutesOfDay(720)).toBe("12:00");
   });
 
+  it("12-hour display, which is what the booking flow shows a customer", () => {
+    expect(formatMinutes12(510)).toBe("8:30 am");
+    expect(formatMinutes12(660)).toBe("11:00 am");
+    expect(formatMinutes12(780)).toBe("1:00 pm");
+    expect(formatMinutes12(930)).toBe("3:30 pm");
+    expect(formatMinutes12(0)).toBe("12:00 am");
+    expect(formatMinutes12(720)).toBe("12:00 pm");
+  });
+
   it("1440 reads as end-of-day rather than wrapping to 00:00", () => {
     // The Dart's equivalent case exists because `formatMinutes12(1440)` had to say
     // "12:00 am" rather than the inverted-looking "12:00 pm". In 24 hours the honest
     // answer is 24:00, which is also the literal Postgres `time` value — and the editor
     // clamps its inputs to 23:59, so 1440 is unreachable through the UI either way.
     expect(formatMinutesOfDay(1440)).toBe("24:00");
+    // The 12-hour side keeps the Dart's answer: midnight is "12:00 am", never "12:00 pm",
+    // and 0 renders the same way — this is the `% 24`, not a special case for either.
+    expect(formatMinutes12(1440)).toBe("12:00 am");
+    expect(formatMinutes12(0)).toBe("12:00 am");
     expect(hmsFromMinutes(1440)).toBe("24:00:00");
     expect(formatSegment({ startMin: 1410, endMin: 1440 })).toBe("23:30 – 24:00");
   });

@@ -5,7 +5,7 @@ import { CoverImage } from "@/components/ui/cover-image";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { RatingPill } from "@/components/ui/rating";
 import { basketTotal } from "@/lib/booking-basket";
-import { formatMinutesOfDay, thimphuMinutesOfDay } from "@/lib/time";
+import { formatMinutes12, thimphuMinutesOfDay } from "@/lib/time";
 import type { Business, ServiceItem, StaffMember } from "@/lib/types/salon";
 import { cn, formatDuration, formatNu } from "@/lib/utils";
 
@@ -181,7 +181,7 @@ function Identity({ business }: { business: Business }) {
  *
  * The end time is computed from the basket's own duration rather than read off the slot:
  * a slot's `end` is what `compute_availability` returned for the whole basket, and both
- * agree — but stating it as *"12:00–12:25 (25 min duration)"* needs the duration anyway,
+ * agree — but stating it as *"12:00 pm – 12:25 pm (25 min duration)"* needs the duration anyway,
  * so it is derived once here rather than in two places.
  */
 function When({ start, services }: { start: Date; services: ServiceItem[] }) {
@@ -199,7 +199,7 @@ function When({ start, services }: { start: Date; services: ServiceItem[] }) {
         })}
       </Line>
       <Line icon={Icons.clock}>
-        {formatMinutesOfDay(from)}–{formatMinutesOfDay(from + minutes)} (
+        {formatMinutes12(from)} – {formatMinutes12(from + minutes)} (
         {formatDuration(minutes)})
       </Line>
     </div>

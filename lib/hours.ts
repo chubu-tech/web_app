@@ -28,14 +28,14 @@ import type { Booking, WorkingHour } from "./types/booking";
  * already refuses a booking that does not sit entirely inside one interval, so a gap is
  * unbookable for free, with no column to add and no rule to keep in step.
  *
- * **One deliberate divergence from the Dart: 24-hour display.** `hours_model.dart` has
- * `formatMinutes12` ("8:30 am") for the design mock. Every other time in `tho_web` is
- * `HH:MM` — slot chips, the calendar, `formatMinutesOfDay` — and `<input type="time">`,
- * which stands in for Flutter's `showTimePicker`, both reads and writes 24-hour. A gap pill
- * reading "1:00 pm" beside an input reading "13:00" would be worse than diverging from the
- * mock, so `formatMinutesOfDay` from `lib/time.ts` is used throughout and
- * `formatMinutes12` is not ported. Its three test cases port as 24-hour equivalents,
- * including the 1440 end-of-day boundary.
+ * **This editor stays 24-hour, and that is deliberate.** The customer booking flow reads
+ * 12-hour — `formatMinutes12` in `lib/time.ts`, the port of `hours_model.dart:46` — because
+ * a slot there is a time somebody turns up at. Here every time sits beside an
+ * `<input type="time">`, which stands in for Flutter's `showTimePicker` and both reads and
+ * writes 24-hour. A gap pill reading "1:00 pm" next to an input reading "13:00" is worse
+ * than the two surfaces differing, so `formatMinutesOfDay` is used throughout this file.
+ * Its three `formatMinutes12` test cases port as 24-hour equivalents, including the 1440
+ * end-of-day boundary.
  */
 
 export const DAY_NAMES = [

@@ -6,7 +6,7 @@ import { ConfettiBurst } from "@/components/ui/confetti-burst";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/sheet";
 import { cancellationNotice } from "@/lib/booking-guards";
-import { thimphuMinutesOfDay, formatMinutesOfDay } from "@/lib/time";
+import { thimphuMinutesOfDay, formatMinutes12 } from "@/lib/time";
 import type { Business, ServiceItem, StaffMember } from "@/lib/types/salon";
 
 /**
@@ -56,7 +56,7 @@ export function BookingConfirmedSheet({
     month: "long",
     timeZone: "Asia/Thimphu",
   });
-  const time = formatMinutesOfDay(thimphuMinutesOfDay(start));
+  const time = formatMinutes12(thimphuMinutesOfDay(start));
 
   return (
     <Sheet open={open} onClose={onDone} title="You're booked">

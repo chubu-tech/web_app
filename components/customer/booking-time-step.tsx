@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { groupByDayPart, noSlotsForSelection } from "@/lib/booking-basket";
-import { addDays, formatMinutesOfDay, thimphuMinutesOfDay, toIsoDay } from "@/lib/time";
+import { addDays, formatMinutes12, thimphuMinutesOfDay, toIsoDay } from "@/lib/time";
 import type { ServiceItem } from "@/lib/types/salon";
 import { cn } from "@/lib/utils";
 import type { SlotOption } from "./use-availability";
@@ -226,7 +226,7 @@ export function BookingTimeStep({
                   )}
                 >
                   <span className="text-title text-ink flex-1 font-medium tabular-nums">
-                    {formatMinutesOfDay(thimphuMinutesOfDay(slot.start))}
+                    {formatMinutes12(thimphuMinutesOfDay(slot.start))}
                   </span>
                   {/* Only where it says something: with a named stylist every row would
                       read "1 available", which is not information. */}
