@@ -205,6 +205,34 @@ export const metadata: Metadata = {
   applicationName: brand.name,
   formatDetection: { telephone: false },
   /*
+    iOS "Add to Home Screen", which reads almost none of the manifest.
+
+    Safari has no install prompt and no API to request one — `beforeinstallprompt` is
+    Chromium-only, so on iOS this is always a person tapping Share → Add to Home Screen by
+    hand. What these three tags control is what they get when they do.
+
+    - **`title`.** Without it iOS labels the icon with the document `<title>`, which here is
+      "THO — Salon & Barber Booking in Bhutan" and reaches the home screen as "THO — Sal…".
+      `brand.name` is the label the app icon already uses on both stores.
+    - **`capable`.** Launches standalone, without Safari's chrome. The manifest has asked for
+      `display: "standalone"` all along and iOS 15.4+ honours it, so this agrees with an
+      existing decision rather than making a new one — it is what older iOS reads, and it
+      costs nothing to state twice.
+    - **`statusBarStyle: "default"`.** Dark text on a light bar, matching
+      `viewport.themeColor` and a design with no dark mode. Not `black-translucent`, which
+      does not tint anything — it removes the bar's background entirely and runs the page
+      under the clock, which would put the header behind it.
+
+    The icon itself is `app/apple-icon.tsx` via the file convention; iOS takes
+    `apple-touch-icon` over anything in the manifest, which is why that route stays
+    full-bleed rather than circle-cropped like the favicon.
+  */
+  appleWebApp: {
+    capable: true,
+    title: brand.name,
+    statusBarStyle: "default",
+  },
+  /*
     Through `shareCard` rather than written out, and the reason is not brevity.
 
     This block used to declare `openGraph` without `images` and let
