@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
+import { ProductCategoryStrip } from "@/components/customer/product-category-strip";
 import { ProductGridCard } from "@/components/ui/product-card";
 import { ProductSheet } from "@/components/customer/product-sheet";
 import { useOrderCart } from "@/components/customer/use-order-cart";
@@ -12,7 +13,7 @@ import {
   productFilterIsActive,
   type ProductFilter,
 } from "@/lib/product-filter";
-import type { Product } from "@/lib/types/salon";
+import type { Product, ProductCategory } from "@/lib/types/salon";
 
 /**
  * The cross-salon products grid — a port of `ProductsBrowse` in
@@ -29,18 +30,30 @@ import type { Product } from "@/lib/types/salon";
  *
  * ## Empty states say which kind of empty
  *
- * Three of them, and the distinction is the same one Discover draws: *nothing for sale anywhere* is a
- * claim about the marketplace and may only be made when nothing has been narrowed; *no matches* is
- * about the search term; *nothing in this price range* is about the filter and offers to clear it.
- * Collapsing them would tell a customer the shop is empty when they had simply typed a typo.
+ * **Four** of them now, and the distinction is the same one Discover draws: *nothing for sale
+ * anywhere* is a claim about the marketplace and may only be made when nothing has been narrowed;
+ * *no matches* is about the search term; *nothing in this shelf* is about the category and offers
+ * to leave it; *nothing in this price range* is about the filter and offers to clear it. Collapsing
+ * them would tell a customer the shop is empty when they had simply typed a typo.
+ *
+ * The order they are tested in is the order the customer narrowed: a typo inside a category is
+ * reported as the typo, because that is the thing they can fix in one keystroke.
  */
 export function ProductsBrowse({
   products,
+  categories,
+  categorySlug,
+  onSelectCategory,
   query,
   filter,
   onClearFilter,
 }: {
   products: Product[];
+  /** The platform taxonomy. Empty renders no strip and narrows nothing. */
+  categories: ProductCategory[];
+  /** From `?cat=`. */
+  categorySlug: string | null;
+  onSelectCategory: (slug: string | null) => void;
   /** The shared search box's term — Discover owns it, and it serves both segments. */
   query: string;
   filter: ProductFilter;
@@ -49,12 +62,36 @@ export function ProductsBrowse({
   const { qtyOf, addProduct, setProductQty, dialog } = useOrderCart();
   const [open, setOpen] = useState<Product | null>(null);
 
+  /*
+    The slug is resolved against the loaded taxonomy rather than trusted. A hand-edited or
+    stale `?cat=` then narrows **nothing** — the strip shows no selection and the grid shows
+    everything — instead of matching no product and reporting an empty shelf that does not
+    exist. Same rule `productFilterFromParams` applies to a stale price bound.
+  */
+  const category = categories.find((c) => c.slug === categorySlug) ?? null;
+
   const q = query.trim().toLowerCase();
-  const matching = useMemo(
-    () => (q.length === 0 ? products : products.filter((p) => p.name.toLowerCase().includes(q))),
-    [products, q],
-  );
+  const matching = useMemo(() => {
+    const byCategory =
+      category == null ? products : products.filter((p) => p.categoryId === category.id);
+    return q.length === 0
+      ? byCategory
+      : byCategory.filter((p) => p.name.toLowerCase().includes(q));
+  }, [products, q, category]);
   const visible = useMemo(() => applyProductFilter(filter, matching), [filter, matching]);
+
+  /*
+    The strip stays above every state below, empty ones included. It is how the customer got
+    into a narrow shelf and it has to be how they get out — an empty state that replaces the
+    control that caused it leaves the back button as the only way back.
+  */
+  const strip = (
+    <ProductCategoryStrip
+      categories={categories}
+      selectedSlug={category?.slug ?? null}
+      onSelect={onSelectCategory}
+    />
+  );
 
   if (products.length === 0) {
     return (
@@ -68,28 +105,49 @@ export function ProductsBrowse({
 
   if (visible.length === 0) {
     const filtered = productFilterIsActive(filter);
+    // Narrowest cause first: a typo inside a shelf is still a typo.
+    const cause = q.length > 0 ? "query" : category != null ? "category" : "filter";
     return (
-      <EmptyState
-        icon={q.length > 0 ? Icons.searchEmpty : Icons.filterOff}
-        title={q.length > 0 ? "No matches" : "Nothing in that price range"}
-        message={
-          q.length > 0
-            ? `Nothing matches “${query.trim()}”.`
-            : "Try widening the range, or clearing the filter."
-        }
-        action={
-          filtered ? (
-            <Button variant="outlined" onClick={onClearFilter}>
-              Clear filter
-            </Button>
-          ) : undefined
-        }
-      />
+      <>
+        {strip}
+        <div className="mt-lg">
+          <EmptyState
+            icon={cause === "query" ? Icons.searchEmpty : Icons.filterOff}
+            title={
+              cause === "query"
+                ? "No matches"
+                : cause === "category"
+                  ? `Nothing in ${category!.name} yet`
+                  : "Nothing in that price range"
+            }
+            message={
+              cause === "query"
+                ? `Nothing matches “${query.trim()}”.`
+                : cause === "category"
+                  ? "No salon has listed anything on this shelf. Try another, or browse everything."
+                  : "Try widening the range, or clearing the filter."
+            }
+            action={
+              cause === "category" ? (
+                <Button variant="outlined" onClick={() => onSelectCategory(null)}>
+                  Browse everything
+                </Button>
+              ) : filtered ? (
+                <Button variant="outlined" onClick={onClearFilter}>
+                  Clear filter
+                </Button>
+              ) : undefined
+            }
+          />
+        </div>
+      </>
     );
   }
 
   return (
     <>
+      {strip}
+      <div className="mt-md" />
       {/*
         One auto-fill track at every width, replacing `grid-cols-1 tablet:grid-cols-2
         wide:[360px]` — a table written for the old row card, whose 360px minimum put a

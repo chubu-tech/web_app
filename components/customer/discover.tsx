@@ -76,6 +76,8 @@ export function Discover({
   favouriteIds,
   filters,
   products,
+  productCategories,
+  categorySlug,
   productFilter,
   tab,
   availability,
