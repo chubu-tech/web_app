@@ -172,16 +172,76 @@ export function relativeDayLabel(start: Date, now: Date): string | null {
  * nobody has completed still reads as Upcoming. That is the honest answer: it is
  * still live as far as the salon is concerned.
  */
-export function bookingTab(b: Pick<Booking, "status">): 0 | 1 | 2 {
+export function bookingTab(b: Pick<Booking, "status">): BookingSegment {
   switch (b.status) {
     case "pending":
     case "confirmed":
-      return 0;
+      return UPCOMING_SEGMENT;
     case "completed":
-      return 1;
+      return COMPLETED_SEGMENT;
     default:
-      return 2;
+      return CANCELLED_SEGMENT;
   }
+}
+
+export type BookingSegment = 0 | 1 | 2;
+
+export const UPCOMING_SEGMENT = 0;
+export const COMPLETED_SEGMENT = 1;
+export const CANCELLED_SEGMENT = 2;
+
+/**
+ * One segment's bookings, in the order that segment should read.
+ *
+ * **Upcoming ascending, history descending — and the direction is the whole point of this
+ * function.** All three surfaces that show these tabs used to `filter()` and stop, so each
+ * inherited whatever order its own read happened to return. Two of the three reads are
+ * `start_ts` descending (`fetchMyBookings`, `fetchStaffBookings`), which is right for
+ * Completed and Cancelled and **backwards for Upcoming**: it put next month's appointment
+ * above this afternoon's. The third (`fetchBusinessBookings`) is ascending, so it had the
+ * inverse fault on its two history tabs.
+ *
+ * Sorting here rather than in the readers is deliberate: one read feeds all three tabs, so no
+ * single `.order()` can be right for all of them — and a caller that forgot to sort would
+ * silently get whichever direction the reader chose.
+ *
+ * Ties break on `id`, so the order is total. Two bookings can genuinely share a start —
+ * different stylists at the same salon, same slot — and without it their relative order can
+ * shift between renders.
+ */
+export function bookingsForSegment<T extends Pick<Booking, "status" | "startTs" | "id">>(
+  bookings: readonly T[],
+  segment: BookingSegment,
+): T[] {
+  const ascending = segment === UPCOMING_SEGMENT;
+  return bookings
+    .filter((b) => bookingTab(b) === segment)
+    .sort((a, b) => {
+      const delta = a.startTs.getTime() - b.startTs.getTime();
+      if (delta !== 0) return ascending ? delta : -delta;
+      return a.id.localeCompare(b.id);
+    });
+}
+
+/**
+ * Narrow a `SegmentedControl` index to a segment.
+ *
+ * That control's `onChange` hands back a `number`, because it knows nothing about what its
+ * labels mean. **Narrowed rather than cast**: an out-of-range index resolves to Upcoming,
+ * which is a visible wrong tab rather than a `bookingsForSegment` that silently matches
+ * nothing and renders the empty state over somebody's four live bookings.
+ */
+export function asBookingSegment(index: number): BookingSegment {
+  return index === COMPLETED_SEGMENT || index === CANCELLED_SEGMENT ? index : UPCOMING_SEGMENT;
+}
+
+/** How many bookings fall in each segment, in one pass. */
+export function bookingSegmentCounts(
+  bookings: readonly Pick<Booking, "status">[],
+): [number, number, number] {
+  const counts: [number, number, number] = [0, 0, 0];
+  for (const b of bookings) counts[bookingTab(b)]++;
+  return counts;
 }
 
 /**

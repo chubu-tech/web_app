@@ -18,7 +18,14 @@ import { asSentence, errorCode } from "./booking-errors";
 export const QUEUE_ERROR = {
   /** No session at all. */
   unauthenticated: "28000",
-  /** The shop's plan doesn't include a queue, or the owner switched it off. */
+  /**
+   * The owner switched the queue off — `queue_enabled` is false.
+   *
+   * **This used to have two meanings and now has one.** `20260902000003` removed the
+   * plan gate from `join_queue`, so P0001 can no longer mean "not on this tier". Do not
+   * reintroduce the ambiguity in the copy: pointing an owner at a plan they already have
+   * would send them to buy something twice.
+   */
   noQueue: "P0001",
   /** Already holding a place in *this* shop's line. Not an error — a redirect. */
   alreadyInLine: "P0003",

@@ -31,9 +31,11 @@ import { Icons } from "@/components/ui/icons";
  *
  * It deliberately does **not** call `getAccount()` to render the real nav. That would read
  * cookies, turn the one static route in the build into a dynamic one, and start the inbox
- * poll on an error page — to decide whether a header says "Sign in". `data-shell="customer"`
- * still puts it on the cream canvas, so it reads as this site either way. (The typeface is
- * no longer part of that — Inter comes from `--font-sans` at `:root` on every route.)
+ * poll on an error page — to decide whether a header says "Sign in". It reads as this site
+ * either way: the wordmark and the ink carry that now, where `data-shell="customer"` used to
+ * do it by putting the page on the cream canvas. Neither the canvas nor the typeface is
+ * shell-scoped any more — one white ground everywhere, and Inter from `--font-sans` at
+ * `:root` on every route — so the attribute is kept as the shell marker, not as a skin.
  *
  * Owner routes get their own at `app/business/not-found.tsx`; `business` **is** a real URL
  * segment, so that boundary resolves normally and keeps the console's own chrome.

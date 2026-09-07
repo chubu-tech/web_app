@@ -3,13 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ActionHint } from "@/components/ui/action-hint";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { cancelBooking } from "@/lib/api/booking";
 import { reconcileBooking, setBookingStatus } from "@/lib/api/owner";
 import { ownerErrorMessage, type OwnerAction } from "@/lib/api/owner-errors";
+import { canFinalizeBooking, finalizeHintOrUnlocked } from "@/lib/booking-status-rules";
+import { fullDayTimeLabel } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/client";
-import { THIMPHU_TZ } from "@/lib/time";
 import type { Booking, BookingStatus } from "@/lib/types/booking";
 
 /**
@@ -27,6 +29,15 @@ import type { Booking, BookingStatus } from "@/lib/types/booking";
  * ported because the app has it and the enum allows it, but the only way to reach it is
  * `reconcile_booking`. Worth knowing before hunting for the bug that "Confirm never shows".
  *
+ * **Complete and No-show are gated by time, and that is also the server's rule.**
+ * `20260902000001_status_time_gate.sql` refuses both with P0017 until the appointment is
+ * under way, because `completed` is what awards loyalty points, burns a pack credit and
+ * counts as earned revenue in analytics, payroll and the tax estimate. Until then this
+ * renders `ActionHint` in their place — the client hides them from `start_ts`, five minutes
+ * stricter than the server, so no button here can be one the server refuses. `Cancel` stays
+ * throughout: cancelling ahead of time is the one thing an owner legitimately does to a
+ * future booking from this screen.
+ *
  * **Cancel is a different call from the other three**, and Undo is a third. Cancelling
  * carries a reason and its own side effects (`cancel_booking`), and undoing it needs
  * `reconcile_booking` — the one RPC with no transition validation, which is exactly why it
@@ -40,6 +51,15 @@ export function BookingActions({ booking }: { booking: Booking }) {
   const status = booking.status;
   const live = status === "pending" || status === "confirmed";
   if (!live) return null;
+
+  /*
+    Read once per render rather than held in state. A booking whose start passes while this
+    screen is open keeps the hint until something else re-renders — the app arms a timer for
+    that moment; here the 4-second-poll surfaces around this one and the router refresh after
+    any action cover it, and a stale "Complete in 1m" beside a working Cancel is a much
+    smaller wrong than a timer leaking on every booking row.
+  */
+  const canFinalize = canFinalizeBooking(booking);
 
   async function transition(
     action: OwnerAction,
@@ -104,7 +124,7 @@ export function BookingActions({ booking }: { booking: Booking }) {
           >
             Confirm booking
           </Button>
-        ) : (
+        ) : canFinalize ? (
           <Button
             busy={busy === "completeBooking"}
             disabled={busy != null}
@@ -112,9 +132,11 @@ export function BookingActions({ booking }: { booking: Booking }) {
           >
             Mark completed
           </Button>
+        ) : (
+          <ActionHint>{finalizeHintOrUnlocked(booking)}</ActionHint>
         )}
 
-        {status === "confirmed" ? (
+        {status === "confirmed" && canFinalize ? (
           <Button
             variant="outlined"
             busy={busy === "noShowBooking"}
@@ -151,14 +173,7 @@ export function BookingActions({ booking }: { booking: Booking }) {
       >
         <p className="text-body-md text-muted">
           The{" "}
-          {booking.startTs.toLocaleString("en-GB", {
-            weekday: "long",
-            day: "numeric",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: THIMPHU_TZ,
-          })}{" "}
+          {fullDayTimeLabel(booking.startTs)}{" "}
           appointment will be cancelled. The customer is notified.
         </p>
       </Sheet>

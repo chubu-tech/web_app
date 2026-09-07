@@ -75,6 +75,10 @@ export default async function Image() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
+          // Stays the editorial cream, deliberately, while the product moved to the app's
+          // white. This is brand artwork rather than a product surface — nobody scrolls it —
+          // and its sibling at `/app/share-card` is mid-change, so the two want deciding
+          // together rather than one being nudged now.
           background: "#f6f3ee",
           padding: `${px(72)}px ${px(80)}px`,
         }}

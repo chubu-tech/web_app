@@ -48,12 +48,15 @@ import { WaitlistCta } from "./waitlist-cta";
  * 5. **`RevealGroup`** still wraps the band, so it staggers as one gesture rather than
  *    firing an observer per column.
  *
- * ## The surface is `bg-canvas`, and that now means cream
+ * ## The surface is `bg-canvas`, and `paper` is what sits on it
  *
- * `app/(marketing)/layout.tsx` declares `data-shell="marketing"`, so the public pages render
- * on the same `#f6f3ee` as the product. The footer is page *ground*, so it keeps `canvas`;
- * the signup panel and the social buttons are things lifted off it, so they take `paper`.
- * That distinction did no work while both resolved to white — it does now.
+ * The footer is page *ground*, so it takes `canvas`; the signup panel and the social buttons
+ * are things lifted off it, so they take `paper`. Both resolve to `#ffffff` again after the
+ * canvas port, so the distinction currently draws nothing — **keep asking for it anyway.**
+ * It records which of the two a surface is, which is what made the cream release a token
+ * change rather than a sweep of this file, and it is what an edge has to be added to: a
+ * `paper` surface that must read as lifted needs `shadow-card` or a ring, never a border
+ * beside `shadow-card` (that pairing is the ghost card — see `app/globals.css`).
  */
 export function SiteFooter() {
   const year = new Date().getFullYear();
@@ -249,7 +252,8 @@ export function SiteFooter() {
                     aria-label={network.label}
                     // 40px, paper fill, hairline stroke. No scale on hover — the stroke and
                     // the fill carry it. `paper`, not `canvas`: these are lifted off the
-                    // footer's ground, which is cream now.
+                    // footer's ground. The ring is what draws them now that both tokens are
+                    // white again — see the note at the top of this file.
                     className={cn(
                       "grid size-10 place-items-center rounded-full",
                       "text-body ring-hairline bg-paper ring-1 ring-inset",

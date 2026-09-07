@@ -11,6 +11,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { ownerErrorMessage } from "@/lib/api/owner-errors";
 import { createBusiness } from "@/lib/api/owner-setup";
 import { createClient } from "@/lib/supabase/client";
+import { BUSINESS_TYPES, travels as isTravelling, type BusinessType } from "@/lib/types/salon";
 
 /**
  * Add a salon.
@@ -35,28 +36,39 @@ export function CreateSalonForm({ isFirst }: { isFirst: boolean }) {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
+  const [type, setType] = useState<BusinessType>("salon");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function create() {
     const trimmed = name.trim();
-    if (!trimmed) {
-      setError("Enter a name for your salon.");
+    /*
+      Mirrors `create_business`'s own check (`22023` under 2 or over 80) so the common mistake
+      costs no round trip. **The server still validates** — this only saves a wait, it is not
+      the gate.
+    */
+    if (trimmed.length < 2) {
+      setError("Enter your salon's name.");
+      return;
+    }
+    if (trimmed.length > 80) {
+      setError("That name is too long — keep it under 80 characters.");
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("no session");
-
-      const created = await createBusiness(supabase, user.id, {
+      /*
+        No `getUser()` first: `create_business` derives the owner from `auth.uid()` itself and
+        refuses a session it does not like — `28000` with none, `P0003` for a guest, who has a
+        uid but no email the moderation queue could reach them on. Reading the id here only to
+        pass it back would be a round trip that decides nothing.
+      */
+      const created = await createBusiness(createClient(), {
         name: trimmed,
         addressText: address.trim() || null,
         phone: phone.trim() || null,
+        businessType: type,
       });
 
       // Switch the console to it through the same route the salon picker posts to, so the
@@ -104,13 +116,56 @@ export function CreateSalonForm({ isFirst }: { isFirst: boolean }) {
           placeholder="e.g. Norzin Salon & Spa"
           autoFocus
         />
-        <Field
-          label="Address"
-          value={address}
-          onChange={setAddress}
-          placeholder="Street, town"
-          hint="You can place yourself on the map afterwards."
-        />
+        <fieldset>
+          <legend className="text-caption text-muted mb-sm">What kind of business?</legend>
+          <div className="gap-sm flex flex-wrap">
+            {BUSINESS_TYPES.map((t) => {
+              const selected = t.value === type;
+              return (
+                <button
+                  key={t.value}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setType(t.value)}
+                  className={
+                    selected
+                      ? "text-caption bg-rausch-soft border-rausch text-rausch-cta px-lg min-h-11 rounded-full border font-semibold"
+                      : "text-caption border-hairline text-ink hover:bg-surface-soft px-lg min-h-11 rounded-full border font-semibold"
+                  }
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-caption-sm text-muted-soft mt-sm">
+            {BUSINESS_TYPES.find((t) => t.value === type)?.blurb}
+          </p>
+        </fieldset>
+
+        {/*
+          The label switches with the type: a travelling stylist has no shopfront to send
+          anyone to, so the field asks for the area they cover rather than an address they
+          would have to invent. `travels()` is the same predicate the salon page uses to show
+          a coverage line and hide Directions.
+        */}
+        {isTravelling({ businessType: type }) ? (
+          <Field
+            label="Where do you work?"
+            value={address}
+            onChange={setAddress}
+            placeholder="e.g. Thimphu and Babesa"
+            hint="The area you cover. Customers see this instead of an address."
+          />
+        ) : (
+          <Field
+            label="Address"
+            value={address}
+            onChange={setAddress}
+            placeholder="Street, town"
+            hint="You can place yourself on the map afterwards."
+          />
+        )}
         <Field label="Phone" value={phone} onChange={setPhone} type="tel" />
       </div>
 

@@ -1,4 +1,4 @@
-import { hasFeature, type Plan } from "../entitlements";
+import type { Plan } from "../entitlements";
 // `queue.ts` imports nothing, so this direction cannot cycle.
 import type { QueueEntry } from "./queue";
 
@@ -14,6 +14,15 @@ export type BusinessType = "salon" | "barber" | "home_based" | "mobile";
 
 /** Whether a queue can be joined from the salon page or only by scanning on site. */
 export type QueueJoinMode = "anywhere" | "qr_only";
+
+/**
+ * `businesses.status` — where a salon is in moderation.
+ *
+ * A salon is created `pending` (`create_business`), so a self-served owner has a console and
+ * no listing until an operator reviews it. `businesses_select`'s public arm requires
+ * `approved`, which is what makes the wait real rather than cosmetic.
+ */
+export type BusinessStatus = "pending" | "approved" | "rejected" | "suspended";
 
 export type Business = {
   id: string;
@@ -48,7 +57,33 @@ export type Business = {
   /** Nudge lapsed customers to book again, after this many days since their last visit. */
   rebookingEnabled: boolean;
   rebookingDays: number;
+  /**
+   * Where the salon is in moderation.
+   *
+   * **Only meaningful on an owner's own read.** `BUSINESS_PUBLIC_SELECT` does not ask for it,
+   * because a public query can only ever see `approved` rows anyway — so on a customer
+   * surface this is the mapper's default rather than a fact from the row. See the default's
+   * own note in `toBusiness`.
+   */
+  status: BusinessStatus;
+  /**
+   * Why a `rejected` salon was rejected, as written by the operator who rejected it.
+   *
+   * **Withheld from `anon` at the column-grant level** (`20260807000003`), so it only ever
+   * arrives for a signed-in member — which is also why a public select must not ask for it.
+   */
+  rejectionReason: string | null;
 };
+
+/** Visible to customers: reviewed and switched on. */
+export function isListed(b: Pick<Business, "status" | "isActive">): boolean {
+  return b.status === "approved" && b.isActive;
+}
+
+/** Waiting on an operator. */
+export function isAwaitingReview(b: Pick<Business, "status">): boolean {
+  return b.status === "pending";
+}
 
 export function hasLocation(
   b: Pick<Business, "lat" | "lng">,
@@ -66,11 +101,17 @@ export function travels(b: Pick<Business, "businessType">): boolean {
 }
 
 /**
- * True when the salon both *may* run a queue (plan) and *wants* to (switch).
- * Both halves matter — an owner can turn it off on a plan that allows it.
+ * True when the salon wants to run a queue.
+ *
+ * **The owner's switch is the whole gate.** This used to AND it with a plan
+ * entitlement, and that half is gone: migration `20260902000003` removed the
+ * `plan in ('growth','pro')` check from `join_queue`, `check_in_booking` and
+ * `queue_active_line`, so the queue is available on every tier and
+ * `businesses.queue_enabled` is the only control. Keeping a plan term here would
+ * hide a surface the server is willing to serve.
  */
-export function runsQueue(b: Pick<Business, "queueEnabled" | "plan">): boolean {
-  return b.queueEnabled && hasFeature(b.plan, "walkInQueue");
+export function runsQueue(b: Pick<Business, "queueEnabled">): boolean {
+  return b.queueEnabled;
 }
 
 /** True when a customer must scan the shop's QR on site to take a place. */
@@ -157,12 +198,23 @@ export const SERVICE_CATEGORIES = [
   "Other",
 ] as const;
 
-/** `businesses.business_type`, with the label each one shows. */
-export const BUSINESS_TYPES: { value: BusinessType; label: string }[] = [
-  { value: "salon", label: "Salon" },
-  { value: "barber", label: "Barber shop" },
-  { value: "home_based", label: "Home-based" },
-  { value: "mobile", label: "Mobile / I travel" },
+/**
+ * `businesses.business_type`, with the label and the line each one shows an owner.
+ *
+ * **Ordered by how common each is in Bhutan, not alphabetically**, and worded the way an
+ * owner would say it — "I travel to clients", not "mobile". Both are upstream's choices
+ * (`business_onboarding.dart`), and the labels are its labels, so an owner who has used the
+ * app meets the same four words here.
+ *
+ * `create_business` validates the value against exactly this set (`22023` otherwise), so
+ * adding a fifth row here without a migration would produce a picker whose last option
+ * always fails.
+ */
+export const BUSINESS_TYPES: { value: BusinessType; label: string; blurb: string }[] = [
+  { value: "salon", label: "Salon", blurb: "A shopfront clients come to" },
+  { value: "barber", label: "Barber shop", blurb: "Cuts and shaves, walk-ins welcome" },
+  { value: "home_based", label: "Home studio", blurb: "You work from your own place" },
+  { value: "mobile", label: "I travel to clients", blurb: "You go to them" },
 ];
 
 /**
@@ -265,6 +317,22 @@ export function offerEndsLabel(offer: Pick<Offer, "endsOn">, now = new Date()): 
   return `${d} day${d === 1 ? "" : "s"} left`;
 }
 
+/**
+ * One product, as `product_cards` returns it.
+ *
+ * **The catalogue-depth half of this type describes columns that have been live since
+ * August** and that this app read none of until now. `20260810000001` added the taxonomy,
+ * `…000004` the detail columns and `…000005` the `product_cards` view; `20260811000006`
+ * folded the ratings in. So the fields below are not a forward declaration — every one of
+ * them has data behind it today, and the reason the shop looked thin here was that
+ * `lib/api/shop.ts` was still selecting from the bare `products` table.
+ *
+ * Every added field is **nullable or defaulted**, mirroring the migrations: a row written
+ * before the rework must still build, and so must the plain-table read that
+ * `fetchProductsForBusiness` used to do. They are required properties all the same — the
+ * compiler is what enumerates the construction sites, which is the same reason
+ * `lib/entitlements.ts` deleted a union member rather than granting it everywhere.
+ */
 export type Product = {
   id: string;
   businessId: string;
@@ -277,6 +345,90 @@ export type Product = {
   sortOrder: number;
   /** Only on the cross-salon browse, which joins the salon name. */
   businessName: string | null;
+
+  /* --- catalogue depth ---------------------------------------------------- */
+
+  brandId: string | null;
+  brandName: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  /** Free-form merchandising tags. Never null from the view — an empty array instead. */
+  tags: string[];
+  /** Who it suits — "curly", "fine". Rendered as **Suits** on the detail page. */
+  hairTypes: string[];
+  /** What it is for — "frizz", "dandruff". Rendered as **Targets**. */
+  concerns: string[];
+  /** "200 ml". The unit the price is *per*, which is why it never belongs in the name. */
+  volume: string | null;
+  ingredients: string | null;
+  howToUse: string | null;
+  /**
+   * The was-price. **Only a markdown when it is strictly greater than `priceNu`** — see
+   * `isDiscounted`; a compare-at left at or below the price is a stale field, not an offer.
+   */
+  compareAtNu: number | null;
+
+  /* --- aggregates, `product_cards` only ----------------------------------- */
+
+  /**
+   * Whole percent off, computed by the view. Null on a plain-table read, and 0 rather than
+   * null when there is no markdown, so **never test this for truthiness to decide whether
+   * to draw a badge** — ask `isDiscounted`, which tests the thing that is actually true.
+   */
+  discountPct: number | null;
+  /** Null when nobody has reviewed it. A null average is not "unrated but fine". */
+  ratingAvg: number | null;
+  ratingCount: number;
+  /** Views over the last 7 Bhutan days. 0 on any read that does not go through the view. */
+  trendingViews: number;
+  /** Null on a hand-built product; sorts last rather than throwing. */
+  createdAt: Date | null;
+};
+
+/**
+ * A genuine markdown — `compare_at_nu > price_nu`, the same predicate the view's
+ * `discount_pct` is computed from and the app's `Product.isDiscounted` uses.
+ *
+ * Separate from reading `discountPct` because the two disagree in one direction that
+ * matters: a plain-table read has no `discount_pct` at all, and a null there must not be
+ * read as "not discounted" when `compareAtNu` says otherwise.
+ */
+export function isDiscounted(p: Pick<Product, "priceNu" | "compareAtNu">): boolean {
+  return p.compareAtNu != null && p.compareAtNu > p.priceNu;
+}
+
+/**
+ * The badge number, rounded to a whole percent — `((compare − price) / compare) × 100`.
+ *
+ * Prefers the view's own `discount_pct` so the badge cannot disagree with the `onSale`
+ * filter, which is a server-side `discount_pct > 0`, and falls back to the arithmetic on a
+ * plain-table read. Null when there is no markdown, so the caller renders nothing rather
+ * than a "−0%".
+ */
+export function discountPercent(
+  p: Pick<Product, "priceNu" | "compareAtNu" | "discountPct">,
+): number | null {
+  if (!isDiscounted(p)) return null;
+  if (p.discountPct != null && p.discountPct > 0) return p.discountPct;
+  return Math.round(((p.compareAtNu! - p.priceNu) * 100) / p.compareAtNu!);
+}
+
+/**
+ * One shelf of the product taxonomy — a row of `product_categories`.
+ *
+ * `icon` is a glyph **name**, not a glyph: the column stores `"productHairCare"` and the
+ * client resolves it. That indirection is what makes a taxonomy change shippable as a data
+ * migration on its own, ahead of any client release — `20260902000002` repointed three
+ * categories this way — and it is why an unknown name has to fall back to a generic glyph
+ * rather than drop the category. A shelf missing from the strip is a shelf nobody can shop.
+ */
+export type ProductCategory = {
+  id: string;
+  name: string;
+  slug: string;
+  /** The glyph's name in `Icons`. Null on a row that has never been given one. */
+  icon: string | null;
+  sort: number;
 };
 
 export type BusinessPhoto = {

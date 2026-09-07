@@ -15,8 +15,10 @@ import { Icons } from "@/components/ui/icons";
  * this page, which it would not be under the root boundary.
  *
  * Without it, an owner hitting a stale link would fall through to the root boundary and get
- * the *customer* shell — cream canvas, a "Find a salon" button — which is a disorienting
- * place to land while working at a till, and offers nothing that helps.
+ * the *customer* shell — a customer wordmark row and a "Find a salon" button — which is a
+ * disorienting place to land while working at a till, and offers nothing that helps. (It was
+ * the canvas colour that gave that away first, back when the two shells sat on different
+ * grounds; the copy and the chrome are what distinguish them now.)
  */
 export default function OwnerNotFound() {
   return (

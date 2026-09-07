@@ -15,6 +15,7 @@ import {
   toServiceItem,
   toStaffMember,
 } from "./mappers";
+import { PRODUCT_CARD_SELECT } from "./shop";
 
 /**
  * Everything the salon page reads, ported from `tho/app/lib/data/api.dart`.
@@ -208,17 +209,32 @@ export async function fetchLiveOffers(
   return (data ?? []).map((m) => toOffer(m as Record<string, unknown>));
 }
 
+/**
+ * One salon's shelf — the Shop tab, and `/cart`'s re-price.
+ *
+ * **`product_cards` when `availableOnly`, the table otherwise**, and the split is forced
+ * rather than stylistic: the view is defined over buyable stock, so it cannot answer
+ * "everything this salon has listed, sold out included". Only `/cart` asks that, and it
+ * asks in order to notice that a line has gone out of stock — which is exactly the row the
+ * view omits. Giving it the view would have made a sold-out line vanish from the re-price
+ * and silently survive into `place_order`, where the RPC refuses the whole order with
+ * `P0002` and names nothing.
+ *
+ * So the customer-facing path gets the ratings and the markdowns, and the one caller that
+ * needs to see unbuyable rows still can.
+ */
 export async function fetchProductsForBusiness(
   supabase: SupabaseClient,
   businessId: string,
   { availableOnly = true }: { availableOnly?: boolean } = {},
 ): Promise<Product[]> {
-  let q = supabase
-    .from("products")
-    .select("*")
-    .eq("business_id", businessId)
-    .eq("is_archived", false);
-  if (availableOnly) q = q.eq("in_stock", true);
+  const q = availableOnly
+    ? supabase.from("product_cards").select(PRODUCT_CARD_SELECT).eq("business_id", businessId)
+    : supabase
+        .from("products")
+        .select("*")
+        .eq("business_id", businessId)
+        .eq("is_archived", false);
 
   const { data } = await q.order("sort_order", { ascending: true });
   return (data ?? []).map((m) => toProduct(m as Record<string, unknown>));

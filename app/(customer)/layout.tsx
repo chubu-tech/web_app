@@ -7,11 +7,12 @@ import { SiteFooter } from "@/components/customer/site-footer";
 import { requireLiveAccount } from "@/lib/session";
 
 /**
- * The cream canvas, so the browser chrome matches the page rather than the owner
- * console's white. A nested `viewport` overwrites the root's — nested segments win, per
- * Next's metadata merging.
+ * Declared, not inherited, so the browser chrome matches this shell's canvas whatever the
+ * root's is. A nested `viewport` overwrites the root's — nested segments win, per Next's
+ * metadata merging. It was the editorial cream against the console's white; the canvas port
+ * moved every shell to `#ffffff`, so this now agrees with the root rather than correcting it.
  */
-export const viewport: Viewport = { themeColor: "#f6f3ee" };
+export const viewport: Viewport = { themeColor: "#ffffff" };
 
 /**
  * The customer shell, ported from `CustomerHome`'s `Scaffold`
@@ -42,11 +43,13 @@ export default async function CustomerLayout({
 
   return (
     /*
-      `data-shell="customer"` is what switches this whole subtree onto the editorial
-      token layer — see the scope block in `app/globals.css`. It has to be here rather
-      than in the root layout, which cannot know the route without calling `headers()`
-      and forcing every page dynamic. `bg-canvas` on the wrapper is belt to the
-      `body:has()` brace: body carries the cream for overscroll, this covers the subtree.
+      `data-shell="customer"` is the shell marker. It no longer re-points any colour — the
+      canvas port deleted `[data-shell]`'s colour scope from `app/globals.css` once every
+      shell agreed on white — but it stays declared here rather than in the root layout,
+      which cannot know the route without calling `headers()` and forcing every page
+      dynamic, and the attribute is what `[data-shell="marketing"]`'s type scope keys off
+      one group over. `bg-canvas` on the wrapper paints the subtree; `body` in
+      `@layer base` covers the viewport itself, which is what iOS overscroll shows.
     */
     <div data-shell="customer" className="bg-canvas flex min-h-full flex-col">
       <CustomerHeader signedIn={account.state === "registered"} />

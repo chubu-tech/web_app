@@ -36,25 +36,36 @@ import { WaitlistProvider } from "@/components/marketing/waitlist-provider";
  * into the product watched the page change colour — the precise thing the `[data-shell]`
  * block in `globals.css` was widened to stop, one boundary further out.
  *
- * So the attribute is here now, and the group renders on the same cream as the other 51
- * routes. Two consequences worth knowing before editing anything under `components/marketing`:
+ * So the attribute is here now, and the group renders on the same ground as the other 51
+ * routes.
  *
- * 1. **A card is `bg-paper`, not `bg-canvas`.** Those were interchangeable while canvas was
- *    white and they are not any more: `canvas` is the page, `paper` is a thing lifted off
- *    it. Roughly 18 surfaces were reclassified in the same change — the hero's queue card,
+ * **That ground is white again**, not cream: the canvas port moved `--color-canvas` to
+ * `tokens.dart`'s `#ffffff` for every shell, so the seam is closed from the other side. The
+ * attribute still earns its place — it is what scopes the public documents to the web type
+ * scale (`[data-shell="marketing"]` in `globals.css`) now that the product carries the app's.
+ *
+ * Two consequences worth knowing before editing anything under `components/marketing`:
+ *
+ * 1. **A card is `bg-paper`, not `bg-canvas`.** `canvas` is the page, `paper` is a thing
+ *    lifted off it. With a white canvas the two resolve to the same colour, so a surface that
+ *    must read as lifted needs `shadow-card` — the same way the app does it. Keep asking for
+ *    `paper` regardless: it records the intent, and it is what makes the distinction
+ *    recoverable if the ground ever moves again. Roughly 18 surfaces were reclassified in the same change — the hero's queue card,
  *    the search bar, the pricing cards, the plan mock's chips, the waitlist modal. Reach for
  *    `paper` whenever the element carries `shadow-card` or a ring.
- * 2. **`bg-surface-soft` and `bg-surface-strong` are now tints OF cream** (`#efe9e1`,
- *    `#e6ded2`) rather than tints of white. Nothing referencing them needed changing, which
- *    is the point of the token indirection — but a new value hardcoded as a grey will read
- *    as a cold patch on a warm page.
+ * 2. **`bg-surface-soft` and `bg-surface-strong` are neutral greys again** — `#f7f7f7` and
+ *    `#f2f2f2`, `tokens.dart`'s values. They spent one release as warm tints of cream
+ *    (`#efe9e1` / `#e6ded2`), and nothing referencing them needed changing in either
+ *    direction, which is the whole point of the token indirection. The rule that follows is
+ *    the opposite of the one that used to be here: a hardcoded warm grey is now the thing
+ *    that will read as a stain on a cold page.
  *
- * `viewport.themeColor` below follows the canvas for the same reason `app/(customer)` sets
- * its own: the browser chrome on a phone is part of the page, and a white status bar above a
- * cream document is the seam again, in miniature.
+ * `viewport.themeColor` below still follows the canvas, for the reason it always did — the
+ * browser chrome on a phone is part of the page — but every shell now agrees on `#ffffff`,
+ * so the three declarations are a belt rather than three different answers.
  */
 export const viewport: Viewport = {
-  themeColor: "#f6f3ee",
+  themeColor: "#ffffff",
   colorScheme: "light",
 };
 

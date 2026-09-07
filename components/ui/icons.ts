@@ -1,4 +1,7 @@
 import {
+  Droplets,
+  Fan,
+  SprayCan,
   AlertCircle,
   ArrowLeft,
   ArrowRight,
@@ -274,6 +277,23 @@ export const Icons = {
    */
   cart: ShoppingCart,
   product: Package,
+  /*
+    The product taxonomy's own three, added by `20260902000002_product_category_icons.sql`,
+    which repointed `hair-care`, `styling` and `tools` away from a scissors alias, a
+    pixel-identical second scissors, and a settings cog. Upstream's reason for moving off
+    scissors is worth keeping: that shelf is shampoo, oil and masks, and scissors name a
+    haircut rather than the thing you buy.
+
+    All three are approximations of HugeIcons glyphs lucide has no equivalent for — a
+    shampoo bottle, a curling iron and a hair dryer. The substitutions keep the *distinction*
+    the taxonomy needs, which is what a glyph beside its own label is for:
+      · `Droplets`  — the wash-and-treat shelf, things that pour.
+      · `SprayCan`  — waxes, sprays and creams; the shelf's most literal object.
+      · `Fan`       — an appliance that moves air, which is a dryer's whole function.
+  */
+  productHairCare: Droplets,
+  productStyling: SprayCan,
+  productTools: Fan,
   qr: QrCode,
   receipt: Receipt,
   ticket: Ticket,
@@ -387,6 +407,25 @@ export const IconSize = {
   /** Empty states — the glyph owns the whole tab body. */
   hero: 56,
 } as const;
+
+/**
+ * The glyph for one `product_categories` row, resolved from the **name stored in the
+ * column** rather than guessed from the category's title.
+ *
+ * That indirection is the point: the taxonomy's icons are data, so a shelf can be renamed
+ * or repointed by a migration alone. The fallback is the other half of the same contract —
+ * a name this build has never heard of (a category added after it shipped) renders the
+ * generic product glyph, because a category that vanishes from the strip is a shelf nobody
+ * can reach, where a category wearing the wrong glyph is merely plain.
+ *
+ * Distinct from `categoryIcon` below, which matches *service* categories on their text and
+ * has no stored glyph to read.
+ */
+export function categoryGlyph(icon: string | null | undefined) {
+  if (!icon) return Icons.product;
+  const found = (Icons as Record<string, (typeof Icons)[keyof typeof Icons]>)[icon];
+  return found ?? Icons.product;
+}
 
 /**
  * The category glyph, matched on the category's name.

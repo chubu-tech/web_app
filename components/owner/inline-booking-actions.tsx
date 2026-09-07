@@ -3,13 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ActionHint } from "@/components/ui/action-hint";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { cancelBooking } from "@/lib/api/booking";
 import { reconcileBooking, setBookingStatus } from "@/lib/api/owner";
 import { ownerErrorMessage, type OwnerAction } from "@/lib/api/owner-errors";
+import { canFinalizeBooking, finalizeHintOrUnlocked } from "@/lib/booking-status-rules";
+import { fullDayTimeLabel } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/client";
-import { THIMPHU_TZ } from "@/lib/time";
 import type { Booking, BookingStatus } from "@/lib/types/booking";
 
 /**
@@ -68,6 +70,10 @@ export function InlineBookingActions({
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const live = status === "pending" || status === "confirmed";
+  // The server refuses `completed`/`no_show` before `start_ts` with P0017
+  // (`20260902000001`), so the buttons are not offered until then — see
+  // `lib/booking-status-rules.ts` for why the client is the stricter of the two.
+  const canFinalize = canFinalizeBooking(booking);
   if (!live) return null;
 
   async function transition(
@@ -146,7 +152,7 @@ export function InlineBookingActions({
           >
             Confirm
           </Button>
-        ) : (
+        ) : canFinalize ? (
           <Button
             className="min-h-9 px-3"
             busy={busy === "completeBooking"}
@@ -155,9 +161,12 @@ export function InlineBookingActions({
           >
             Complete
           </Button>
+        ) : (
+          // Dense, to match the 36px buttons it stands among on a calendar card.
+          <ActionHint dense>{finalizeHintOrUnlocked(booking)}</ActionHint>
         )}
 
-        {status === "confirmed" ? (
+        {status === "confirmed" && canFinalize ? (
           <Button
             variant="outlined"
             className="min-h-9 px-3"
@@ -196,14 +205,7 @@ export function InlineBookingActions({
       >
         <p className="text-body-md text-muted">
           The{" "}
-          {booking.startTs.toLocaleString("en-GB", {
-            weekday: "long",
-            day: "numeric",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: THIMPHU_TZ,
-          })}{" "}
+          {fullDayTimeLabel(booking.startTs)}{" "}
           appointment will be cancelled. The customer is notified.
         </p>
       </Sheet>

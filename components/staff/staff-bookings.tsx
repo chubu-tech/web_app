@@ -5,7 +5,13 @@ import { OwnerBookingCard } from "@/components/owner/owner-booking-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { bookingTab, type Booking } from "@/lib/types/booking";
+import {
+  asBookingSegment,
+  bookingSegmentCounts,
+  bookingsForSegment,
+  type Booking,
+  type BookingSegment,
+} from "@/lib/types/booking";
 
 /**
  * A stylist's own appointments, segmented — a port of `StaffBookingsTab`
@@ -38,16 +44,12 @@ import { bookingTab, type Booking } from "@/lib/types/booking";
 const LABELS = ["Upcoming", "Completed", "Cancelled"];
 
 export function StaffBookings({ bookings }: { bookings: Booking[] }) {
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState<BookingSegment>(0);
 
-  const counts = useMemo(
-    () => [0, 1, 2].map((t) => bookings.filter((b) => bookingTab(b) === t).length),
-    [bookings],
-  );
-  const shown = useMemo(
-    () => bookings.filter((b) => bookingTab(b) === tab),
-    [bookings, tab],
-  );
+  const counts = useMemo(() => bookingSegmentCounts(bookings), [bookings]);
+  // Sorted, not just filtered: this read is `start_ts` descending, which is right for the two
+  // history tabs and backwards for Upcoming. `bookingsForSegment` owns that rule.
+  const shown = useMemo(() => bookingsForSegment(bookings, tab), [bookings, tab]);
 
   return (
     <div>
@@ -58,7 +60,7 @@ export function StaffBookings({ bookings }: { bookings: Booking[] }) {
         labels={LABELS}
         counts={counts}
         index={tab}
-        onChange={setTab}
+        onChange={(i) => setTab(asBookingSegment(i))}
         className="max-w-[28rem]"
       />
 

@@ -72,7 +72,14 @@ export function SalonServices({
   const [expanded, setExpanded] = useState(false);
 
   if (services.length === 0) {
-    return <p className="text-body-sm text-muted">No services listed yet.</p>;
+    // Says what to do about it rather than only what is absent. Six of the eighteen live
+    // salons are in this state, so it is an ordinary case and not an edge one.
+    return (
+      <p className="text-body-sm text-muted">
+        This salon hasn&apos;t put its menu up yet. Give them a call and they&apos;ll tell you
+        what they do.
+      </p>
+    );
   }
 
   const tagged = services.some((s) => s.gender != null);
@@ -117,6 +124,13 @@ export function SalonServices({
                 <p className="text-body-sm text-muted mt-xxs">
                   {formatDuration(s.durationMinutes)}
                 </p>
+                {/* Clamped rather than truncated at a character count: an owner writes as much
+                    as they like and the row must stay a row. */}
+                {s.description ? (
+                  <p className="text-caption-sm text-muted-soft mt-xxs line-clamp-2">
+                    {s.description}
+                  </p>
+                ) : null}
                 <p className="text-title text-ink mt-xs font-semibold">{formatNu(s.price)}</p>
               </div>
 

@@ -58,6 +58,16 @@ export const PLAN_TIERS: readonly PlanTier[] = [
       { label: "List view" },
       { label: "1 stylist" },
       { label: "Profile, photos & reviews" },
+      /*
+        **On Basic, and it is a correction rather than an edit.** Migration
+        `20260902000003_queue_for_all_plans.sql` removed the `plan in ('growth','pro')` gate
+        from `join_queue`, `check_in_booking` and `queue_active_line`, so the queue is
+        unconditional at every tier. This bullet sat under Growth for four days after that
+        shipped — and `/for-salons` renders these bullets on an indexable page, so it was a
+        published false claim about what a subscription buys, the same defect as the
+        "Priority placement" line removed above. `plans_config.dart` carries the same label.
+      */
+      { label: "Walk-in queue & QR check-in" },
       { label: "Today-snapshot numbers" },
     ],
   },
@@ -93,7 +103,6 @@ export const PLAN_TIERS: readonly PlanTier[] = [
       { label: "Discount codes" },
       { label: "Order payments recorded at the counter" },
       { label: "Loyalty program" },
-      { label: "Walk-in queue" },
     ],
   },
   {
@@ -186,11 +195,6 @@ export const FEATURE_COPY: Record<Feature, { tier: Plan; title: string; blurb: s
     title: "Loyalty program",
     blurb: "Reward repeat customers with points they redeem for perks.",
   },
-  walkInQueue: {
-    tier: "growth",
-    title: "Walk-in queue",
-    blurb: "Let walk-ins join a live line and check in bookings ahead of it.",
-  },
   commissions: {
     tier: "pro",
     title: "Commissions & payroll",
@@ -217,5 +221,22 @@ export const FEATURE_COPY: Record<Feature, { tier: Plan; title: string; blurb: s
     tier: "pro",
     title: "Prepaid packs",
     blurb: "Sell ten cuts up front and lock in the repeat visits.",
+  },
+  reminderChannel: {
+    tier: "pro",
+    title: "Reminder channel",
+    /*
+      **Describes the choice, not the delivery**, and deliberately. Whether an SMS actually
+      leaves the building depends on a gateway credential this project has not set —
+      `supabase/functions/process-notifications/index.ts` falls back to `[simulate sms]`
+      without it — and a paywall is a sentence somebody reads while deciding to pay. Same
+      restraint as the `deposits` blurb above.
+
+      It exists as its own feature because the settings row used to gate on `deposits` as a
+      stand-in for "Pro": a locked tap raised the deposits paywall and pitched no-show cover
+      to an owner who had asked how reminders reach their customers. Same tier, so no salon's
+      entitlements moved — only what the owner is told.
+    */
+    blurb: "Choose how booking reminders reach your customers.",
   },
 };

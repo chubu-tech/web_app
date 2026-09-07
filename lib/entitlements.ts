@@ -24,9 +24,29 @@ export type Feature =
   | "loyalty"
   | "commissions"
   | "deposits"
-  | "walkInQueue"
   | "stylePicker"
-  | "servicePacks";
+  | "servicePacks"
+  | "reminderChannel";
+
+/*
+  **There is no `walkInQueue`.**
+
+  The walk-in queue and its QR check-in are available on every plan. Migration
+  `20260902000003_queue_for_all_plans.sql` deleted the `plan in ('growth','pro')`
+  gate from `join_queue`, `check_in_booking` and `queue_active_line`'s pre-join
+  preview branch, so there is nothing left to gate — `businesses.queue_enabled`,
+  the owner's own per-salon switch, is the only control.
+
+  Deleted rather than granted everywhere, and deliberately: a `Feature` nobody
+  checks is exactly the shape that let `priorityPlacement` go on being sold for a
+  thing that did not exist (see the note below). Removing the union member is also
+  what makes the compiler enumerate every consumer instead of us guessing at them.
+
+  Note the existing Basic salons ship switched **off** — `queue_enabled` defaults
+  to true, so the migration turned it off for them rather than publishing a live
+  "join the queue · N ahead" surface at ten real salons whose owners have never
+  opened the board. So the owner-facing story is the switch, not a tier.
+*/
 
 /** Features introduced AT each tier; higher tiers inherit the lower ones. */
 const GROWTH_ADDS: readonly Feature[] = [
@@ -37,7 +57,6 @@ const GROWTH_ADDS: readonly Feature[] = [
   "clientBook",
   "productStore",
   "loyalty",
-  "walkInQueue",
 ];
 
 const PRO_ADDS: readonly Feature[] = [
@@ -54,6 +73,15 @@ const PRO_ADDS: readonly Feature[] = [
     the standard the removal below set.
   */
   "servicePacks",
+  /*
+    How booking reminders reach a customer (Push / SMS / WhatsApp).
+
+    Pro, which is the tier it was already on. The settings row used to gate on
+    `deposits` as a stand-in for "Pro", so a locked tap raised the deposits paywall
+    and pitched no-show cover to an owner who had asked about reminders. Same tier,
+    its own name — **no salon's entitlements move**.
+  */
+  "reminderChannel",
 ];
 
 /*

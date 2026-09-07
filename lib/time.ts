@@ -120,6 +120,14 @@ export function formatMinutesOfDay(minutes: number): string {
  * Display only, and only where a customer is reading a clock time. {@link formatMinutesOfDay}
  * stays the 24-hour form and stays the one to use anywhere near `<input type="time">`,
  * which both reads and writes 24-hour — see the note at the top of `lib/hours.ts`.
+ *
+ * **Not superseded by `lib/clock.ts`, and the lowercase marker is why.** That module is the
+ * authority for anything with an *instant* behind it and renders `2:00 PM`. This one takes
+ * minutes-from-midnight — an hours *segment*, which has no date and no timezone — and
+ * upstream keeps it lowercase deliberately: `hours_model.dart:39` says "'8:30 am' —
+ * lowercase meridiem, matching the design mock". So the two are a real split rather than
+ * drift, and folding this into `clock.ts` would restyle an owner screen the app still draws
+ * the other way. Use {@link clockLabel} for a `HH:mm` string from the database instead.
  */
 export function formatMinutes12(minutes: number): string {
   const h24 = Math.floor(minutes / 60) % 24;

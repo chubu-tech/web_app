@@ -43,7 +43,20 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/discover",
     scope: "/",
     display: "standalone",
-    background_color: "#f6f3ee",
+    /*
+      The ground an installed copy launches on, and it has to be the ground `start_url`
+      actually opens on — `/discover`, which the canvas port moved to `#ffffff`. It was the
+      editorial cream, which now exists nowhere in the product, so a home-screen launch
+      flashed a colour the app no longer has.
+
+      **Not `--color-brand-field`, tempting though the symmetry is.** The Flutter splash puts
+      the *bare* mark on crimson, alpha and all. A manifest splash can only paint one of these
+      icons, and they are the launcher artwork — the mark on its own baked crimson vignette,
+      darker at the centre than the flat token. On a crimson ground that reads as a dark box
+      floating on a lighter one; on white it reads as the icon. Same reason `theme_color`
+      matches the meta tag: the launch path must not change what the product looks like.
+    */
+    background_color: "#ffffff",
     theme_color: "#ffffff",
     lang: "en-BT",
     categories: ["lifestyle", "shopping", "business"],

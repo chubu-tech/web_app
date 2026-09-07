@@ -1,26 +1,22 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { QueueEntry } from "../types/queue";
 import { toQueueEntry } from "./mappers";
+import { oneRow } from "./one-row";
 
 /**
  * Walk-in queue reads and writes, ported from the queue section of
  * `tho/app/lib/data/api.dart:1449-1557`.
  *
  * **Every write is an RPC** — `join_queue`, `leave_queue` and `check_in_booking`
- * authorise the caller, enforce the plan gate and the owner's switch, and stamp the
- * server clock on `joined_at`. `queue_entries` is `revoke insert, update, delete`
+ * authorise the caller, enforce the owner's `queue_enabled` switch, and stamp the
+ * server clock on `joined_at`. There is no plan gate any more:
+ * `20260902000003_queue_for_all_plans.sql` removed it, and the switch is the only
+ * control. `queue_entries` is `revoke insert, update, delete`
  * for `authenticated`, so there is no direct write to reach for.
  */
 
 /** The embeds a direct `queue_entries` read wants: the service's length and the salon's name. */
 const QUEUE_SELECT = "*, services(duration_minutes), businesses(name)";
-
-/** An RPC returning `public.queue_entries` can arrive as a row or a single-element list. */
-function oneRow(data: unknown): Record<string, unknown> {
-  const row = Array.isArray(data) ? data[0] : data;
-  if (row == null || typeof row !== "object") throw new Error("queue RPC returned no row");
-  return row as Record<string, unknown>;
-}
 
 /**
  * The shop's active line (waiting + serving), PII-free, via `queue_active_line`.
@@ -33,8 +29,10 @@ function oneRow(data: unknown): Record<string, unknown> {
  * Its projection omits `business_id` — every row belongs to `businessId` by
  * construction — so that is threaded in as the mapper's fallback.
  *
- * Callable by any authenticated user for a growth/pro shop (the pre-join preview
- * relaxation in `20260731000003_queue_preview.sql`), and **not callable by `anon`**:
+ * Callable by any authenticated user for a shop with the queue switched on — the
+ * pre-join preview relaxation in `20260731000003_queue_preview.sql`, whose plan
+ * condition `20260902000003` dropped so the branch keys on `queue_enabled` alone —
+ * and **not callable by `anon`**:
  * a signed-out visitor gets a permission error, which surfaces as "Wait unknown"
  * rather than a fabricated zero.
  */
@@ -83,7 +81,7 @@ export async function joinQueue(
     p_via_qr: viaQr,
   });
   if (error) throw error;
-  return toQueueEntry(oneRow(data));
+  return toQueueEntry(oneRow(data, "queue RPC"));
 }
 
 /** Give the place up. Only legal while `waiting` — see `canCustomerLeave`. */
@@ -93,7 +91,7 @@ export async function leaveQueue(
 ): Promise<QueueEntry> {
   const { data, error } = await supabase.rpc("leave_queue", { p_entry: entryId });
   if (error) throw error;
-  return toQueueEntry(oneRow(data));
+  return toQueueEntry(oneRow(data, "queue RPC"));
 }
 
 /**
@@ -110,7 +108,7 @@ export async function checkInBooking(
 ): Promise<QueueEntry> {
   const { data, error } = await supabase.rpc("check_in_booking", { p_booking: bookingId });
   if (error) throw error;
-  return toQueueEntry(oneRow(data));
+  return toQueueEntry(oneRow(data, "queue RPC"));
 }
 
 /**

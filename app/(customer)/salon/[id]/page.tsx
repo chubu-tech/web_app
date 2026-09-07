@@ -729,7 +729,7 @@ export default async function SalonPage({
           {products.length > 0 ? (
             <SalonSection id="shop">
               <SectionHeader title="Shop" as="h2" className="mb-base" />
-              <SalonShop products={products} salonName={business.name} />
+              <SalonShop products={products} />
             </SalonSection>
           ) : null}
 
@@ -823,6 +823,9 @@ export default async function SalonPage({
             services={services}
             staffByService={staffByService}
             initialServiceId={initialServiceId}
+            // Six of the eighteen live salons list no services, and for those the phone is
+            // the only thing that can be offered — see `SalonBooking`'s `phone`.
+            phone={business.phone}
           />
 
           {/* Hours and the address at the foot, under a rule — the reference's card ends

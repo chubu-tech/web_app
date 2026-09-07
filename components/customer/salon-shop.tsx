@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
-import { ProductCard } from "@/components/customer/product-card";
+import { ProductRailCard } from "@/components/ui/product-card";
 import { ProductSheet } from "@/components/customer/product-sheet";
+import { useOrderCart } from "@/components/customer/use-order-cart";
 import type { Product } from "@/lib/types/salon";
-import { useCart } from "@/lib/use-cart";
 
 /**
  * A salon's shelf — the Shop tab, ported from
@@ -18,39 +17,23 @@ import { useCart } from "@/lib/use-cart";
  * offers the filter on this tab too, and the tab's own comment calls it optional.
  *
  * The one-salon conflict is more likely on this tab than anywhere: a customer with a cart from salon
- * A opening salon B's shop is the ordinary case, not the edge. So the offer to start again names both
- * the product and what is being replaced.
+ * A opening salon B's shop is the ordinary case, not the edge. `useOrderCart` owns the question that
+ * raises, and now names the salon from the product itself — `product_cards` joins `business_name` on
+ * every read, where the old bare-table select left it null and this component had to pass its own
+ * `salonName` down to say it.
+ *
+ * **`ProductRailCard`, not the grid form**, even though this lays out as a grid: the salon is the
+ * page you are already on, so naming it on every card would be the same word repeated down the
+ * screen. That is upstream's split exactly, and it is a property of the shelf rather than of the
+ * layout.
  *
  * `SalonTabs` renders this only when the salon has in-stock products, which is why there is no
  * "shop closed" state — the tab simply isn't there. The empty state below covers the race where the
  * last item sold out between the server render and a client refresh.
  */
-export function SalonShop({
-  products,
-  salonName,
-}: {
-  products: Product[];
-  salonName: string;
-}) {
-  const { cart, add, setQty, replace } = useCart();
+export function SalonShop({ products }: { products: Product[] }) {
+  const { qtyOf, addProduct, setProductQty, dialog } = useOrderCart();
   const [open, setOpen] = useState<Product | null>(null);
-
-  const qtyOf = (id: string) => cart.lines.find((l) => l.productId === id)?.qty ?? 0;
-
-  function addProduct(product: Product) {
-    const result = add(product);
-    if (result.ok) return;
-    toast.error("Your cart has items from another salon.", {
-      description: `Start a new cart with ${product.name} from ${salonName}?`,
-      action: {
-        label: "Start new",
-        onClick: () => {
-          replace(result.replacement);
-          toast.success(`Cart replaced with ${product.name}.`);
-        },
-      },
-    });
-  }
 
   if (products.length === 0) {
     return (
@@ -68,16 +51,19 @@ export function SalonShop({
         Order now and collect at the salon — you pay in cash when you pick it up.
       </p>
 
-      <ul className="gap-md flex flex-col">
+      {/* The same track as the cross-salon browse. A salon's shelf is four items at most
+          today, so this is two columns on a phone and one row on anything wider — but it is
+          the same rule rather than a second hand-picked one, which is the point. */}
+      <ul className="gap-md grid grid-cols-[repeat(auto-fill,minmax(min(45%,10rem),1fr))]">
         {products.map((product) => (
           <li key={product.id}>
-            <ProductCard
+            <ProductRailCard
               product={product}
               qty={qtyOf(product.id)}
-              showSalon={false}
               onAdd={() => addProduct(product)}
-              onSetQty={(qty) => setQty(product.id, qty)}
+              onSetQty={(qty) => setProductQty(product, qty)}
               onOpen={() => setOpen(product)}
+              sizes="(min-width: 744px) 220px, 50vw"
             />
           </li>
         ))}
@@ -86,10 +72,11 @@ export function SalonShop({
       <ProductSheet
         product={open}
         qty={open ? qtyOf(open.id) : 0}
-        onSetQty={(qty) => open && setQty(open.id, qty)}
+        onSetQty={(qty) => open && setProductQty(open, qty)}
         onAdd={() => open && addProduct(open)}
         onClose={() => setOpen(null)}
       />
+      {dialog}
     </>
   );
 }

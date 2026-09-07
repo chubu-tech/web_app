@@ -8,29 +8,35 @@
  * in Thimphu, is the whole product.
  */
 
+import { toE164 } from "./bhutan-phone";
+
 /**
  * Strips a phone number down to the digits `wa.me` wants: country code plus
  * number, no `+`, spaces, dashes or parentheses.
  *
- * Bhutan's country code is 975 and local mobiles are 8 digits starting 17 or 77.
- * A number typed without its country code is the common case in a Bhutan-first
- * app, so it is prefixed rather than rejected.
- *
  * Returns null when there is nothing usable, so callers **hide the action**
  * rather than launching a link that lands on an error page.
+ *
+ * **Bhutanese numbers go through `lib/bhutan-phone.ts`, which is the one authority for what a
+ * valid one is.** This used to carry its own copy of that arithmetic — the `00` strip, the
+ * bare-8-digit prefixing, the `17`/`77` check — and two normalisers for one product is how
+ * the two eventually disagree about an edge case nobody re-tests.
+ *
+ * What stays here is the part that is genuinely about `wa.me` rather than about Bhutan: a
+ * number that is **already international** is passed through on length alone. A salon may
+ * legitimately publish a foreign WhatsApp, and this link is the only thing that reads it, so
+ * refusing one because it is not Bhutanese would remove a working button.
  */
 export function whatsappDigits(raw: string | null | undefined): string | null {
   if (raw == null) return null;
+
+  // The Bhutanese case, which is almost all of them, and the only one with a real rule.
+  const e164 = toE164(raw);
+  if (e164 != null) return e164.slice(1);
+
   let digits = raw.replace(/[^0-9]/g, "");
-  if (digits.length === 0) return null;
-
-  // 00975… → 975…
+  // `00` is the international access prefix, not part of the number.
   if (digits.startsWith("00")) digits = digits.slice(2);
-
-  // A bare 8-digit Bhutanese mobile: add the country code.
-  if (digits.length === 8 && (digits.startsWith("17") || digits.startsWith("77"))) {
-    digits = `975${digits}`;
-  }
 
   // Shorter than any real international number — a landline fragment or a typo.
   if (digits.length < 8) return null;

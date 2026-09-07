@@ -5,7 +5,7 @@ import { Icons, IconSize } from "@/components/ui/icons";
 import { PhotoStrip } from "@/components/ui/photo-gallery";
 import { SectionHeader } from "@/components/ui/section-header";
 import { StatusPill } from "@/components/ui/status-pill";
-import { THIMPHU_TZ } from "@/lib/time";
+import { fullDayTimeLabel } from "@/lib/clock";
 import { bookingCode, customerName, type Booking } from "@/lib/types/booking";
 import { formatNu } from "@/lib/utils";
 import { whatsappUrl } from "@/lib/whatsapp";
@@ -120,15 +120,7 @@ export function BookingDetail({
       {/* ----------------------------------------------------------- when ---- */}
       <section className="gap-sm flex flex-col">
         <Meta icon={Icons.booking}>
-          {booking.startTs.toLocaleString("en-GB", {
-            weekday: "long",
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: THIMPHU_TZ,
-          })}
+          {fullDayTimeLabel(booking.startTs)}
         </Meta>
         {booking.staffName ? (
           <Meta icon={Icons.person}>with {booking.staffName}</Meta>

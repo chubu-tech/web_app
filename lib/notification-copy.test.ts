@@ -103,13 +103,20 @@ describe("notificationStyle", () => {
 });
 
 describe("notificationText", () => {
-  // 07:00 UTC is 13:00 in Thimphu. The body must say 13:00, wherever the reader is.
+  /*
+    07:00 UTC is 1pm in Thimphu. The body must say the salon's time, wherever the reader is.
+
+    **These assertions were rewritten when the clock became 12-hour**, and they were pinning
+    `13:00`. That is the shape audit A5-02 warned about: a suite written against the old
+    convention certifies it, so the sweep has to move the fixtures first or the tests argue
+    for keeping the thing being replaced.
+  */
   const startTs = "2026-08-07T07:00:00+00:00";
 
   it("puts the appointment time in the body, in Thimphu time", () => {
     const { title, body } = notificationText("booking_created", { start_ts: startTs });
     expect(title).toBe("Booking confirmed");
-    expect(body).toContain("13:00");
+    expect(body).toContain("1:00 PM");
     expect(body).toContain("Fri 7 Aug");
   });
 
@@ -118,7 +125,7 @@ describe("notificationText", () => {
       start_ts: startTs,
       tz: "UTC",
     });
-    expect(body).toContain("07:00");
+    expect(body).toContain("7:00 AM");
   });
 
   it("still reads as a sentence when start_ts is missing or junk", () => {
@@ -248,7 +255,7 @@ describe("ownerNotificationText", () => {
 
     const owner = ownerNotificationText("booking_created", payload);
     expect(owner.title).toBe("New booking");
-    expect(owner.body).toContain("09:30");
+    expect(owner.body).toContain("9:30 AM");
     expect(owner.body).not.toMatch(/your/i);
   });
 
@@ -257,7 +264,7 @@ describe("ownerNotificationText", () => {
     // rendering a key the server has never written. A name is never in the payload, so the body
     // points at the booking instead of naming somebody.
     const owner = ownerNotificationText("booking_created", payload);
-    expect(owner.body).toBe("For Fri 7 Aug, 09:30. Open it to see who.");
+    expect(owner.body).toBe("For Fri 7 Aug · 9:30 AM. Open it to see who.");
     // Even a payload that *claims* to hold a name is ignored, so a future server change has to be
     // a deliberate one here rather than silently altering live copy.
     expect(ownerNotificationText("booking_created", { ...payload, customer_name: "Pema" }).body).toBe(
@@ -279,7 +286,7 @@ describe("ownerNotificationText", () => {
   it("uses the time when there is one and a plain sentence when there is not", () => {
     // `booking_cancelled` and `order_placed` arrive with an empty payload on live data.
     expect(ownerNotificationText("booking_cancelled", payload).body).toBe(
-      "Fri 7 Aug, 09:30 is free again.",
+      "Fri 7 Aug · 9:30 AM is free again.",
     );
     expect(ownerNotificationText("booking_cancelled", {}).body).toBe("A booking was cancelled.");
     expect(ownerNotificationText("booking_no_show", {}).body).toBe("A no-show.");

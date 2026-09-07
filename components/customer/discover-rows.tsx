@@ -513,10 +513,11 @@ function OfferBanner({
         </div>
 
         <div className="gap-xs flex flex-col">
-          {/* The size goes on this wrapper and the colour on the heading inside it. Two
-              `text-*` classes through one `cn` is what `lib/utils.ts` documents as remedy 1
-              — `twMerge` treats `text-display-sm` and `text-on-primary` as one family and
-              drops the loser, which is how a label on a photograph became a black box. */}
+          {/* The size goes on this wrapper and the colour on the heading inside it. That was
+              a workaround for `cn` dropping one of two `text-*` classes — how a label on a
+              photograph once became a black box — and `lib/utils.ts` has since taught
+              tailwind-merge the scale, so the split is no longer required. It stays because
+              the responsive size belongs to the block and the colour to the heading. */}
           <div className={solo ? "text-display-md tablet:text-display-lg" : "text-display-sm"}>
             <h3 className="text-on-primary line-clamp-2 font-semibold">
               <Link

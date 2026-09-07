@@ -15,6 +15,7 @@ import {
 } from "@/lib/api/booking";
 import { fetchBusinessById } from "@/lib/api/discovery";
 import { cancellationWindow } from "@/lib/booking-guards";
+import { dayTimeLabel, fullDayTimeLabel } from "@/lib/clock";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -107,14 +108,7 @@ export default async function BookingDetailPage({
         closed: windowState.closed,
         text: windowState.closed
           ? "Free cancellation has closed for this booking. Call the salon if you need to change it."
-          : `Free until ${windowState.freeUntil.toLocaleString("en-GB", {
-              weekday: "short",
-              day: "numeric",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Asia/Thimphu",
-            })}.`,
+          : `Free until ${dayTimeLabel(windowState.freeUntil)}.`,
       }
     : null;
 
@@ -143,14 +137,7 @@ export default async function BookingDetailPage({
       note: open
         ? "You can check in now — this adds you to the shop's line ahead of walk-ins."
         : now < opensAt.getTime()
-          ? `Check-in opens ${opensAt.toLocaleString("en-GB", {
-              weekday: "short",
-              day: "numeric",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Asia/Thimphu",
-            })}.`
+          ? `Check-in opens ${dayTimeLabel(opensAt)}.`
           : "This appointment is too old to check in.",
     };
   }
@@ -198,15 +185,7 @@ export default async function BookingDetailPage({
 
         <div className="mt-md gap-xxs flex flex-col">
           <IconLine icon={Icons.booking}>
-            {booking.startTs.toLocaleString("en-GB", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Asia/Thimphu",
-            })}
+            {fullDayTimeLabel(booking.startTs)}
           </IconLine>
           {booking.staffName ? (
             <IconLine icon={Icons.person}>with {booking.staffName}</IconLine>

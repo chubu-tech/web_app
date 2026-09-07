@@ -1,6 +1,6 @@
 import { kmTo, type Coords } from "./discover-logic";
 import { queueShopSummary } from "./queue-logic";
-import { THIMPHU_OFFSET_MIN } from "./time";
+import { timeLabel } from "./clock";
 import type { Business, SalonAvailability } from "./types/salon";
 
 /**
@@ -76,8 +76,9 @@ export function availableToday(
     const business = byId.get(a.businessId);
     if (!business) continue;
 
-    // Empty means "no walk-in answer" here — the RPC returns `[]` for any salon below
-    // Growth or with the line switched off, not only for a salon whose line is empty.
+    // Empty means "no walk-in answer" here — the RPC returns `[]` for a salon with the line
+    // switched off, not only for one whose line happens to be empty. It used to mean "below
+    // Growth" as well; `20260902000003_queue_for_all_plans.sql` removed that half.
     const waitMinutes =
       a.queueLine.length === 0
         ? null
@@ -114,12 +115,77 @@ export function availableToday(
  * differs is that the app can assume the device is local and this cannot.
  */
 export function availableLabel(s: Pick<AvailableSalon, "slot" | "waitMinutes">): string {
-  if (s.slot != null) {
-    const local = new Date(s.slot.getTime() + THIMPHU_OFFSET_MIN * 60_000);
-    const hh = String(local.getUTCHours()).padStart(2, "0");
-    const mm = String(local.getUTCMinutes()).padStart(2, "0");
-    return `Today ${hh}:${mm}`;
-  }
+  if (s.slot != null) return `Today ${timeLabel(s.slot)}`;
   const wait = s.waitMinutes ?? 0;
   return wait <= 0 ? "Walk in · no wait" : `Walk in · ~${wait} min`;
+}
+
+/** How busy a salon is right now. */
+export type SalonPresence = "open" | "packed" | "fullyBooked";
+
+/**
+ * A walk-in wait at or above this reads as "packed" rather than as a wait.
+ *
+ * Half an hour is the point where somebody standing in a Thimphu salon starts wondering
+ * whether to try the shop next door — which is exactly the moment the card should have told
+ * them before they walked over.
+ */
+export const PACKED_WAIT_MINUTES = 30;
+
+/**
+ * The state and the sentence for one salon, or `null` when the availability read says nothing
+ * about it — a port of `../tho/app/lib/customer/salon_presence.dart`.
+ *
+ * **This exists because the product already knew the answer and only ever showed the happy
+ * half of it.** `salons_available_today` returns the soonest bookable slot *and* the live
+ * walk-in line for every salon in one round trip, and the only surface reading it was the
+ * Available-today rail — which **drops** any salon with neither. So a salon with nothing left
+ * today vanished from that rail and reappeared in the list below it looking exactly like one
+ * with slots all afternoon. The customer found out by opening it, choosing a service,
+ * choosing a stylist, and meeting an empty day.
+ *
+ * **Null rather than a guess**, and it is the most important branch here: this is one RPC over
+ * every salon, so a salon missing from it — added mid-session, or the read failed — must show
+ * **no badge at all**. A card claiming "Fully booked" because a network call was slow is worse
+ * than a card claiming nothing.
+ *
+ * Pure, with no clock read and no data access, for the same reason `booking-guards.ts` is: the
+ * rules are worth testing directly and the badge is presentation.
+ */
+export function presenceFor(
+  a: SalonAvailability | null | undefined,
+): { state: SalonPresence; label: string } | null {
+  if (a == null) return null;
+
+  const wait =
+    a.queueLine.length === 0
+      ? null
+      // One estimator, shared with the join sheet, the salon page and the Available-today
+      // rail. A second one here would let two surfaces quote different waits for one line.
+      : queueShopSummary({ line: a.queueLine, barberCount: a.barberCount }).etaMinutes;
+
+  // A bookable slot beats a queue: it is a time somebody can hold rather than a wait they
+  // have to stand through.
+  if (a.nextSlot != null) {
+    return { state: "open", label: `Next ${timeLabel(a.nextSlot)}` };
+  }
+  if (wait != null) {
+    if (wait >= PACKED_WAIT_MINUTES) {
+      return { state: "packed", label: `Packed · ~${wait} min wait` };
+    }
+    return { state: "open", label: wait <= 0 ? "Walk in · no wait" : `Walk in · ~${wait} min` };
+  }
+  return { state: "fullyBooked", label: "Fully booked today" };
+}
+
+/** The same, keyed by business id — what a list of cards actually needs. */
+export function presenceByBusiness(
+  availability: readonly SalonAvailability[],
+): Map<string, { state: SalonPresence; label: string }> {
+  const out = new Map<string, { state: SalonPresence; label: string }>();
+  for (const a of availability) {
+    const p = presenceFor(a);
+    if (p != null) out.set(a.businessId, p);
+  }
+  return out;
 }

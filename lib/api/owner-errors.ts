@@ -36,6 +36,35 @@ export const OWNER_ERROR = {
   checkFailed: "23514",
   /** A unique constraint: two segments of the same day opening at the same time. */
   duplicate: "23505",
+  /**
+   * `set_booking_status` refused `completed` / `no_show` because the appointment has not
+   * started (`20260902000001_status_time_gate.sql`).
+   *
+   * The console hides both buttons until `start_ts` (`lib/booking-status-rules.ts`), and the
+   * server allows from `start_ts - 5 minutes`, so reaching this means the two clocks
+   * disagree — a till tablet running fast. The server's own sentence names the start in the
+   * salon's timezone, which is the useful half.
+   */
+  /**
+   * `create_business` refused because the caller is a guest. A guest has a uid, so the
+   * insert-shaped check would have passed — what it has no is an email the moderation queue
+   * could reach them on.
+   */
+  guestRefused: "P0003",
+  /**
+   * A value `create_business` will not take: a salon name under 2 or over 80 characters, or
+   * a `business_type` outside the four the picker offers. The form checks the name first, so
+   * reaching this means the picker and the migration have drifted apart.
+   */
+  invalidArgument: "22023",
+  notStarted: "P0017",
+  /**
+   * The row moved under the request. The same migration made the transition atomic after two
+   * taps landing together each wrote a status event and fanned out its own notification — a
+   * customer could be told the visit was complete *and* that they were a no-show. On a shared
+   * till with two people working the board, this is an ordinary race rather than a fault.
+   */
+  statusMovedUnderUs: "40001",
 } as const;
 
 /** Which owner action failed. The same code needs different words for each. */
@@ -63,6 +92,7 @@ export type OwnerAction =
   | "saveSalonHours"
   | "saveSalon"
   | "createSalon"
+  | "resubmitSalon"
   | "uploadPhoto"
   | "removePhoto"
   // 3c — the back office. Almost all of these are `P0001` raises whose message is better
@@ -119,7 +149,8 @@ const FALLBACK: Record<OwnerAction, string> = {
   saveStaffHours: "Couldn't save these hours.",
   saveSalonHours: "Couldn't save your opening hours.",
   saveSalon: "Couldn't save. Please try again.",
-  createSalon: "Couldn't create the salon. Please try again.",
+  createSalon: "Couldn't create your salon. Check your connection and try again.",
+  resubmitSalon: "Couldn't send it for review. Please try again.",
   uploadPhoto: "Couldn't upload that photo.",
   removePhoto: "Couldn't remove that photo.",
   loadClientBook: "Couldn't load your client book.",
@@ -194,6 +225,22 @@ export function ownerErrorMessage(action: OwnerAction, error: unknown): string {
     return "Those hours are already listed for that day.";
   }
 
+  if (code === OWNER_ERROR.guestRefused) {
+    return "Create an account with your email before listing a salon.";
+  }
+  if (code === OWNER_ERROR.invalidArgument) {
+    // The server names which value it refused, and it is the only party that knows.
+    return messageOf(error, "One of those details isn't allowed. Check the name and type.");
+  }
+  if (code === OWNER_ERROR.notStarted) {
+    return messageOf(error, "That appointment has not started yet.");
+  }
+  if (code === OWNER_ERROR.statusMovedUnderUs) {
+    // Deliberately not the server's words: 'booking status changed under this request' is a
+    // log line. What the owner needs is what to do about it.
+    return "Someone else just updated this booking. Refresh and check it.";
+  }
+
   if (code === OWNER_ERROR.raised) {
     switch (action) {
       case "callNext":
@@ -212,6 +259,14 @@ export function ownerErrorMessage(action: OwnerAction, error: unknown): string {
         return messageOf(error, fallback);
       case "cancelBooking":
         // 'only active bookings can be cancelled (current: %)'.
+        return messageOf(error, fallback);
+      case "createSalon":
+        // 'You already run 10 salons on this account. Contact support to add more.' — the cap
+        // is the server's number and it says it in full, so passing it through is right.
+        return messageOf(error, fallback);
+      case "resubmitSalon":
+        // 'only a rejected salon can be sent back for review' — which names the state, and
+        // the header only offers the action on that state, so this is a race or a stale page.
         return messageOf(error, fallback);
       case "addWalkIn":
         // 'this shop is not running a queue' / 'service not found for this business'

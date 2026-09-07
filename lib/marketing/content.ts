@@ -122,22 +122,22 @@ export const brand = {
    */
   stores: { ios: "", android: "" },
   /**
-   * The App Store listing's address, for the one surface that needs to reach it while
-   * `stores.ios` is still empty: `/app`, the branded share link.
+   * Both store listings' addresses, for the one surface that needs to reach them while
+   * `stores` is still empty: `/app`, the branded share link.
    *
-   * ## Why this is separate from `stores.ios`
+   * ## Why this is separate from `stores`
    *
-   * They answer different questions. `stores.ios` is *"has the site launched?"* — the
-   * switch above, with copy consequences across nine components. This is *"where does the
-   * listing live?"*, which has one consumer and no copy attached. The app is live on the
-   * Bhutan storefront (v1.1.0, released 2026-08-24) while the site still says "coming
-   * soon", so the two genuinely have different answers right now, and collapsing them
-   * into one constant would mean the share link could not exist until the whole site's
-   * launch copy changed.
+   * They answer different questions. `stores` is *"has the site launched?"* — the switch
+   * above, with copy consequences across nine components. This is *"where do the listings
+   * live?"*, which has one consumer and no copy attached. The apps are live (iOS on the
+   * Bhutan storefront, v1.1.0, released 2026-08-24) while the site still says "coming
+   * soon", so the two genuinely have different answers right now, and collapsing them into
+   * one constant would mean the share link could not exist until the whole site's launch
+   * copy changed.
    *
-   * ## The URL, and why this exact form
+   * ## The Apple URL, and why this exact form
    *
-   * `url` is the canonical address Apple itself reports as `trackViewUrl` (minus the
+   * `ios.url` is the canonical address Apple itself reports as `trackViewUrl` (minus the
    * `?uo=4` analytics parameter). **The country segment is not optional.** Verified
    * against Apple, not assumed:
    *
@@ -151,15 +151,40 @@ export const brand = {
    * The app is published to the **Bhutan storefront only**, and the storefront-less form
    * that usually redirects does not exist for it. So a link without `/bt/` is a 404 that
    * unfurls as nothing — which is what was being shared before this was written down.
+   * `itunes.apple.com/lookup?id=6801982891` returns `resultCount: 0` and the same lookup
+   * with `&country=bt` returns 1, which is the machine-readable form of the same fact.
    *
-   * `id` is kept beside the URL because it is the stable identity: the `tho-bt` slug is
-   * generated from the listing's name and Apple changes it if the name changes, while
-   * `id6801982891` never moves. Anything that has to construct a store URL should build
-   * it from `id`.
+   * ## The Play URL is the plain one, and it resolves everywhere
+   *
+   * Google has no storefront segment: availability is a property of the listing, not the
+   * URL, so `play.google.com/store/apps/details?id=<package>` is the whole address and
+   * returns 200 regardless of the caller's region. No `&hl=` or `&gl=` — both are display
+   * hints Google infers anyway, and pinning them means a shared link that renders in the
+   * sharer's language rather than the reader's.
+   *
+   * ## `id` beside each `url`
+   *
+   * Because the id is the stable identity and the URL is not. Apple regenerates the
+   * `tho-bt` slug from the listing's name if the name ever changes, while `id6801982891`
+   * never moves; Google's URL *is* the package name. Anything that has to construct a
+   * store URL should build it from `id`.
+   *
+   * **A warning that belongs here rather than in a commit message:** neither listing's
+   * own unfurl is ours to fix. Apple serves *"Tho.bt App - App Store"* with its literal
+   * `Placeholder.mill` image, and Google serves *"Tho - Que & Appointment App - Apps on
+   * Google Play"* — note Google's own listing spells it *Que*. Those are App Store Connect
+   * and Play Console edits, not repo edits. `/app` exists because it is the one link in
+   * this chain whose preview we control.
    */
   appListing: {
-    id: "6801982891",
-    url: "https://apps.apple.com/bt/app/tho-bt/id6801982891",
+    ios: {
+      id: "6801982891",
+      url: "https://apps.apple.com/bt/app/tho-bt/id6801982891",
+    },
+    android: {
+      id: "bt.tho.app",
+      url: "https://play.google.com/store/apps/details?id=bt.tho.app",
+    },
   },
   /**
    * Social profiles, for the footer's Follow us row.
@@ -633,7 +658,17 @@ export const pricing = {
       tagline: "Get found and take bookings.",
       /*
         Nothing here is gated: `Entitlements` unlocks the empty set at Basic, so every
-        line is a capability an ungated salon has today. Four were missing from this card
+        line is a capability an ungated salon has today.
+
+        **The walk-in queue joined this card, and it is a correction rather than an edit.**
+        `20260902000003_queue_for_all_plans.sql` removed the `plan in ('growth','pro')` gate
+        from `join_queue`, `check_in_booking` and `queue_active_line`, so the queue is
+        unconditional at every tier and `businesses.queue_enabled` — the owner's own switch —
+        is the only control. It sat under Growth on this card and on `/for-salons` after that
+        shipped, which is a published claim about what a subscription buys, and the same
+        defect as the "priority placement" line struck from Pro. `plans_config.dart` upstream
+        carries the matching label. Note the existing Basic salons ship switched **off**, so
+        an owner opts in from Settings rather than finding a line already running. Four were missing from this card
         and are real — the service list and prices, a stylist's working hours, the message
         thread with a customer, and offers, which carry no plan check anywhere.
 
@@ -649,6 +684,7 @@ export const pricing = {
         "Your services, prices and who works when",
         "Your profile, photos and reviews",
         "Message customers and post offers",
+        "The walk-in queue, joined by QR at your door",
         "1 stylist",
       ],
       cta: "Start with Basic",
@@ -675,7 +711,6 @@ export const pricing = {
       features: [
         "Everything in Basic",
         "As many stylists as you like",
-        "The walk-in queue, joined by QR at your door",
         "Week view",
         "Reminders sent for you",
         "Your customer list and visit history",
@@ -920,7 +955,7 @@ export const faq = [
       makes about them — an engine quoting this sentence must not end up telling a customer
       that any particular salon delivers.
     */
-    a: "Salon plans on THO are Nu 399, Nu 699 or Nu 1,499 a month, billed in Ngultrum. Basic gets you listed and takes online bookings with one stylist. Growth adds unlimited stylists, the walk-in queue, automatic reminders, a client book, loyalty, products with pickup or delivery and discount codes, and reporting. Pro adds payroll, a Bhutan income-tax estimate, deposits recorded against a booking, and prepaid packs you sell up front — ten cuts paid at your counter. There is no free salon tier, and customers never pay anything.",
+    a: "Salon plans on THO are Nu 399, Nu 699 or Nu 1,499 a month, billed in Ngultrum. Basic gets you listed and takes online bookings with one stylist, and includes the walk-in queue with QR check-in. Growth adds unlimited stylists, automatic reminders, a client book, loyalty, products with pickup or delivery and discount codes, and reporting. Pro adds payroll, a Bhutan income-tax estimate, deposits recorded against a booking, and prepaid packs you sell up front — ten cuts paid at your counter. There is no free salon tier, and customers never pay anything.",
   },
 ] as const;
 

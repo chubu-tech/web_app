@@ -28,6 +28,22 @@ function product(id: string, name: string, priceNu: number): Product {
     isArchived: false,
     sortOrder: 0,
     businessName: null,
+    brandId: null,
+    brandName: null,
+    categoryId: null,
+    categoryName: null,
+    tags: [],
+    hairTypes: [],
+    concerns: [],
+    volume: null,
+    ingredients: null,
+    howToUse: null,
+    compareAtNu: null,
+    discountPct: null,
+    ratingAvg: null,
+    ratingCount: 0,
+    trendingViews: 0,
+    createdAt: null,
   };
 }
 

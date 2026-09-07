@@ -1,4 +1,5 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { jwtIsAnonymous } from "./jwt-claims";
 
 /**
  * The account model, ported from `tho/app/lib/auth/` and `data/api.dart`.
@@ -104,32 +105,94 @@ export async function ensureGuestSession(
 }
 
 /**
- * Turn the current guest into a registered user, keeping the same user id — so
- * anything they saved as a guest survives.
+ * What became of an attempt to turn a guest into a registered account.
  *
- * Returns whether they are now a *real* user. `false` means the account was
- * created but needs email confirmation first, which is the case on this project.
- * Say so rather than claiming success: the app's guest wall makes the same
- * distinction (`guest_wall.dart:91`).
+ * Three outcomes, not a boolean, because the middle two need different words and a
+ * different button — and conflating them is what produced the defect below.
+ */
+export type GuestUpgrade =
+  /** The session itself now proves a real account. Retry whatever they were doing. */
+  | "ready"
+  /** The account exists; this project requires the email round-trip before it is real. */
+  | "awaitingEmailConfirmation"
+  /** The account is real but this browser could not finish signing in to it. */
+  | "sessionStale";
+
+/**
+ * Turn the current guest into a registered user, keeping the same user id — so anything they
+ * saved as a guest survives.
+ *
+ * **`refreshSession` is the whole fix, and it is not optional.** `auth.updateUser()` does
+ * *not* re-issue the access token: gotrue copies the new user into the existing session and
+ * keeps the old JWT. So `getUser()` reports the new email while every RPC still reads
+ * `is_anonymous: true` from the claim and refuses with `P0010`. Before this, the customer
+ * met *"Create an account to book"* **after** creating one, as often as they retried — the
+ * defect upstream fixed in `e71dfa0`, and this repo had it in the same shape.
+ *
+ * The judgement is made from **the claim in the refreshed token**, not from the user record,
+ * because the claim is what `private.is_real_user()` reads. The two can no longer disagree.
+ *
+ * The profile name is written **after** the refresh, so it goes out under the new token. A
+ * failure there costs the name, never the account — and `handle_user_meta_update`
+ * (`20260902000004`) fills a blank `profiles.full_name` from the auth metadata anyway, so
+ * this is the fast path rather than the only one.
  */
 export async function upgradeGuest(
   supabase: SupabaseClient,
   email: string,
   password: string,
   fullName?: string,
-): Promise<{ ok: boolean; confirmed: boolean; error?: string }> {
+): Promise<{ ok: boolean; outcome: GuestUpgrade; error?: string }> {
   const { error } = await supabase.auth.updateUser({
     email,
     password,
     data: fullName ? { full_name: fullName } : undefined,
   });
-  if (error) return { ok: false, confirmed: false, error: friendlyAuthError(error) };
+  if (error) {
+    return { ok: false, outcome: "sessionStale", error: friendlyAuthError(error) };
+  }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const outcome = await resumeUpgrade(supabase);
 
-  return { ok: true, confirmed: !isGuestUser(user) };
+  if (fullName && outcome === "ready") {
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      // Best-effort: the account is already made, so a failed name write must not report the
+      // upgrade as failed. `handle_new_user` cannot have set it — that trigger is AFTER
+      // INSERT and an anonymous user's INSERT carries no metadata, which is why the salon
+      // used to see "Guest" on a booking somebody had put their name to.
+      const { error: nameError } = await supabase
+        .from("profiles")
+        .update({ full_name: fullName })
+        .eq("id", data.user.id);
+      if (nameError) {
+        // Swallowed on purpose, and recoverable: `handle_user_meta_update`
+        // (`20260902000004`) fills a blank `profiles.full_name` from the auth metadata this
+        // upgrade just wrote, so the name still lands even when this write does not.
+      }
+    }
+  }
+
+  return { ok: true, outcome };
+}
+
+/**
+ * Re-check whether this browser's session now proves a real account, **writing nothing**.
+ *
+ * This is what the wall's "Continue" calls. It has to be separate from
+ * {@link upgradeGuest} for one reason: a second `updateUser` would try to create the account
+ * again, and the person tapping Continue has already got one.
+ */
+export async function resumeUpgrade(supabase: SupabaseClient): Promise<GuestUpgrade> {
+  const { data, error } = await supabase.auth.refreshSession();
+  if (error) return "sessionStale";
+
+  const claim = jwtIsAnonymous(data.session?.access_token);
+  // `null` means the token could not be read — fall back to the user record rather than
+  // treating "I could not tell" as an answer either way.
+  const isGuest = claim ?? isGuestUser(data.user ?? null);
+
+  return isGuest ? "awaitingEmailConfirmation" : "ready";
 }
 
 /**
@@ -147,8 +210,30 @@ export function friendlyAuthError(error: unknown): string {
       : error,
   ).toLowerCase();
 
-  if (s.includes("already registered") || s.includes("already been registered")) {
-    return "That email already has an account — try signing in.";
+  if (
+    s.includes("already registered") ||
+    s.includes("already been registered") ||
+    // gotrue's newer wording, and the code it sends with it. A guest hitting this has an
+    // account under a *different* user id, so upgrading this session can never reach it —
+    // which is why the sentence has to say "sign out", not "try signing in".
+    s.includes("email_exists") ||
+    s.includes("already in use")
+  ) {
+    return "That email already has an account. Sign out and sign in with it instead.";
+  }
+  if (
+    s.includes("invalid email") ||
+    s.includes("email_address_invalid") ||
+    // gotrue's actual wording for a malformed address, and the reason
+    // `lib/credentials.ts` validates before the round trip: this arrives as a message
+    // about the *request* ("invalid format") rather than about what the person typed.
+    s.includes("unable to validate email")
+  ) {
+    return "That email address doesn't look right.";
+  }
+  if (s.includes("anonymous")) {
+    // `manual_linking_disabled`, or an anonymous session the project will not upgrade.
+    return "Guest accounts can't be upgraded right now. Please sign in instead.";
   }
   if (s.includes("invalid login") || s.includes("invalid credentials")) {
     return "Wrong email or password.";

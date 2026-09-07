@@ -12,7 +12,7 @@ import {
 } from "@/lib/api/discovery";
 import { fetchMyFavouriteIds } from "@/lib/api/favourites";
 import { fetchLiveOffers } from "@/lib/api/salon";
-import { fetchProducts } from "@/lib/api/shop";
+import { fetchProductCategories, fetchProducts } from "@/lib/api/shop";
 import { CUSTOMER_HOME, homeForRole } from "@/lib/auth";
 import { shareCard } from "@/lib/seo";
 import { priceBounds, productFilterFromParams } from "@/lib/product-filter";
@@ -148,6 +148,7 @@ export default async function DiscoverPage({
     offers,
     favouriteIds,
     products,
+    productCategories,
     staffInvites,
     availability,
   ] = await Promise.all([
@@ -193,6 +194,15 @@ export default async function DiscoverPage({
       // that the salon list must survive it failing.
       fetchProducts(supabase).catch(() => []),
       /*
+        The product taxonomy — platform-owned, eight rows, and the same for every visitor.
+
+        Decorative in the strict sense: `ProductCategoryStrip` renders nothing at all for an
+        empty list, so a failed read costs the narrowing axis and leaves the whole catalogue
+        in the grid beneath it. That is the trade upstream makes too, and it is why this is a
+        `.catch` rather than something the page waits on.
+      */
+      fetchProductCategories(supabase).catch(() => []),
+      /*
         Invitations to a chair, addressed to whoever is signed in.
 
         Here because `/` is where a bare sign-in lands a customer, which is exactly where
@@ -216,6 +226,15 @@ export default async function DiscoverPage({
   // Reconciled against the loaded bounds here rather than in the component: a bound that does not
   // narrow the catalogue is stored as cleared, so a stale or hand-edited URL cannot show an active
   // filter badge over an unfiltered list.
+  /*
+    The category axis, as a **slug** rather than an id: a shared `?cat=hair-care` says what it
+    is, where a uuid says nothing. It is deliberately not part of `ProductFilter` — that type
+    is the sort-and-price sheet, and the category is the strip's own axis, carried beside the
+    filter exactly as `?q=` is. Validated against the loaded taxonomy in `ProductsBrowse`, so
+    a hand-edited slug narrows nothing rather than emptying the grid.
+  */
+  const categorySlug = one("cat") ?? null;
+
   const productFilter = productFilterFromParams(
     { sort: one("sort"), min: one("min"), max: one("max") },
     priceBounds(products),
@@ -241,6 +260,8 @@ export default async function DiscoverPage({
         favouriteIds={[...favouriteIds]}
         filters={filters}
         products={products}
+        productCategories={productCategories}
+        categorySlug={categorySlug}
         productFilter={productFilter}
         tab={tab}
         searchTerm={searchTerm ?? ""}

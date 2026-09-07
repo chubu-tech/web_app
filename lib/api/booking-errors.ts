@@ -69,6 +69,27 @@ export const BOOKING_ERROR = {
    * morning's walk-in at lunchtime is ordinary shop work.
    */
   pastStart: "P0016",
+  /**
+   * `completed` / `no_show` before the appointment has started
+   * (`20260902000001_status_time_gate.sql`), from `set_booking_status`.
+   *
+   * The server allows from `start_ts - 5 minutes`; the client hides the buttons until
+   * `start_ts`, so reaching this code means a clock disagreement rather than a mis-tap —
+   * which is exactly why its message is worth passing through: it names the appointment's
+   * start in the **salon's** timezone, not the reader's.
+   */
+  notStarted: "P0017",
+  /**
+   * The booking's status changed under this request. The same migration made the transition
+   * atomic — `for update` before judging, plus `and status = v_from` on the UPDATE — after
+   * two taps landing together both passed the guard and wrote two status events, each fanning
+   * out its own notification. A customer could be told the visit was complete *and* that they
+   * were a no-show.
+   *
+   * `40001` is Postgres's own serialization-failure class, so this is not one of the
+   * project's `P00xx` codes and will never collide with one.
+   */
+  statusMovedUnderUs: "40001",
 } as const;
 
 type PgError = { code?: string; message?: string };
@@ -138,6 +159,15 @@ export function bookingErrorMessage(error: unknown, fallback: string): string {
     }
     case BOOKING_ERROR.pastStart:
       return bookingBlockMessage("pastStart");
+    case BOOKING_ERROR.notStarted:
+      // The server's own sentence names the local start time and the salon's timezone —
+      // "this appointment starts at 20:00 on Wednesday 2 Sep; it can be marked completed
+      // once it is under way" — which is strictly more use than anything written here.
+      return message
+        ? asSentence(message)
+        : "That appointment has not started yet.";
+    case BOOKING_ERROR.statusMovedUnderUs:
+      return "Someone else just updated this booking. Pull to refresh and check it.";
     case BOOKING_ERROR.notEntitled:
       // These carry a specific, useful reason ("this shop is not running a queue",
       // "style selection is a Pro feature") — pass it through rather than flatten it.

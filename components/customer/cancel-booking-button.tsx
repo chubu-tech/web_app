@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { cancelBooking } from "@/lib/api/booking";
 import { bookingErrorMessage } from "@/lib/api/booking-errors";
+import { fullDayTimeLabel } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/client";
 import type { Booking } from "@/lib/types/booking";
 
@@ -79,14 +80,7 @@ export function CancelBookingButton({
         <div className="p-base gap-md flex flex-col">
           <p className="text-body-md text-body">
             Your{" "}
-            {booking.startTs.toLocaleString("en-GB", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Asia/Thimphu",
-            })}{" "}
+            {fullDayTimeLabel(booking.startTs)}{" "}
             appointment at {booking.businessName ?? "the salon"} will be cancelled.
           </p>
           <Button variant="filled" fullWidth busy={busy} onClick={() => void confirm()}>

@@ -16,6 +16,8 @@ import { formatMinutesOfDay, thimphuMinutesOfDay } from "@/lib/time";
 import type { Slot } from "@/lib/types/booking";
 import type { ServiceItem, StaffMember } from "@/lib/types/salon";
 import { cn, formatDuration, formatNu } from "@/lib/utils";
+import { BhutanPhoneField } from "@/components/ui/bhutan-phone-field";
+import { bhutanPhoneError, toE164 } from "@/lib/bhutan-phone";
 
 /**
  * Book a slot for someone at the counter — a port of
@@ -53,6 +55,7 @@ export function WalkInForm({
   const router = useRouter();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [showPhoneError, setShowPhoneError] = useState(false);
   const [note, setNote] = useState("");
   const [staffId, setStaffId] = useState(staff[0]?.id ?? "");
   const [picked, setPicked] = useState<string[]>([]);
@@ -84,6 +87,17 @@ export function WalkInForm({
 
   async function submit() {
     if (!slot) return;
+    /*
+      Optional on purpose — a walk-in who will not leave a number still gets booked. But
+      **typed half-way is a typo rather than a decision**, and stored it is worse than blank:
+      the booking then carries a Call and a WhatsApp action that land on nothing.
+    */
+    const phoneProblem = bhutanPhoneError(phone);
+    if (phoneProblem) {
+      setShowPhoneError(true);
+      toast.error(phoneProblem);
+      return;
+    }
     idempotencyKey.current ??= crypto.randomUUID();
     setBusy(true);
     try {
@@ -95,7 +109,7 @@ export function WalkInForm({
         start: slot.start,
         source: "walk_in",
         customerName: name.trim() || null,
-        customerPhone: phone.trim() || null,
+        customerPhone: toE164(phone),
         customerNote: note.trim() || null,
       });
       toast.success("Walk-in booked.");
@@ -118,12 +132,10 @@ export function WalkInForm({
         <SectionHeader title="Customer (optional)" as="h2" />
         <div className="gap-base mt-sm flex flex-col">
           <Field label="Name" value={name} onChange={setName} placeholder="e.g. Karma" />
-          <Field
-            label="Phone"
-            type="tel"
+          <BhutanPhoneField
             value={phone}
             onChange={setPhone}
-            placeholder="+975 17 000 000"
+            showError={showPhoneError}
             hint="Lets you call or WhatsApp them from the booking."
           />
           <Field

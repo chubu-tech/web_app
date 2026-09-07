@@ -4,6 +4,7 @@ import { Icons, IconSize } from "./icons";
 import { RatingPill } from "./rating";
 import { cn } from "@/lib/utils";
 import { salonPath } from "@/lib/slug";
+import type { SalonPresence } from "@/lib/available-today";
 
 /**
  * The photo-forward salon card, ported from
@@ -67,6 +68,7 @@ export function BusinessCard({
   avgRating,
   reviewCount,
   distanceLabel,
+  presence,
   chip,
   favourite,
   href,
@@ -95,6 +97,27 @@ export function BusinessCard({
   /** Line three — what the place is and how many have rated it. */
   meta?: string | null;
   imageUrl?: string | null;
+  /**
+   * Whether this salon can see somebody today — from `presenceFor`.
+   *
+   * **Takes the cover's chip slot from `distanceLabel` when both are known**, and the trade is
+   * deliberate: distance is already the row a customer chose to browse by and is often in the
+   * heading above the grid, whereas "Fully booked today" is the fact that changes whether they
+   * open the card at all. Upstream draws only this one on the cover.
+   *
+   * **An explicit `chip` still wins over it**, which is why `/salons` and `/recommended` do
+   * not pass this yet: both spend that slot on the distance they are *ordered by*, so a badge
+   * there would either displace the ranking's own explanation or — passed alongside a `chip` —
+   * render nothing while still costing the heaviest read on Discover. The card has one slot
+   * over the cover by design (the bottom-left one was removed with the scrim), so giving those
+   * two pages a badge is a question about the card's slots rather than about availability, and
+   * it belongs with the design pass rather than here.
+   *
+   * `null` renders nothing. That is the availability read saying nothing about this salon, and
+   * a card claiming "Fully booked" because an RPC was slow is worse than a card claiming
+   * nothing — see `presenceFor`.
+   */
+  presence?: { state: SalonPresence; label: string } | null;
   avgRating: number | null;
   reviewCount: number;
   /**
@@ -161,7 +184,9 @@ export function BusinessCard({
         )}
         chip={
           chip ??
-          (distanceLabel ? (
+          (presence ? (
+            <PresenceBadge presence={presence} />
+          ) : distanceLabel ? (
             <MediaChip>
               <Icons.location
                 className="text-rausch-cta shrink-0"
@@ -247,6 +272,49 @@ export function BusinessCard({
  * Ink on 92% canvas clears it by a wide margin whatever is underneath, because at 92% the
  * photograph contributes 8% of the result.
  */
+/**
+ * The cover's availability pill.
+ *
+ * Three states, one fill each, and the colours are doing semantic work rather than
+ * decorating: `open` borrows the same green pair a confirmed booking wears, `packed` the
+ * brand tint used for "busy, but you can still be seen", and `fullyBooked` the muted
+ * treatment every dead state in this product uses. So the badge is legible before the words
+ * are read, which is the point of it being on the cover.
+ *
+ * Not a `MediaChip`: that one is deliberately neutral (`bg-canvas/92`) so a distance reads
+ * over any photograph, and a distance has no state to signal.
+ */
+function PresenceBadge({ presence }: { presence: { state: SalonPresence; label: string } }) {
+  const tone =
+    presence.state === "open"
+      ? "bg-success-soft text-success-text"
+      : presence.state === "packed"
+        ? "bg-rausch-soft text-rausch"
+        : "bg-surface-strong text-muted";
+  const Glyph =
+    presence.state === "open"
+      ? Icons.check
+      : presence.state === "packed"
+        ? Icons.queue
+        : Icons.close;
+
+  return (
+    <span
+      className={cn(
+        "text-badge px-sm py-xxs gap-xxs shadow-card inline-flex items-center rounded-full font-semibold",
+        tone,
+      )}
+    >
+      <Glyph
+        className="shrink-0"
+        style={{ width: IconSize.xxs, height: IconSize.xxs }}
+        aria-hidden
+      />
+      {presence.label}
+    </span>
+  );
+}
+
 export function MediaChip({ children }: { children: React.ReactNode }) {
   return (
     <span className="bg-canvas/92 text-ink text-badge px-sm py-xxs gap-xxs shadow-card inline-flex items-center rounded-full font-semibold backdrop-blur-sm">

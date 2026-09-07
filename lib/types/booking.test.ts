@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   bookingCode,
+  asBookingSegment,
+  bookingSegmentCounts,
+  bookingsForSegment,
   bookingTab,
   canRemind,
   hasNote,
@@ -310,5 +313,112 @@ describe("relativeDayLabel", () => {
     // the 10th (14:00 Thimphu) is the same Thimphu day.
     const lateUtc = new Date("2026-08-09T23:00:00.000Z");
     expect(relativeDayLabel(new Date("2026-08-10T08:00:00.000Z"), lateUtc)).toBe("Today");
+  });
+});
+
+/*
+  The direction is the behaviour these cover, because all three surfaces that show these tabs
+  used to filter and stop — so each inherited whatever order its own read returned, and two of
+  the three reads are `start_ts` descending. That put next month's appointment above this
+  afternoon's on the customer's and the stylist's Upcoming tab.
+
+  The fixtures are handed in **descending** order on purpose: that is what those two readers
+  actually return, so a test given already-ascending input would pass without the sort.
+*/
+describe("bookingsForSegment", () => {
+  const at = (id: string, iso: string, status: BookingStatus) => ({
+    id,
+    startTs: new Date(iso),
+    status,
+  });
+
+  // Newest first, as `fetchMyBookings` and `fetchStaffBookings` return them.
+  const live = [
+    at("next-month", "2026-10-02T08:00:00Z", "confirmed"),
+    at("tomorrow", "2026-09-03T08:00:00Z", "confirmed"),
+    at("this-afternoon", "2026-09-02T08:00:00Z", "pending"),
+  ];
+
+  it("puts the soonest appointment first in Upcoming", () => {
+    expect(bookingsForSegment(live, 0).map((b) => b.id)).toEqual([
+      "this-afternoon",
+      "tomorrow",
+      "next-month",
+    ]);
+  });
+
+  it("keeps history newest-first", () => {
+    const past = [
+      at("older", "2026-08-01T08:00:00Z", "completed"),
+      at("newer", "2026-08-20T08:00:00Z", "completed"),
+    ];
+    expect(bookingsForSegment(past, 1).map((b) => b.id)).toEqual(["newer", "older"]);
+  });
+
+  it("takes cancelled and no-show into the same segment", () => {
+    const dead = [
+      at("cancelled", "2026-08-01T08:00:00Z", "cancelled"),
+      at("no-show", "2026-08-20T08:00:00Z", "no_show"),
+    ];
+    expect(bookingsForSegment(dead, 2).map((b) => b.id)).toEqual(["no-show", "cancelled"]);
+  });
+
+  it("does not leak a booking into a segment it does not belong to", () => {
+    expect(bookingsForSegment(live, 1)).toEqual([]);
+    expect(bookingsForSegment(live, 2)).toEqual([]);
+  });
+
+  /*
+    Two stylists at one salon can genuinely hold the same slot, so a tie is real. Breaking it
+    on `id` makes the order total — without it the two can swap places between renders.
+  */
+  it("breaks a tied start on id, so the order is stable", () => {
+    const tied = [
+      at("b", "2026-09-02T08:00:00Z", "confirmed"),
+      at("a", "2026-09-02T08:00:00Z", "confirmed"),
+    ];
+    expect(bookingsForSegment(tied, 0).map((x) => x.id)).toEqual(["a", "b"]);
+    expect(bookingsForSegment([...tied].reverse(), 0).map((x) => x.id)).toEqual(["a", "b"]);
+  });
+
+  it("does not mutate what it was given", () => {
+    const order = live.map((b) => b.id);
+    bookingsForSegment(live, 0);
+    expect(live.map((b) => b.id)).toEqual(order);
+  });
+});
+
+describe("bookingSegmentCounts", () => {
+  it("tallies all three in one pass", () => {
+    expect(
+      bookingSegmentCounts([
+        { status: "confirmed" },
+        { status: "pending" },
+        { status: "completed" },
+        { status: "cancelled" },
+        { status: "no_show" },
+      ]),
+    ).toEqual([2, 1, 2]);
+  });
+
+  it("is all zeroes for nobody", () => {
+    expect(bookingSegmentCounts([])).toEqual([0, 0, 0]);
+  });
+});
+
+describe("asBookingSegment", () => {
+  it("passes the three real indices through", () => {
+    expect(asBookingSegment(0)).toBe(0);
+    expect(asBookingSegment(1)).toBe(1);
+    expect(asBookingSegment(2)).toBe(2);
+  });
+
+  /*
+    Falls back to Upcoming rather than to nothing. An out-of-range index showing the wrong tab
+    is something a person notices; one that matches no segment renders the empty state over
+    somebody's live bookings, which reads as data loss.
+  */
+  it("resolves anything else to Upcoming", () => {
+    for (const n of [-1, 3, 99, Number.NaN]) expect(asBookingSegment(n)).toBe(0);
   });
 });

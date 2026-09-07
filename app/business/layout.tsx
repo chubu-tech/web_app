@@ -66,11 +66,12 @@ export default async function OwnerLayout({
 
   return (
     /*
-      `data-shell="owner"` is what puts the console on the same editorial canvas as the
-      customer routes and the marketing site — see the scope block in `app/globals.css`,
-      which now matches on the attribute's presence rather than on the value `customer`.
-      `bg-canvas` on the wrapper is belt to the `body:has()` brace: body carries the cream
-      so overscroll does not flash white, this covers the subtree.
+      `data-shell="owner"` is the shell marker. It used to be what put the console on the
+      same editorial canvas as the customer routes and the marketing site; the canvas port
+      moved `--color-canvas` to `tokens.dart`'s white for all of them and deleted that scope
+      block from `app/globals.css`, so the attribute now records which shell this is and
+      nothing more. `bg-canvas` on the wrapper paints the subtree, and `body` in
+      `@layer base` covers the viewport itself so overscroll shows the same colour.
     */
     <div data-shell="owner" className="bg-canvas flex min-h-full flex-col">
       <OwnerHeader

@@ -78,19 +78,17 @@ export function NavLink({
         because the link also hosts the underline and the badge — clipping at the link would
         cut both.
 
-        **`text-title` is here and not in the link's `cn` call, and that is not a style
-        choice.** `cn` is `twMerge`, and tailwind-merge does not know this project's type
-        scale: it has no `title` in its font-size list, so it reads `text-title` as a
-        *colour* and the `text-muted`/`text-ink` branch below wins on being last. The class
-        is deleted before it reaches the DOM. Measured — the rendered `class` attribute had
-        `font-medium` and no size at all, so both shells' nav links inherited `body`'s 16px
-        where `../landing_page` sets 15px (`text-[0.9375rem]` in `site-header.tsx`).
-        `text-title` is 0.9375rem, i.e. exactly that, and it brings the token's own tracking
-        with it.
+        `text-title` sits here rather than in the link's `cn` call. **That used to be a
+        workaround and is now just where it belongs.** `cn` did not know this project's type
+        scale, so it read `text-title` as a *colour* and the `text-muted`/`text-ink` branch
+        below won on being last — the class was deleted before it reached the DOM, and both
+        shells' nav links inherited `body`'s 16px. `lib/utils.ts` teaches tailwind-merge the
+        scale now, so putting it in the `cn` call would work too.
 
-        This span has no colour class, so nothing here conflicts and the token survives. The
-        icon and the badge carry their own sizes (`IconSize`, `text-badge`), so the link
-        itself never needs a font size.
+        It stays here because the label is the thing with a size: the icon and the badge carry
+        their own (`IconSize`, `text-badge`), so the link itself never needs a font size.
+        `text-title` is 0.9375rem, matching `../landing_page`'s 15px nav, and it brings the
+        token's own tracking with it.
 
         The same trap applies to all ten `--text-*` tokens at 40 `cn` call sites across the
         app. See the note on `cn` in `lib/utils.ts`.

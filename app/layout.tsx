@@ -252,8 +252,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  // The owner console's canvas. `app/(customer)/layout.tsx` overrides this with the
-  // cream one for the customer routes.
+  // Every shell's canvas, since the port moved them all onto `tokens.dart`'s white. The
+  // three nested layouts still declare their own — see `app/(marketing)/layout.tsx` — but
+  // they now declare the same value rather than correcting this one.
   themeColor: "#ffffff",
   // Light only — DESIGN.md has no dark mode.
   colorScheme: "light",

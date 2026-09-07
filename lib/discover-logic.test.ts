@@ -50,6 +50,10 @@ function biz(id: string, at?: { lat: number; lng: number }): Business {
     monthlyRevenueGoal: null,
     rebookingEnabled: false,
     rebookingDays: 30,
+    // These fixtures stand in for salons a customer can see, which by RLS are
+    // approved and active — the same thing `toBusiness`'s default encodes.
+    status: "approved" as const,
+    rejectionReason: null,
   };
 }
 

@@ -2,12 +2,14 @@ import { planFromString } from "../entitlements";
 import type {
   Business,
   BusinessPhoto,
+  BusinessStatus,
   BusinessType,
   CatalogService,
   Category,
   Hairstyle,
   Offer,
   Product,
+  ProductCategory,
   QueueJoinMode,
   Review,
   SalonAvailability,
@@ -72,6 +74,16 @@ const numOrNull = (v: unknown): number | null =>
   v == null ? null : Number.isFinite(Number(v)) ? Number(v) : null;
 const dateOrNull = (v: unknown): Date | null =>
   typeof v === "string" ? new Date(v) : null;
+/**
+ * A Postgres `text[]`, which PostgREST sends as a JSON array.
+ *
+ * Always an array, never null: every consumer of `tags` / `hair_types` / `concerns` wants
+ * to map or check `.length`, and a nullable one would put the same `?? []` at each of them.
+ * Non-strings are dropped rather than coerced — a stray number in a text column is bad data,
+ * and `String(null)` rendering as "null" on a product page is the worse failure.
+ */
+const strArray = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.length > 0) : [];
 
 export function toBusiness(m: Row): Business {
   return {
@@ -107,6 +119,19 @@ export function toBusiness(m: Row): Business {
     monthlyRevenueGoal: numOrNull(m.monthly_revenue_goal),
     rebookingEnabled: (m.rebooking_enabled as boolean | null) ?? false,
     rebookingDays: numOrNull(m.rebooking_days) ?? 30,
+    /*
+      **Defaults to `approved`, and that is deliberate rather than optimistic.**
+
+      Most rows reach this mapper through a customer read whose RLS has already filtered to
+      approved salons, and `BUSINESS_PUBLIC_SELECT` does not ask for the column — so a
+      missing value means "this projection has no opinion", not "unreviewed". Failing closed
+      to `pending` here would put an "Under review" badge on every salon on Discover.
+
+      An owner's own read is `select("*")` as `authenticated`, which holds all 39 columns, so
+      the real value always arrives on the one surface that acts on it.
+    */
+    status: (str(m.status) ?? "approved") as BusinessStatus,
+    rejectionReason: str(m.rejection_reason),
   };
 }
 
@@ -116,6 +141,12 @@ export function toBusiness(m: Row): Business {
  * Separate from `toBusiness` and taking `avg` as an explicit nullable, because
  * an unrated salon must *clear* the field rather than keep a stale value — the
  * Dart original has the same carve-out for exactly this reason.
+ *
+ * **The spread is what keeps this honest as `Business` grows.** Upstream wrote its
+ * equivalent as a 27-field hand-written constructor and it silently dropped every field it
+ * did not name — `status` would have been the fourth to go that way, on the discovery screen,
+ * which merges ratings in a second pass over the same rows. Do not expand this into a
+ * field-by-field copy.
  */
 export function withRating(
   b: Business,
@@ -244,6 +275,18 @@ export function toOffer(m: Row): Offer {
   };
 }
 
+/**
+ * One product row, from **either** shape.
+ *
+ * `product_cards` is the read every customer surface now uses: it carries the salon name,
+ * the brand and category names, the computed `discount_pct` and the rating aggregates as
+ * flat columns. The bare `products` table is still read by the owner's catalogue manager,
+ * where a join to a public view would be the wrong grant and the aggregates mean nothing.
+ *
+ * So the salon name is taken from **either** the view's `business_name` column or the
+ * table read's `businesses(name)` embed. Reading only one of the two is what would make a
+ * card silently lose its attribution the next time a call site moved between them.
+ */
 export function toProduct(m: Row): Product {
   const biz = (m.businesses ?? null) as Row | null;
   return {
@@ -256,7 +299,36 @@ export function toProduct(m: Row): Product {
     inStock: (m.in_stock as boolean | null) ?? true,
     isArchived: (m.is_archived as boolean | null) ?? false,
     sortOrder: numOrNull(m.sort_order) ?? 0,
-    businessName: biz ? str(biz.name) : null,
+    businessName: str(m.business_name) ?? (biz ? str(biz.name) : null),
+
+    brandId: str(m.brand_id),
+    brandName: str(m.brand_name),
+    categoryId: str(m.category_id),
+    categoryName: str(m.category_name),
+    tags: strArray(m.tags),
+    hairTypes: strArray(m.hair_types),
+    concerns: strArray(m.concerns),
+    volume: str(m.volume),
+    ingredients: str(m.ingredients),
+    howToUse: str(m.how_to_use),
+    compareAtNu: numOrNull(m.compare_at_nu),
+
+    discountPct: numOrNull(m.discount_pct),
+    // `rating_avg` arrives as a numeric, which PostgREST sends as a string.
+    ratingAvg: numOrNull(m.rating_avg),
+    ratingCount: numOrNull(m.rating_count) ?? 0,
+    trendingViews: numOrNull(m.trending_views) ?? 0,
+    createdAt: dateOrNull(m.created_at),
+  };
+}
+
+export function toProductCategory(m: Row): ProductCategory {
+  return {
+    id: m.id as string,
+    name: m.name as string,
+    slug: m.slug as string,
+    icon: str(m.icon),
+    sort: numOrNull(m.sort) ?? 0,
   };
 }
 

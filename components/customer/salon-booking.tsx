@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Icons, IconSize } from "@/components/ui/icons";
 import { SelectTile } from "@/components/ui/select-tile";
 import { SectionHeader } from "@/components/ui/section-header";
 import { bookableServices } from "@/lib/booking-basket";
@@ -36,9 +37,20 @@ export function SalonBooking({
   staffByService,
   initialServiceId = null,
   gender = "any",
+  phone = null,
 }: {
   salonId: string;
   services: ServiceItem[];
+  /**
+   * The salon's phone, for the case where there is nothing to book.
+   *
+   * **Six of the eighteen live salons have no menu at all**, and until now each of them
+   * rendered a permanently disabled "Book appointment" over the caption *"No services listed
+   * yet"* — a control that could never work, in the most prominent place on the page, with a
+   * fixed bar holding a phone-sized strip to carry it. Upstream replaced that with the one
+   * thing that does work: the salon's own number.
+   */
+  phone?: string | null;
   /**
    * The service the price list handed over, from `?service=`.
    *
@@ -84,6 +96,14 @@ export function SalonBooking({
     : null;
   const missing = serviceId ? null : "Choose a service to continue";
 
+  /*
+    Nothing on the menu is a different situation from nothing selected, and it needs a
+    different control: no amount of choosing will produce a service, so the Book button is not
+    "not yet ready", it is inapplicable. `tel:` is what the customer can actually act on.
+  */
+  const nothingToBook = services.length === 0;
+  const callHref = phone ? `tel:${phone}` : null;
+
   return (
     <>
       <div className="gap-lg flex flex-col">
@@ -91,8 +111,8 @@ export function SalonBooking({
           <SectionHeader title="Choose a service" as="h3" />
           {bookable.length === 0 ? (
             <p className="text-body-sm text-muted">
-              {services.length === 0
-                ? "No services listed yet."
+              {nothingToBook
+                ? "This salon hasn't put its menu up yet. Give them a call and they'll tell you what they do."
                 : "No services are bookable online yet — call the salon to arrange one."}
             </p>
           ) : (
@@ -113,7 +133,7 @@ export function SalonBooking({
         </section>
 
         <div className="hidden desktop:block">
-          <BookCta href={href} note={missing} />
+          {nothingToBook ? <CallCta href={callHref} /> : <BookCta href={href} note={missing} />}
         </div>
       </div>
 
@@ -125,9 +145,17 @@ export function SalonBooking({
         `tablet:` (744). Between those two widths the bar floated 62px above the bottom
         over empty space. `bottom-0` at every width fixes that as a side effect.
       */}
-      <div className="border-hairline bg-paper p-base pb-[calc(var(--spacing-base)+env(safe-area-inset-bottom))] fixed inset-x-0 bottom-0 z-20 border-t desktop:hidden">
-        <BookCta href={href} note={missing} />
-      </div>
+      {/*
+        Nothing to book **and** no number to ring is the one case that draws no bar at all: a
+        fixed strip across the bottom of the viewport has to be carrying something, and an
+        empty one is the "permanently blank sticky bar" upstream also removed. The section
+        above already says why there is nothing there.
+      */}
+      {nothingToBook && callHref == null ? null : (
+        <div className="border-hairline bg-paper p-base pb-[calc(var(--spacing-base)+env(safe-area-inset-bottom))] fixed inset-x-0 bottom-0 z-20 border-t desktop:hidden">
+          {nothingToBook ? <CallCta href={callHref} /> : <BookCta href={href} note={missing} />}
+        </div>
+      )}
     </>
   );
 }
@@ -163,6 +191,26 @@ function BookCta({ href, note }: { href: string | null; note: string | null }) {
 }
 
 /**
+ * What replaces Book when there is no menu to book from.
+ *
+ * A real `tel:` link, not a disabled button with an explanation: this is the action that
+ * works, so it gets the prominent slot. With no number on file there is nothing to offer and
+ * the caller draws no bar at all.
+ */
+function CallCta({ href }: { href: string | null }) {
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      className="bg-rausch-cta text-on-primary text-title hover:bg-rausch-cta-pressed gap-sm flex min-h-12 items-center justify-center rounded-sm font-medium"
+    >
+      <Icons.phone style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
+      Call to book
+    </a>
+  );
+}
+
+/**
  * Service tiles, grouped Women / Men / Unisex / Other — but **only when any service
  * carries a gender**, exactly as `_serviceTiles` does
  * (`business_detail_screen.dart:619`). 24 of 31 live services have none, so most
@@ -186,6 +234,13 @@ function ServiceGroups({
         onSelect={onSelect}
         title={s.name}
         subtitle={`${formatDuration(s.durationMinutes)} · ${formatNu(s.price)}`}
+        /*
+          The description the owner's editor asks them to write, which reached no customer
+          screen at all before this — the salon page's menu and the booking flow's first step
+          both show it now, so a customer choosing between "Haircut" and "Haircut & beard" has
+          the salon's own words for the difference.
+        */
+        detail={s.description}
         media={
           s.imageUrl ? (
             <Avatar name={s.name} photoUrl={s.imageUrl} size={40} square />

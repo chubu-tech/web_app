@@ -11,7 +11,7 @@ import { Icons, IconSize } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Sheet } from "@/components/ui/sheet";
 import { CUSTOMER_HOME } from "@/lib/auth";
-import { availableToday } from "@/lib/available-today";
+import { availableToday, presenceByBusiness } from "@/lib/available-today";
 import { formatKm, kmTo, nearestSalons, withinDistance } from "@/lib/discover-logic";
 import { resolveLocation, type Fix } from "@/lib/geo";
 import { placeAt } from "@/lib/places";
@@ -39,6 +39,7 @@ import {
   type Category,
   type Offer,
   type Product,
+  type ProductCategory,
   type SalonAvailability,
 } from "@/lib/types/salon";
 import type { WorkingHour } from "@/lib/types/booking";
@@ -94,6 +95,10 @@ export function Discover({
   availability: SalonAvailability[];
   /** Every buyable product, across every salon — the Products segment's whole catalogue. */
   products: Product[];
+  /** The platform taxonomy, in its own `sort` order. Empty when the read failed. */
+  productCategories: ProductCategory[];
+  /** From `?cat=`, a slug. Null on the unnarrowed browse. */
+  categorySlug: string | null;
   /** From `?sort=&min=&max=`, already reconciled against the loaded bounds by the page. */
   productFilter: ProductFilter;
   /** From `?tab=`. Anything but `products` is the salon list. */
@@ -197,8 +202,23 @@ export function Discover({
     router.push(`${CUSTOMER_HOME}?${params.toString()}`, { scroll: false });
   }
 
+  /*
+    The two product axes write the same URL and each preserves the other. They were one
+    function until the category strip arrived; keeping them separate but symmetrical is what
+    stops "narrow by price" from silently clearing the shelf you were looking at, which is
+    the bug the salon side already documents in `goToTab`.
+  */
   function applyProducts(next: ProductFilter) {
-    const params = new URLSearchParams({ tab: "products", ...productFilterToParams(next) });
+    pushProducts(productFilterToParams(next), categorySlug);
+  }
+
+  function applyCategory(slug: string | null) {
+    pushProducts(productFilterToParams(productFilter), slug);
+  }
+
+  function pushProducts(filterParams: Record<string, string>, cat: string | null) {
+    const params = new URLSearchParams({ tab: "products", ...filterParams });
+    if (cat) params.set("cat", cat);
     router.push(`${CUSTOMER_HOME}?${params.toString()}`, { scroll: false });
   }
 
@@ -295,6 +315,19 @@ export function Discover({
     return out;
   }, [businesses, location]);
 
+  /**
+   * "Next 2:30 PM" / "Packed · ~45 min wait" / "Fully booked today", per salon.
+   *
+   * **Built from the whole `availability` read, not from `availableEntries`.** That list drops
+   * every salon with no answer, which is precisely the set this badge exists to label: before
+   * it, a fully booked salon vanished from the Available-today row and reappeared in the grid
+   * below looking exactly like one with slots all afternoon.
+   *
+   * Free to render here — Discover has already paid for the read. Absent from the map means
+   * the read said nothing about that salon, and `BusinessCard` draws no badge for it.
+   */
+  const presence = useMemo(() => presenceByBusiness(availability), [availability]);
+
   const active = filtersActive(filters);
   // Sections show on the default browse view; a live search shows just results.
   const showSections = q.length === 0;
@@ -330,6 +363,7 @@ export function Discover({
         // `kmTo` returns null otherwise, which means unknown and must not render as
         // "0.0 km". 2 of the 13 live salons have no location at all.
         distanceLabel={distanceLabels.get(b.id) ?? null}
+        presence={presence.get(b.id) ?? null}
         favourite={
           <FavouriteButton
             businessId={b.id}
@@ -517,6 +551,9 @@ export function Discover({
         <div className="mt-lg">
           <ProductsBrowse
             products={products}
+            categories={productCategories}
+            categorySlug={categorySlug}
+            onSelectCategory={applyCategory}
             query={query}
             filter={productFilter}
             onClearFilter={() => applyProducts(EMPTY_PRODUCT_FILTER)}

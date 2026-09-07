@@ -3,8 +3,8 @@ import Link from "next/link";
 import { SalonGrid } from "@/components/customer/salon-grid";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
-import { MediaChip } from "@/components/ui/business-card";
-import { fetchBusinesses } from "@/lib/api/discovery";
+import { presenceByBusiness } from "@/lib/available-today";
+import { fetchBusinesses, fetchSalonsAvailableToday } from "@/lib/api/discovery";
 import { fetchMyFavouriteIds } from "@/lib/api/favourites";
 import { createClient } from "@/lib/supabase/server";
 import { topRated } from "@/lib/recommendations";
@@ -53,29 +53,29 @@ export const metadata: Metadata = {
 export default async function TopRatedPage() {
   const supabase = await createClient();
 
-  const [businesses, favouriteIds] = await Promise.all([
+  const [businesses, favouriteIds, availability] = await Promise.all([
     // `sort: "rating"` so the server does the ordering it is already indexed for; `topRated`
     // then filters the unrated out and breaks ties on name, which is what makes the order
     // deterministic rather than merely descending.
     fetchBusinesses(supabase, { sort: "rating" }),
     fetchMyFavouriteIds(supabase).catch(() => new Set<string>()),
+    /*
+      One more read, and it is the heaviest on Discover — accepted here because this page is
+      a ranked list somebody is choosing from, and "Fully booked today" is the fact that
+      decides whether they open a card. A failure costs the badge, not the page.
+    */
+    fetchSalonsAvailableToday(supabase).catch(() => []),
   ]);
 
   const rated = topRated(businesses, businesses.length);
 
-  const chips = Object.fromEntries(
-    rated.map((b) => [
-      b.id,
-      <MediaChip key={b.id}>
-        <Icons.star
-          className="text-star shrink-0 fill-current"
-          style={{ width: IconSize.xxs, height: IconSize.xxs }}
-          aria-hidden
-        />
-        {b.avgRating?.toFixed(1)}
-      </MediaChip>,
-    ]),
-  );
+  /*
+    **No cover chip here any more.** It carried the salon's rating, and `BusinessCard` prints
+    the rating beside the name on every card — so this page showed it twice, and the second
+    copy was holding the one slot on the cover. The availability badge takes it instead, which
+    is also how the app arranges the two: rating beside the name, presence over the photo.
+  */
+  const presence = presenceByBusiness(availability);
 
   return (
     <div className="px-base py-lg tablet:px-lg w-full">
@@ -108,7 +108,7 @@ export default async function TopRatedPage() {
           <h2 className="text-display-md text-ink mb-md font-semibold">
             {rated.length === 1 ? "1 rated salon" : `${rated.length} rated salons`}
           </h2>
-          <SalonGrid businesses={rated} favouriteIds={[...favouriteIds]} chips={chips} />
+          <SalonGrid businesses={rated} favouriteIds={[...favouriteIds]} presence={presence} />
         </>
       )}
     </div>

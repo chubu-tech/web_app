@@ -22,6 +22,7 @@ import {
   type NotificationFilter,
   type NotificationIconName,
 } from "@/lib/notification-copy";
+import { dayTimeLabel } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/client";
 import { THIMPHU_TZ } from "@/lib/time";
 import { isUnread, type AppNotification } from "@/lib/types/notification";
@@ -364,14 +365,7 @@ function Row({
         </span>
         {body ? <span className="text-body-sm text-body mt-xxs block">{body}</span> : null}
         <span className="text-caption-sm text-muted-soft mt-xxs block">
-          {n.createdAt.toLocaleString("en-GB", {
-            weekday: "short",
-            day: "numeric",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: THIMPHU_TZ,
-          })}
+          {dayTimeLabel(n.createdAt)}
         </span>
       </span>
       {unread ? <span aria-label="Unread" className="bg-rausch size-2 shrink-0 rounded-full" /> : null}

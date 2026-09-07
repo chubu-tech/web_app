@@ -14,6 +14,7 @@ import {
   type ClientSegment,
   type ClientSort,
 } from "@/lib/analytics";
+import { dayTimeLabel } from "@/lib/clock";
 import type { ClientSummary } from "@/lib/types/back-office";
 import { whatsappUrl } from "@/lib/whatsapp";
 import { formatNu } from "@/lib/utils";
@@ -345,13 +346,5 @@ function lastVisitLabel(d: Date | null, now: Date): string {
 }
 
 function bookedLabel(d: Date): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: "Asia/Thimphu",
-  }).format(d);
+  return dayTimeLabel(d);
 }

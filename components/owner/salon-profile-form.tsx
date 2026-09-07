@@ -24,6 +24,8 @@ import { hasFeature } from "@/lib/entitlements";
 import { downscaleImage, imageRejection, releasePreview } from "@/lib/images";
 import { createClient } from "@/lib/supabase/client";
 import { fetchBusinessPhotos } from "@/lib/api/salon";
+import { BhutanPhoneField } from "@/components/ui/bhutan-phone-field";
+import { bhutanPhoneError, toE164, toLocal } from "@/lib/bhutan-phone";
 import {
   BUSINESS_TYPES,
   travels as isTravelling,
@@ -77,8 +79,10 @@ export function SalonProfileForm({
     business.serviceRadiusKm == null ? "" : String(business.serviceRadiusKm),
   );
   const [address, setAddress] = useState(business.addressText ?? "");
-  const [phone, setPhone] = useState(business.phone ?? "");
-  const [whatsapp, setWhatsapp] = useState(business.whatsappPhone ?? "");
+  // Both are stored E.164 and shown local — the field only ever holds the 8 digits.
+  const [phone, setPhone] = useState(toLocal(business.phone ?? ""));
+  const [whatsapp, setWhatsapp] = useState(toLocal(business.whatsappPhone ?? ""));
+  const [showPhoneErrors, setShowPhoneErrors] = useState(false);
   const [coverUrl, setCoverUrl] = useState(business.coverUrl);
   const [categoryIds, setCategoryIds] = useState<string[]>(initialCategoryIds);
   const [pin, setPin] = useState<{ lat: number | null; lng: number | null }>({
@@ -103,8 +107,7 @@ export function SalonProfileForm({
   const galleryInput = useRef<HTMLInputElement>(null);
 
   const travels = isTravelling({ businessType: type });
-  const runsQueueOnPlan = hasFeature(business.plan, "walkInQueue");
-  const canPickChannel = hasFeature(business.plan, "deposits");
+  const canPickChannel = hasFeature(business.plan, "reminderChannel");
 
   async function upload(
     files: FileList | null,
@@ -182,11 +185,23 @@ export function SalonProfileForm({
       return;
     }
 
+    /*
+      Both numbers stay optional — a salon may not want to publish either — but a half-typed
+      one blocks the save. Stored, it is worse than blank: the salon page would render a
+      WhatsApp button and a Call action that land on nothing.
+    */
+    const phoneProblem = bhutanPhoneError(phone) ?? bhutanPhoneError(whatsapp);
+    if (phoneProblem) {
+      setShowPhoneErrors(true);
+      setError(phoneProblem);
+      return;
+    }
+
     const fields: BusinessFields = {
       name: trimmedName,
       addressText: address.trim() || null,
-      phone: phone.trim() || null,
-      whatsappPhone: whatsapp.trim() || null,
+      phone: toE164(phone),
+      whatsappPhone: toE164(whatsapp),
       businessType: type,
       // A shopfront has no travel radius, and clearing it on a type change stops a stale
       // "travels 10 km" surviving the switch back.
@@ -306,13 +321,12 @@ export function SalonProfileForm({
           onChange={setAddress}
           placeholder={travels ? "e.g. Changangkha and nearby" : "Street, town"}
         />
-        <Field label="Phone" value={phone} onChange={setPhone} type="tel" />
-        <Field
+        <BhutanPhoneField value={phone} onChange={setPhone} showError={showPhoneErrors} />
+        <BhutanPhoneField
           label="WhatsApp number"
           value={whatsapp}
           onChange={setWhatsapp}
-          type="tel"
-          placeholder="+975 17 12 34 56"
+          showError={showPhoneErrors}
           hint="Adds a WhatsApp button to your salon page. Leave blank to hide it."
         />
 
@@ -453,77 +467,61 @@ export function SalonProfileForm({
       {/* ------------------------------------------------------ walk-in queue --- */}
       <div className="mt-xl">
         <SectionHeader title="Walk-in queue" as="h2" />
-        {!runsQueueOnPlan ? (
-          <div className="border-hairline-soft bg-surface-soft p-base gap-sm flex items-start rounded-md border">
-            <Icons.locked
-              className="text-muted mt-0.5 shrink-0"
-              style={{ width: IconSize.xs, height: IconSize.xs }}
-              aria-hidden
-            />
-            <p className="text-body-sm text-muted">
-              The walk-in queue is part of the Growth plan. Customers take a place in line from
-              their phone and watch their position and wait.
-            </p>
-          </div>
-        ) : (
-          <>
-            <label className="gap-base flex cursor-pointer items-start">
-              <input
-                type="checkbox"
-                checked={queueEnabled}
-                onChange={(e) => setQueueEnabled(e.target.checked)}
-                className="accent-rausch-cta mt-1 size-5"
-              />
-              <span>
-                <span className="text-title text-ink block font-medium">Run a walk-in queue</span>
-                <span className="text-body-sm text-muted block">
-                  {queueEnabled
-                    ? "Customers can take a place in line."
-                    : "Off — your salon is appointment-only."}
-                </span>
-              </span>
-            </label>
+        <label className="gap-base flex cursor-pointer items-start">
+          <input
+            type="checkbox"
+            checked={queueEnabled}
+            onChange={(e) => setQueueEnabled(e.target.checked)}
+            className="accent-rausch-cta mt-1 size-5"
+          />
+          <span>
+            <span className="text-title text-ink block font-medium">Run a walk-in queue</span>
+            <span className="text-body-sm text-muted block">
+              {queueEnabled
+                ? "Customers can take a place in line."
+                : "Off — your salon is appointment-only."}
+            </span>
+          </span>
+        </label>
 
-            {queueEnabled ? (
-              <fieldset className="mt-base">
-                <legend className="text-caption text-muted mb-sm font-medium">Who can join</legend>
-                <div className="gap-sm flex flex-col">
-                  {[
-                    {
-                      value: "anywhere",
-                      title: "From anywhere",
-                      blurb: "They can join from your salon page, wherever they are.",
-                    },
-                    {
-                      value: "qr_only",
-                      title: "QR scan only",
-                      blurb:
-                        "They must scan the QR in your shop, so the line is only people who are actually there.",
-                    },
-                  ].map((mode) => (
-                    <label
-                      key={mode.value}
-                      className="border-hairline-soft p-base gap-base flex cursor-pointer items-start rounded-md border"
-                    >
-                      <input
-                        type="radio"
-                        name="queue-join-mode"
-                        value={mode.value}
-                        checked={queueMode === mode.value}
-                        onChange={() => setQueueMode(mode.value as Business["queueJoinMode"])}
-                        className="accent-rausch-cta mt-1 size-5"
-                      />
-                      <span>
-                        <span className="text-title text-ink block font-medium">{mode.title}</span>
-                        <span className="text-body-sm text-muted block">{mode.blurb}</span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            ) : null}
-          </>
-        )}
+        {queueEnabled ? (
+          <fieldset className="mt-base">
+            <legend className="text-caption text-muted mb-sm font-medium">Who can join</legend>
+            <div className="gap-sm flex flex-col">
+              {[
+                {
+                  value: "anywhere",
+                  title: "From anywhere",
+                  blurb: "They can join from your salon page, wherever they are.",
+                },
+                {
+                  value: "qr_only",
+                  title: "QR scan only",
+                  blurb:
+                    "They must scan the QR in your shop, so the line is only people who are actually there.",
+                },
+              ].map((mode) => (
+                <label
+                  key={mode.value}
+                  className="border-hairline-soft p-base gap-base flex cursor-pointer items-start rounded-md border"
+                >
+                  <input
+                    type="radio"
+                    name="queue-join-mode"
+                    value={mode.value}
+                    checked={queueMode === mode.value}
+                    onChange={() => setQueueMode(mode.value as Business["queueJoinMode"])}
+                    className="accent-rausch-cta mt-1 size-5"
+                  />
+                  <span>
+                    <span className="text-title text-ink block font-medium">{mode.title}</span>
+                    <span className="text-body-sm text-muted block">{mode.blurb}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
       </div>
 
       {/* ------------------------------------------------------ notifications --- */}

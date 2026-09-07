@@ -4,13 +4,14 @@ import { LockedTeaser } from "@/components/owner/insight-card";
 import { NoSalonYet } from "@/components/owner/no-salon-yet";
 import { OrdersInboxCard } from "@/components/owner/orders-inbox-card";
 import { PaywallButton } from "@/components/owner/paywall-button";
+import { SalonReviewStatus } from "@/components/owner/salon-review-status";
 import { TodaySnapshot } from "@/components/owner/today-snapshot";
 import { fetchBusinessHours } from "@/lib/api/discovery";
 import { fetchDashboard, fetchPeakHeatmap } from "@/lib/api/owner-analytics";
 import { countNewOrders } from "@/lib/api/owner-back-office";
 import { fetchBusinessBookings } from "@/lib/api/owner";
 import { openMinutesForWeekday } from "@/lib/calendar-logic";
-import { fetchStaff } from "@/lib/api/salon";
+import { fetchServices, fetchStaff } from "@/lib/api/salon";
 import { hasFeature } from "@/lib/entitlements";
 import { getOwnerContext } from "@/lib/owner/context";
 import { createClient } from "@/lib/supabase/server";
@@ -66,16 +67,25 @@ export default async function OwnerInsightsPage({
   const trends = hasFeature(active.plan, "fullAnalytics");
   const storefront = hasFeature(active.plan, "productStore");
 
-  const [bookings, hours, newOrders, roster] = await Promise.all([
+  const [bookings, hours, newOrders, roster, services] = await Promise.all([
     fetchBusinessBookings(supabase, active.id, bounds).catch(() => []),
     fetchBusinessHours(supabase, active.id).catch(() => []),
     storefront ? countNewOrders(supabase, active.id).catch(() => 0) : Promise.resolve(0),
-    // For the header's stylist count only. Decorative, so a failed read costs the count and
-    // not the page — the subtitle then falls back to the salon name alone.
-    fetchStaff(supabase, active.id, { activeOnly: true }).catch(() => []),
+    /*
+      For the header's stylist count **and** the setup checklist, which is why it is
+      `activeOnly: false` now: "have you added your team?" is answered by the roster
+      existing, and an owner who added a stylist and then deactivated them has still added
+      one. The header's own count filters back down to the active ones below.
+
+      Decorative either way, so a failed read costs the count and the checklist, not the
+      page — and `null` is what tells the checklist it could not be read, so it hides rather
+      than telling a staffed salon to go and hire.
+    */
+    fetchStaff(supabase, active.id, { activeOnly: false }).catch(() => null),
+    fetchServices(supabase, active.id, { activeOnly: false }).catch(() => null),
   ]);
 
-  const activeStylists = roster.length;
+  const activeStylists = (roster ?? []).filter((s) => s.isActive).length;
 
   const dash = trends
     ? await fetchDashboard(supabase, active.id, granularity).catch(() => null)
@@ -91,6 +101,16 @@ export default async function OwnerInsightsPage({
 
   return (
     <div className="px-base py-lg gap-lg mx-auto flex w-full max-w-[1128px] flex-col tablet:px-lg">
+      {/*
+        First in the column rather than fixed above it — see the note on the component. It
+        renders nothing for a listed, set-up salon, which is almost every salon almost always.
+      */}
+      <SalonReviewStatus
+        business={active}
+        hasServices={services == null ? null : services.length > 0}
+        hasStaff={roster == null ? null : roster.length > 0}
+      />
+
       <div>
         <h1 className="text-display-lg text-ink font-medium">Insights</h1>
         {/*

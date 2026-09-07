@@ -4,6 +4,7 @@ import { BusinessCard } from "@/components/ui/business-card";
 import { formatKm } from "@/lib/discover-logic";
 import { cardMetaLine, type Business } from "@/lib/types/salon";
 import { FavouriteButton } from "./favourite-button";
+import type { SalonPresence } from "@/lib/available-today";
 
 /**
  * A grid of salon cards, with the heart working — the body of `/recommended`, `/top-rated`
@@ -24,6 +25,7 @@ export function SalonGrid({
   favouriteIds,
   chips,
   distanceKm,
+  presence,
 }: {
   businesses: Business[];
   favouriteIds: string[];
@@ -36,6 +38,12 @@ export function SalonGrid({
    * card renders no chip for it, which is the same distinction `kmTo` returns null for.
    */
   distanceKm?: Record<string, number>;
+  /**
+   * Whether each salon can see somebody today, keyed by business id — from
+   * `presenceByBusiness`. Absent means the availability read said nothing about that salon,
+   * and the card draws no badge.
+   */
+  presence?: Map<string, { state: SalonPresence; label: string }>;
 }) {
   const favourites = new Set(favouriteIds);
 
@@ -59,6 +67,7 @@ export function SalonGrid({
               distanceKm?.[b.id] != null ? formatKm(distanceKm[b.id]!) : null
             }
             chip={chips?.[b.id]}
+            presence={presence?.get(b.id) ?? null}
             // The first card is the largest contentful paint on a page that is nothing but
             // cards, so it is preloaded rather than lazily discovered after layout.
             priority={i === 0}

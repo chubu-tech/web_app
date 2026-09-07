@@ -104,9 +104,11 @@ export function AppHeader({
 
         This was `sticky` with `bg-canvas` and a bottom hairline, and that is what made the
         whole header *section* look like it was moving on scroll rather than just the navbar:
-        a sticky element paints its own background, so the cream fill and the seam travelled
-        down the viewport as a full-width band with the pill floating inside it. The pill was
-        never the problem — the bar behind it was.
+        a sticky element paints its own background, so the fill and the seam travelled down
+        the viewport as a full-width band with the pill floating inside it. The pill was never
+        the problem — the bar behind it was. (The fill was the editorial cream at the time,
+        which made it obvious; on today's white canvas the same bug would show only as the
+        hairline sliding down the page, so do not read the fix as being about the colour.)
 
         Transparent outer means only the condensed pill paints, so page content scrolls
         visibly past it on both sides and behind its blur, which is the marketing site's look.

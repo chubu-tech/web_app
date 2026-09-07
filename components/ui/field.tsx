@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { IconSize, type Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 
 /**
@@ -24,21 +25,40 @@ import { cn } from "@/lib/utils";
 export function Field({
   label,
   hint,
+  error,
   value,
   onChange,
   type = "text",
+  prefix,
   suffix,
   ...rest
 }: {
   label: string;
   hint?: string;
+  /**
+   * Why this field is wrong, shown under it and reddening its border.
+   *
+   * **Takes precedence over `hint`** rather than sitting beside it: two lines under one
+   * input, one of them telling you what to do and the other what you did wrong, is a field
+   * arguing with itself. `aria-describedby` follows whichever is showing, and the error
+   * carries `role="alert"` so it is announced when it appears.
+   */
+  error?: string | null;
   value: string;
   onChange: (value: string) => void;
   type?: string;
+  /**
+   * Rendered inside the border, before the input — a fixed unit or dialling code.
+   *
+   * Note `prefix` is also an HTML global attribute (RDFa), typed `string`, so it has to be
+   * omitted from the spread below or the two intersect into `ReactNode & string` and no
+   * element is assignable.
+   */
+  prefix?: React.ReactNode;
   suffix?: React.ReactNode;
-} & Omit<React.ComponentPropsWithoutRef<"input">, "value" | "onChange" | "type">) {
+} & Omit<React.ComponentPropsWithoutRef<"input">, "value" | "onChange" | "type" | "prefix">) {
   const id = useId();
-  const hintId = hint ? `${id}-hint` : undefined;
+  const messageId = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
 
   return (
     <div>
@@ -47,27 +67,61 @@ export function Field({
       </label>
       <span
         className={cn(
-          "border-hairline mt-xs bg-canvas flex items-center rounded-sm border",
+          "mt-xs bg-canvas flex items-center rounded-sm border",
+          error ? "border-error-text" : "border-hairline",
           "focus-within:border-ink focus-within:border-2",
         )}
       >
+        {prefix}
         <input
           id={id}
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          aria-describedby={hintId}
-          className="text-body-md text-ink placeholder:text-muted-soft px-md min-h-12 w-full bg-transparent outline-none"
+          aria-describedby={messageId}
+          aria-invalid={error ? true : undefined}
+          className={cn(
+            "text-body-md text-ink placeholder:text-muted-soft min-h-12 w-full bg-transparent outline-none",
+            // The prefix owns the left inset when there is one, so the digits sit against it
+            // rather than a gutter's width away from the code they belong to.
+            prefix ? "pr-md" : "px-md",
+          )}
           {...rest}
         />
         {suffix}
       </span>
-      {hint ? (
-        <p id={hintId} className="text-caption-sm text-muted mt-xxs">
+      {error ? (
+        <p id={messageId} role="alert" className="text-caption-sm text-error-text mt-xxs">
+          {error}
+        </p>
+      ) : hint ? (
+        <p id={messageId} className="text-caption-sm text-muted mt-xxs">
           {hint}
         </p>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * A glyph for [Field]'s `prefix` slot — `_FieldIcon` from
+ * `tho/app/lib/auth/email_sign_in_screen.dart`, at its measurements: 12px in from the
+ * border, an `sm` (20px) glyph, 8px of air before the text.
+ *
+ * It lives here rather than in the auth form because the spacing *is* the `prefix`
+ * contract. `Field` deliberately gives the input no left padding when a prefix is present
+ * (so `+975` can sit against the digits it belongs to), which means every prefix owes the
+ * field its whole left inset — a fact worth stating once, next to the prop, rather than
+ * rediscovering it per call site with a hand-written pad.
+ *
+ * Decorative by definition: the `<label>` above already names the field, so a screen
+ * reader announcing "person, Your name" would be reading the ornament out loud.
+ */
+export function FieldIcon({ icon: Icon }: { icon: (typeof Icons)[keyof typeof Icons] }) {
+  return (
+    <span aria-hidden className="pl-md pr-sm text-muted flex items-center">
+      <Icon style={{ width: IconSize.sm, height: IconSize.sm }} />
+    </span>
   );
 }
 

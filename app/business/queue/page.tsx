@@ -21,11 +21,12 @@ export const metadata: Metadata = { title: "Queue" };
  * able to take a place in Norzin's line from the web, and **nothing on any web surface could
  * call them**. AGENTS.md said so in as many words.
  *
- * **`runsQueue` gates everything, and it is two conditions not one.** `queueEnabled &&
- * hasFeature(plan, "walkInQueue")` — the plan *and* the owner's own switch. The app's board
- * checks only the plan, so a Growth salon that turned the queue off still gets a live
- * polling board with a working Call next while `join_queue` refuses its customers with
- * `P0001`. Reading the salon's own switch is the fourth documented divergence from the Dart.
+ * **`runsQueue` gates everything, and it is one condition: the owner's own switch.** It used
+ * to be two — the switch AND a plan entitlement — and the plan half is gone from both
+ * clients: `20260902000003_queue_for_all_plans.sql` removed it from `join_queue`,
+ * `check_in_booking` and `queue_active_line`, so `queue_enabled` is the only control and a
+ * Basic salon that switches it on gets a board the server will serve. A plan term here would
+ * now hide a live surface, which is the opposite of the bug it was written to avoid.
  *
  * When it is off, **nothing is read at all** — not the line, not the roster, not the
  * services. A locked board that still costs four queries and then a request every four

@@ -3,6 +3,7 @@ import type { IntervalPayload } from "../hours";
 import type { WorkingHour } from "../types/booking";
 import type {
   Business,
+  BusinessType,
   BusinessPhoto,
   CatalogService,
   ServiceItem,
@@ -16,6 +17,7 @@ import {
   toStaffMember,
   toWorkingHour,
 } from "./mappers";
+import { oneRow } from "./one-row";
 import { STAFF_PUBLIC_SELECT } from "./salon";
 
 /**
@@ -464,65 +466,85 @@ export async function updateBusiness(
 }
 
 /**
- * Create a salon.
+ * Create a salon, and its counterpart: send a rejected one back for review.
  *
- * `owner_id` must be named — `businesses_insert`'s check is `owner_id = auth.uid()` — and
- * is insertable for exactly that reason while not being updatable. Everything that decides
- * money or visibility takes its default: **`basic`** and **`pending`**. So a salon created
- * here is invisible to customers until an operator reviews it, which is the point.
+ * **Both go through RPCs now, and the create one is a correction rather than a refactor.**
  *
- * **The insert must not return the row, and that is not a style choice.** The live
- * `businesses_select` policy is
+ * This used to insert into `businesses` directly and then read the row back in a second
+ * statement, because `INSERT … RETURNING` failed: a brand-new salon is `pending`, so the
+ * public arm of `businesses_select` is false, and `private.is_business_member` is `STABLE`,
+ * so its subquery runs on the statement's own snapshot and cannot see the row being
+ * inserted. Postgres applies the SELECT policy to rows a write returns, so the whole
+ * statement aborted with `42501`.
  *
- *   (is_active and deleted_at is null and status = 'approved')
- *     or private.is_business_member(id) or private.is_admin()
+ * Migration `20260905000001_create_business_rpc.sql` fixed that at both ends — a
+ * `security definer` RPC whose RETURNING is not RLS-filtered at all, **and** an
+ * `owner_id = (select auth.uid())` arm on the policy, which reads a column of the row being
+ * checked instead of re-querying the table and is therefore snapshot-proof. It also finally
+ * pins the live policy's `status = 'approved'` and `is_admin()` arms, which had been applied
+ * out of band and which the older migration files would have reverted on a rebuild.
  *
- * A brand-new salon is `pending`, so the first branch is false; and
- * `private.is_business_member` is `STABLE`, so its subquery runs on the statement's own
- * snapshot and **cannot see the row the same statement is inserting**. `INSERT … RETURNING`
- * requires the new row to satisfy the SELECT policy, so it fails with *"new row violates
- * row-level security policy"* — a message that reads like the INSERT check when the INSERT
- * check passed perfectly well. Measured, twice: the same insert succeeds without RETURNING
- * and fails with it.
+ * **Four things the direct insert did not do**, which is why keeping it was not an option:
  *
- * **`Api.createBusiness` in the Flutter app does `.insert(…).select().single()`**, so it
- * cannot create a salon at all — which is consistent with there being no owner-created salon
- * in the database. Worth reporting upstream, along with the cause: **no migration in the repo
- * adds `status = 'approved'` to that policy.** It exists only on the live database, applied
- * out of band, so a rebuild from `supabase/migrations` would publish unreviewed salons *and*
- * make this function's problem disappear — two different behaviours from one schema.
+ * - **It never promoted `profiles.role`.** `create_business` sets `customer → owner` (only
+ *   from customer — a staff member's shell and an admin's rights are not something creating
+ *   a salon should quietly take away). Without it a web-created owner is routed by
+ *   `homeForRole` to `/discover` with no route to the console they just made.
+ * - **It was not idempotent.** The RPC is idempotent on `(owner_id, lower(name))` among
+ *   non-deleted rows; the read-back matched `.eq("name", …)` case-sensitively. A double tap,
+ *   or a retry after a timeout the server had actually completed, left the owner with two
+ *   salons to untangle.
+ * - **It enforced no cap** (`P0001` at ten salons) and **no `is_real_user()` bar** (`P0003`),
+ *   so an anonymous session could list a salon.
+ * - **It could not set `business_type` or `description`.**
  *
- * So: insert with no RETURNING, then read the row back in a **second** statement, which has
- * its own snapshot and can see it. The read is narrowed to this owner and this name, newest
- * first, because there is no id to ask for — `id` is deliberately not in the INSERT grant.
- *
- * There is no counterpart to this function. `businesses` has **no DELETE policy at all**, so
- * an owner cannot remove a salon they created — only an operator can.
+ * There is still no counterpart for deletion: `businesses` has **no DELETE policy at all**,
+ * so an owner cannot remove a salon they created — only an operator can.
  */
 export async function createBusiness(
   supabase: SupabaseClient,
-  ownerId: string,
-  fields: { name: string; addressText: string | null; phone: string | null },
+  fields: {
+    name: string;
+    addressText: string | null;
+    phone: string | null;
+    businessType?: BusinessType;
+    description?: string | null;
+  },
 ): Promise<Business> {
-  const { error } = await supabase.from("businesses").insert({
-    owner_id: ownerId,
-    name: fields.name,
-    address_text: fields.addressText,
-    phone: fields.phone,
+  const { data, error } = await supabase.rpc("create_business", {
+    p_name: fields.name,
+    p_phone: fields.phone,
+    p_address_text: fields.addressText,
+    // Named rather than left to the server default, so the form's choice is always the one
+    // that lands — the default only covers a caller that has no opinion.
+    p_business_type: fields.businessType ?? "salon",
+    p_description: fields.description ?? null,
   });
   if (error) throw error;
+  return toBusiness(oneRow(data, "create_business"));
+}
 
-  const { data, error: readError } = await supabase
-    .from("businesses")
-    .select("*")
-    .eq("owner_id", ownerId)
-    .eq("name", fields.name)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (readError) throw readError;
-  if (!data) throw new Error("the salon was created but could not be read back");
-  return toBusiness(data as Record<string, unknown>);
+/**
+ * Send a rejected salon back to moderation.
+ *
+ * **Without this a rejection is a dead end.** `status` is withheld from the owner's column
+ * grant (`20260804000004`), so an owner cannot clear it themselves, and their only recourse
+ * was to create a second salon — which is precisely the mess a moderation queue exists to
+ * prevent.
+ *
+ * Refuses with `42501` unless the caller owns the salon, `P0002` if it does not resolve, and
+ * `P0001` for **any status but `rejected`** — so this is only ever offered on that one
+ * branch of the status header.
+ */
+export async function resubmitBusinessForReview(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<Business> {
+  const { data, error } = await supabase.rpc("resubmit_business_for_review", {
+    p_business: businessId,
+  });
+  if (error) throw error;
+  return toBusiness(oneRow(data, "resubmit_business_for_review"));
 }
 
 export async function fetchBusinessCategoryIds(

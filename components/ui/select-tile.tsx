@@ -17,6 +17,7 @@ export function SelectTile({
   onSelect,
   title,
   subtitle,
+  detail,
   media,
   className,
 }: {
@@ -27,6 +28,14 @@ export function SelectTile({
   onSelect: (value: string) => void;
   title: string;
   subtitle?: string | null;
+  /**
+   * A third, quieter line — the owner-written description of what this actually is.
+   *
+   * **Dropped on a disabled tile**, where the subtitle is the reason the tile cannot be
+   * chosen and a description underneath it would bury that. Upstream makes the same carve-out
+   * for the same reason (`select_tile.dart:34-38`).
+   */
+  detail?: string | null;
   /** An avatar or thumbnail on the leading edge. */
   media?: React.ReactNode;
   className?: string;
@@ -37,7 +46,13 @@ export function SelectTile({
         "gap-md p-base flex cursor-pointer items-center rounded-md border",
         "transition-colors duration-[var(--duration-fast)]",
         checked
-          ? "border-rausch bg-[#FFF5F7] border-2"
+          /* `bg-rausch-soft`, not the `#FFF5F7` this used to carry. Upstream has the same raw
+             literal here (`select_tile.dart:107`) and in the auth form's role cards, both
+             doing exactly what `AppColors.rauschSoft` is documented for — "a *selected* fill
+             that carries rausch's own label on top of it". Two literals plus the token meant
+             one role had three values. Reported upstream; the difference is 5/255 in one
+             channel, so this is a name replacing a number rather than a repaint. */
+          ? "border-rausch bg-rausch-soft border-2"
           : "border-hairline hover:border-border-strong",
         className,
       )}
@@ -56,6 +71,11 @@ export function SelectTile({
         <span className="text-title text-ink block font-medium">{title}</span>
         {subtitle ? (
           <span className="text-body-sm text-muted block">{subtitle}</span>
+        ) : null}
+        {detail ? (
+          <span className="text-caption-sm text-muted-soft mt-xxs line-clamp-2 block">
+            {detail}
+          </span>
         ) : null}
       </span>
     </label>

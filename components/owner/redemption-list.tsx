@@ -9,6 +9,7 @@ import { Field } from "@/components/ui/field";
 import { Icons } from "@/components/ui/icons";
 import { cancelRedemption, confirmRedemption } from "@/lib/api/owner-back-office";
 import { ownerErrorMessage } from "@/lib/api/owner-errors";
+import { dateTimeLabel } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/client";
 import type { LoyaltyRedemption } from "@/lib/types/back-office";
 
@@ -127,12 +128,5 @@ export function RedemptionList({
 }
 
 function askedLabel(d: Date): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: "Asia/Thimphu",
-  }).format(d);
+  return dateTimeLabel(d);
 }

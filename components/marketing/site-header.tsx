@@ -180,10 +180,12 @@ export function SiteHeader() {
             // actually change. `components/ui/app-header.tsx` runs the same list.
             "transition-[background-color,box-shadow,margin,padding,border-radius] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
             condensed
-              ? // `bg-paper/80`, not `bg-white/80`. Same pixels while the public site was
-                // white, and not the same thing now it is cream: `paper` follows the
-                // shell, a raw white does not. It is also what `components/ui/app-header.tsx`
-                // uses for the identical pill, so the two headers cannot drift.
+              ? // `bg-paper/80`, not `bg-white/80`. The same pixels today — the canvas port
+                // put every shell back on white — but `paper` follows the shell where a raw
+                // white does not, which is the whole reason the cream release cost this line
+                // nothing. `shadow-card` is what separates the pill from the page, not the
+                // fill. It is also what `components/ui/app-header.tsx` uses for the identical
+                // pill, so the two headers cannot drift.
                 "mt-3 gap-3 rounded-full bg-paper/80 px-4 py-2.5 shadow-card backdrop-blur-xl sm:mx-4 sm:px-5 lg:mx-auto"
               : "mt-0 gap-3 rounded-none bg-transparent px-5 py-5 sm:px-8 lg:px-10",
           )}

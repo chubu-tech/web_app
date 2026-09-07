@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { availableLabel, availableToday } from "./available-today";
+import {
+  availableLabel,
+  availableToday,
+  PACKED_WAIT_MINUTES,
+  presenceByBusiness,
+  presenceFor,
+} from "./available-today";
 import type { QueueEntry } from "./types/queue";
 import type { Business, SalonAvailability } from "./types/salon";
 
@@ -39,6 +45,10 @@ function biz(id: string, over: Partial<Business> = {}): Business {
     monthlyRevenueGoal: null,
     rebookingEnabled: false,
     rebookingDays: 30,
+    // These fixtures stand in for salons a customer can see, which by RLS are
+    // approved and active — the same thing `toBusiness`'s default encodes.
+    status: "approved" as const,
+    rejectionReason: null,
     ...over,
   };
 }
@@ -231,13 +241,13 @@ describe("availableLabel", () => {
     // 08:00Z is 14:00 in Thimphu (UTC+6). A browser in London must see the hour the
     // customer will actually turn up at.
     expect(availableLabel({ slot: new Date("2026-08-10T08:00:00.000Z"), waitMinutes: null })).toBe(
-      "Today 14:00",
+      "Today 2:00 PM",
     );
   });
 
-  it("pads both fields", () => {
+  it("pads the minute and not the hour, as the one clock formatter does", () => {
     expect(availableLabel({ slot: new Date("2026-08-10T03:05:00.000Z"), waitMinutes: null })).toBe(
-      "Today 09:05",
+      "Today 9:05 AM",
     );
   });
 
@@ -245,7 +255,7 @@ describe("availableLabel", () => {
     // 19:30Z is 01:30 the next Thimphu day. The label states a clock time, not a date, so
     // this is about the arithmetic being an offset rather than a date read.
     expect(availableLabel({ slot: new Date("2026-08-10T19:30:00.000Z"), waitMinutes: null })).toBe(
-      "Today 01:30",
+      "Today 1:30 AM",
     );
   });
 
@@ -263,6 +273,73 @@ describe("availableLabel", () => {
     // stronger promise and the app makes the same choice.
     expect(
       availableLabel({ slot: new Date("2026-08-10T08:00:00.000Z"), waitMinutes: 5 }),
-    ).toBe("Today 14:00");
+    ).toBe("Today 2:00 PM");
+  });
+});
+
+/*
+  The badge these produce is the answer to "can this salon see me today?", and every branch
+  below is a state the product already had the data for and was not showing. The one that
+  matters most is the null case: this is one RPC over every salon, so a missing row must
+  produce **no badge**, never a pessimistic one.
+*/
+describe("presenceFor", () => {
+  /* Reuses this file's own `avail` and `waiting` fixtures rather than a second set. */
+  const line = (n: number) => Array.from({ length: n }, (_, i) => waiting(`q${i}`));
+
+  it("says nothing at all when the read said nothing about this salon", () => {
+    // "Fully booked because an RPC was slow" is worse than claiming nothing.
+    expect(presenceFor(null)).toBeNull();
+    expect(presenceFor(undefined)).toBeNull();
+  });
+
+  it("prefers a bookable slot, in Thimphu time", () => {
+    expect(presenceFor(avail("b1", { nextSlot: new Date("2026-08-10T08:30:00.000Z") }))).toEqual({
+      state: "open",
+      label: "Next 2:30 PM",
+    });
+  });
+
+  it("prefers the slot even when there is also a queue", () => {
+    // A held time beats a wait somebody has to stand through.
+    const p = presenceFor(
+      avail("b1", { nextSlot: new Date("2026-08-10T08:30:00.000Z"), queueLine: line(6) }),
+    );
+    expect(p).toEqual({ state: "open", label: "Next 2:30 PM" });
+  });
+
+  it("reads a long line as packed rather than as a wait", () => {
+    const p = presenceFor(avail("b1", { queueLine: line(4), barberCount: 1 }));
+    expect(p?.state).toBe("packed");
+    expect(p?.label).toMatch(/^Packed · ~\d+ min wait$/);
+  });
+
+  it("reads a short line as a walk-in", () => {
+    const p = presenceFor(avail("b1", { queueLine: line(1), barberCount: 2 }));
+    expect(p?.state).toBe("open");
+    expect(p?.label).toMatch(/^Walk in · (no wait|~\d+ min)$/);
+  });
+
+  it("is fully booked with no slot and no line", () => {
+    expect(presenceFor(avail("b1"))).toEqual({
+      state: "fullyBooked",
+      label: "Fully booked today",
+    });
+  });
+
+  it("puts the packed threshold at half an hour", () => {
+    expect(PACKED_WAIT_MINUTES).toBe(30);
+  });
+});
+
+describe("presenceByBusiness", () => {
+  it("keys by id and skips whatever produced no badge", () => {
+    const map = presenceByBusiness([
+      avail("has-slot", { nextSlot: new Date("2026-08-10T08:00:00.000Z") }),
+      avail("booked-out"),
+    ]);
+    expect(map.get("has-slot")?.label).toBe("Next 2:00 PM");
+    expect(map.get("booked-out")?.state).toBe("fullyBooked");
+    expect(map.has("never-heard-of-it")).toBe(false);
   });
 });

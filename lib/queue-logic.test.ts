@@ -435,34 +435,47 @@ describe("queueShopSummary", () => {
 });
 
 describe("queueLockState", () => {
-  // No live salon is `qr_only` and only three are on a queue-capable plan, so
-  // this is the only coverage two of these three states can get.
+  /*
+    **`unavailable` has one cause now: the owner's switch.**
+
+    It used to have two — the switch, or a plan that did not include the queue — and the
+    plan half is gone. `20260902000003_queue_for_all_plans.sql` removed the
+    `plan in ('growth','pro')` gate from `join_queue`, `check_in_booking` and
+    `queue_active_line`, so a Basic salon with the switch on is `open` and a plan term here
+    would refuse a customer the server would have taken. The two cases that used to assert
+    "unavailable on Basic" are inverted below rather than deleted, because the inversion is
+    the behaviour that changed.
+
+    No live salon is `qr_only`, so that state's coverage is still tests-only.
+  */
   const shop = (
     plan: "basic" | "growth" | "pro",
     queueEnabled: boolean,
     queueJoinMode: "anywhere" | "qr_only",
   ) => ({ plan, queueEnabled, queueJoinMode });
 
-  it("opens for a queue-capable salon that joins from anywhere", () => {
+  it("opens for any salon with the queue switched on, that joins from anywhere", () => {
     expect(queueLockState(shop("growth", true, "anywhere"), false)).toBe("open");
     expect(queueLockState(shop("pro", true, "anywhere"), true)).toBe("open");
   });
 
-  it("is unavailable on a plan without the queue", () => {
-    expect(queueLockState(shop("basic", true, "anywhere"), true)).toBe("unavailable");
+  it("opens on Basic too — the queue is on every plan", () => {
+    expect(queueLockState(shop("basic", true, "anywhere"), true)).toBe("open");
   });
 
-  it("is unavailable when the owner switched the queue off, plan notwithstanding", () => {
+  it("is unavailable when the owner switched the queue off, on any plan", () => {
     expect(queueLockState(shop("growth", false, "anywhere"), true)).toBe("unavailable");
+    expect(queueLockState(shop("basic", false, "anywhere"), true)).toBe("unavailable");
   });
 
   it("asks for a scan at a qr_only salon reached any other way", () => {
     expect(queueLockState(shop("growth", true, "qr_only"), false)).toBe("needs_scan");
     expect(queueLockState(shop("growth", true, "qr_only"), true)).toBe("open");
+    expect(queueLockState(shop("basic", true, "qr_only"), false)).toBe("needs_scan");
   });
 
-  it("reports unavailable rather than needs_scan when both apply", () => {
-    // "Scan to join" would be a lie at a shop that runs no queue at all.
-    expect(queueLockState(shop("basic", true, "qr_only"), false)).toBe("unavailable");
+  it("reports unavailable rather than needs_scan when the queue is off", () => {
+    // "Scan to join" would be a lie at a shop that is running no queue at all.
+    expect(queueLockState(shop("basic", false, "qr_only"), false)).toBe("unavailable");
   });
 });

@@ -22,12 +22,17 @@ function salon(over: Partial<Business> = {}): Business {
     lng: 89.63,
     avgRating: null,
     reviewCount: 0,
-    // Basic does not include the walk-in queue, so this is the no-queue default.
     plan: "basic",
     businessType: "salon",
     serviceRadiusKm: null,
     whatsappPhone: null,
-    queueEnabled: true,
+    /*
+      **The no-queue default, and it moved.** It used to be `plan: "basic"` above, because
+      Basic did not include the queue. `20260902000003_queue_for_all_plans.sql` removed that
+      gate, so `runsQueue` reads this switch alone and the default that means "no queue" is
+      this one. Cases that want a queue set `queueEnabled: true` explicitly.
+    */
+    queueEnabled: false,
     queueJoinMode: "anywhere",
     reminderChannel: "none",
     monthlyRevenueGoal: null,
@@ -75,9 +80,11 @@ describe("placeCopy", () => {
   });
 
   describe("the walk-in queue answer", () => {
-    // `runsQueue` is `queueEnabled && hasFeature(plan, "walkInQueue")`, and the queue is
-    // Growth-and-above — so on live data exactly one of Thimphu's eight salons qualifies.
-    const withQueue = salon({ id: "q1", plan: "growth" });
+    // `runsQueue` is `queueEnabled` alone now — the plan half went with
+    // `20260902000003_queue_for_all_plans.sql`. On live data exactly one of Thimphu's eight
+    // salons still has the switch on, because that migration turned it off for the Basic
+    // ones, so the singular branch is still the case that renders.
+    const withQueue = salon({ id: "q1", queueEnabled: true });
 
     it("agrees subject with verb when only one salon runs a queue", () => {
       // This is the live case, and the first draft rendered "1 of the 8 salons … run".
@@ -94,7 +101,7 @@ describe("placeCopy", () => {
     it("uses the plural verb when several do", () => {
       const copy = placeCopy({
         place: thimphu,
-        salons: [withQueue, salon({ id: "q2", plan: "growth" }), salon({ id: "b3" })],
+        salons: [withQueue, salon({ id: "q2", queueEnabled: true }), salon({ id: "b3" })],
         ...base,
       });
       const answer = copy.faq.find((f) => f.q.includes("walk-in queue"))!.a;

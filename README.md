@@ -58,9 +58,15 @@ lib/
 Two files exist twice on purpose, because they are genuinely different things:
 `components/marketing/ui/button.tsx` is the editorial button and
 `components/ui/button.tsx` is the product one; `lib/marketing/utils.ts` has a
-dependency-free `cn` while `lib/utils.ts` wraps `twMerge`. Neither pair should be
-reconciled — see the note in `lib/utils.ts` for why the product one cannot simply
-be used everywhere.
+dependency-free `cn` that only joins, while `lib/utils.ts` wraps `tailwind-merge`
+so a later utility overrides an earlier one. Neither pair should be reconciled.
+
+`lib/utils.ts`'s one is **configured** with this project's font-size tokens
+(`FONT_SIZE_TOKENS`), and it has to be: tailwind-merge ships Tailwind's own scale,
+so without that list it files `text-title` under *colour* and silently drops the
+size whenever a call also passes one. `lib/utils.test.ts` reads both stylesheets
+and fails if a token is added to the CSS and not to that list, which is the only
+thing that catches it — the class compiles and the build stays clean either way.
 
 ### The stylesheets
 

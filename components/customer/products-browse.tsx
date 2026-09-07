@@ -1,19 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
-import { ProductCard } from "@/components/customer/product-card";
+import { ProductGridCard } from "@/components/ui/product-card";
 import { ProductSheet } from "@/components/customer/product-sheet";
+import { useOrderCart } from "@/components/customer/use-order-cart";
 import {
   applyProductFilter,
   productFilterIsActive,
   type ProductFilter,
 } from "@/lib/product-filter";
 import type { Product } from "@/lib/types/salon";
-import { useCart } from "@/lib/use-cart";
 
 /**
  * The cross-salon products grid — a port of `ProductsBrowse` in
@@ -24,11 +23,9 @@ import { useCart } from "@/lib/use-cart";
  *
  * ## Adding across salons
  *
- * The cart holds one salon's products because `place_order` takes one `p_business`. When a customer
- * adds something from a second salon, `addToCart` refuses and returns the cart they *would* have —
- * so instead of an error this offers the choice: keep the current cart, or start again with this. The
- * app throws `CartSalonMismatch` and the browse catches it into a toast with no way forward, which
- * leaves the customer to work out that they must empty the cart by hand.
+ * `useOrderCart` owns that rule, the question it raises and the two guards around the quantity
+ * control — see the note there. This file used to carry its own copy as a red toast, and so did
+ * the salon shelf.
  *
  * ## Empty states say which kind of empty
  *
@@ -49,7 +46,7 @@ export function ProductsBrowse({
   filter: ProductFilter;
   onClearFilter: () => void;
 }) {
-  const { cart, add, setQty, replace } = useCart();
+  const { qtyOf, addProduct, setProductQty, dialog } = useOrderCart();
   const [open, setOpen] = useState<Product | null>(null);
 
   const q = query.trim().toLowerCase();
@@ -58,24 +55,6 @@ export function ProductsBrowse({
     [products, q],
   );
   const visible = useMemo(() => applyProductFilter(filter, matching), [filter, matching]);
-
-  const qtyOf = (id: string) => cart.lines.find((l) => l.productId === id)?.qty ?? 0;
-
-  function addProduct(product: Product) {
-    const result = add(product);
-    if (result.ok) return;
-    // The one-salon rule. Offer the way through rather than just the refusal.
-    toast.error(`Your cart has items from another salon.`, {
-      description: `Start a new cart with ${product.name}?`,
-      action: {
-        label: "Start new",
-        onClick: () => {
-          replace(result.replacement);
-          toast.success(`Cart replaced with ${product.name}.`);
-        },
-      },
-    });
-  }
 
   if (products.length === 0) {
     return (
@@ -112,23 +91,33 @@ export function ProductsBrowse({
   return (
     <>
       {/*
-        Same auto-fill track as Discover's salon grid, and here for the same reason: the
-        page container is uncapped, and this segment has no filter rail to spend the extra
-        width on, so three fixed columns would put the whole of it into the card. The
-        minimum is 360px rather than 320px because a product card carries a price row and
-        a quantity stepper side by side. It still resolves to 3 columns at 1440, which is
-        what the fixed count gave.
+        One auto-fill track at every width, replacing `grid-cols-1 tablet:grid-cols-2
+        wide:[360px]` — a table written for the old row card, whose 360px minimum put a
+        single product per line on a phone.
+
+        `min(45%, 10rem)` is the whole responsive rule, and both halves are load-bearing.
+        **45%** is "never fewer than two columns", which is what a phone needs and what a
+        fixed minimum cannot express. **10rem** caps it once there is room, and is tuned to
+        reproduce upstream's column counts — its grid is a 220px max-extent, and this track
+        lands on the same 4 / 5 / 7 columns at 744 / 1024 / 1440, with cards between 138
+        and 193px everywhere in between. No breakpoints, which is upstream's rule too.
+
+        `items-stretch` is the default and is relied on: it plus `h-full` inside the card is
+        what makes every card in a row the same height, which is the job upstream needs a
+        measured `mainAxisExtent` for.
       */}
-      <ul className="gap-md grid grid-cols-1 tablet:grid-cols-2 wide:grid-cols-[repeat(auto-fill,minmax(360px,1fr))]">
+      <ul className="gap-md grid grid-cols-[repeat(auto-fill,minmax(min(45%,10rem),1fr))]">
         {visible.map((product) => (
           <li key={product.id}>
-            <ProductCard
+            <ProductGridCard
               product={product}
               qty={qtyOf(product.id)}
-              showSalon
               onAdd={() => addProduct(product)}
-              onSetQty={(qty) => setQty(product.id, qty)}
+              onSetQty={(qty) => setProductQty(product, qty)}
               onOpen={() => setOpen(product)}
+              // Matches the track above: never more than half the viewport on a phone,
+              // never more than a 220px card once the cap is in force.
+              sizes="(min-width: 744px) 220px, 50vw"
             />
           </li>
         ))}
@@ -137,10 +126,11 @@ export function ProductsBrowse({
       <ProductSheet
         product={open}
         qty={open ? qtyOf(open.id) : 0}
-        onSetQty={(qty) => open && setQty(open.id, qty)}
+        onSetQty={(qty) => open && setProductQty(open, qty)}
         onAdd={() => open && addProduct(open)}
         onClose={() => setOpen(null)}
       />
+      {dialog}
     </>
   );
 }

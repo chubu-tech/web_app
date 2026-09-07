@@ -20,7 +20,7 @@
  * and a boundary that needs the same pipeline that just broke is a boundary with a shared
  * failure mode. Inline styles cannot fail separately from the markup they are on.
  *
- * The values are the tokens by hand: `#f6f3ee` is `--color-canvas` on the customer shell,
+ * The values are the tokens by hand: `#ffffff` is `--color-canvas`,
  * `#1c1917` is `--color-ink`, `#E00B41` is `--color-rausch-cta` (the accessible fill — never
  * `#FF385C`, which fails AA against white).
  *
@@ -53,7 +53,7 @@ export default function GlobalError({
           alignItems: "center",
           justifyContent: "center",
           padding: "24px",
-          background: "#f6f3ee",
+          background: "#ffffff",
           color: "#1c1917",
           fontFamily:
             'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',

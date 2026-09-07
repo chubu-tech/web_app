@@ -36,10 +36,11 @@ import { Container } from "@/components/marketing/ui/section";
  * 2. **`data-shell` comes from the parent, not from here.** This used to read "no
  *    `data-shell`", on the grounds that the marketing group carried none and these
  *    therefore rendered on white. `app/(marketing)/layout.tsx` declares
- *    `data-shell="marketing"` now — closing the seam where `/` was `#ffffff` and every
- *    product route was `#f6f3ee` — and these four nest inside it, so they inherit the
- *    cream with nothing to add here. The pages were already restyled onto the marketing
- *    type scale; the words are untouched by any of it.
+ *    `data-shell="marketing"` now, and these four nest inside it, so they inherit it with
+ *    nothing to add here. What they inherit through it matters more than it used to: the
+ *    attribute is what keeps these pages on the **web** type scale after the product moved
+ *    to the app's, which is deliberate — `/privacy` is the URL both app stores link to and is
+ *    read end to end, not scanned like a console. The words are untouched by any of it.
  * 3. **No `error.tsx`/`loading.tsx` above them any more.** Neither is missed: all
  *    four are static, read nothing and have nothing to fail or to wait for. If a
  *    marketing boundary is ever added it belongs at `app/(marketing)/`, where the

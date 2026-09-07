@@ -8,8 +8,8 @@ import { TermsGate } from "@/components/ui/terms-gate";
 import { fetchMessages, markConversationRead, sendMessage } from "@/lib/api/chat";
 import { hasAcceptedTerms } from "@/lib/api/moderation";
 import { isMine } from "@/lib/chat-logic";
+import { timeLabel } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/client";
-import { THIMPHU_TZ } from "@/lib/time";
 import { QUICK_REPLIES, type Message } from "@/lib/types/chat";
 import { cn } from "@/lib/utils";
 import { usePollTick } from "./use-poll";
@@ -248,11 +248,7 @@ function Bubble({ message, mine }: { message: Message; mine: boolean }) {
             mine ? "text-on-primary/75" : "text-muted",
           )}
         >
-          {message.createdAt.toLocaleTimeString("en-GB", {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: THIMPHU_TZ,
-          })}
+          {timeLabel(message.createdAt)}
         </time>
       </div>
 

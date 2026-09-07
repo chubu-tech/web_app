@@ -171,7 +171,7 @@ export function QueueBoard({
     return (
       <div className="px-base py-lg mx-auto w-full max-w-[1128px] tablet:px-lg">
         {heading}
-        <QueueLocked business={business} />
+        <QueueLocked />
       </div>
     );
   }
@@ -299,22 +299,26 @@ function SummaryStrip({ summary: s }: { summary: QueueBoardSummary }) {
   );
 }
 
-function QueueLocked({ business }: { business: Business }) {
-  // Two different reasons land here, and the copy has to tell them apart: the plan does not
-  // include the queue, or it does and the owner switched it off in the app's Settings. The
-  // app conflates them — its board gates on the plan alone, so a Growth salon with the
-  // queue off still gets a live board with a working Call next while `join_queue` refuses
-  // its customers. `runsQueue` is the predicate that covers both, and this is the fourth
-  // documented divergence from the Dart.
-  const entitled = business.plan === "growth" || business.plan === "pro";
-  return entitled ? (
+function QueueLocked() {
+  /*
+    **One reason lands here now: the owner switched the queue off.**
+
+    There used to be two, and the copy had to tell them apart — the plan did not include the
+    queue, or it did and the switch was off. Migration `20260902000003_queue_for_all_plans.sql`
+    removed the plan half from `join_queue`, `check_in_booking` and `queue_active_line`, so
+    `runsQueue` is the switch alone and the "Growth feature" branch that used to sit here was a
+    paywall in front of something every plan already has.
+
+    Worth knowing why an owner may find it off without having touched it: `queue_enabled`
+    defaults to true, so the same migration turned it off for every salon already on Basic
+    rather than publishing a live "join the queue · N ahead" surface at ten real salons whose
+    owners had never opened this board.
+  */
+  return (
     <EmptyState
       icon={Icons.locked}
       title="The walk-in queue is switched off"
-      // 3a had to say "in the app's Settings", because the web had none. 3b does, so this
-      // points at it — a message telling someone to go and find another client for a switch
-      // that is two clicks away is worse than no message.
-      message="Your plan includes it, but this salon is set to appointments only. Turn it back on and the board starts here."
+      message="This salon is set to appointments only. Turn it back on and the board starts here."
       action={
         <Link
           href="/business/settings/salon"
@@ -323,12 +327,6 @@ function QueueLocked({ business }: { business: Business }) {
           Open salon settings
         </Link>
       }
-    />
-  ) : (
-    <EmptyState
-      icon={Icons.locked}
-      title="Walk-in queue is a Growth feature"
-      message="A live walk-in line for your salon is part of the Growth plan."
     />
   );
 }

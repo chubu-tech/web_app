@@ -8,6 +8,8 @@ import { Icons, IconSize } from "@/components/ui/icons";
 import { updateMyProfile, uploadAvatar } from "@/lib/api/profile";
 import { downscaleImage, imageRejection, releasePreview } from "@/lib/images";
 import { createClient } from "@/lib/supabase/client";
+import { BhutanPhoneField } from "@/components/ui/bhutan-phone-field";
+import { bhutanPhoneError, toE164, toLocal } from "@/lib/bhutan-phone";
 
 /**
  * Editing your own profile, in place on `/profile` — a port of the top of
@@ -34,7 +36,9 @@ export function ProfileEditor({
   email: string | null;
 }) {
   const [name, setName] = useState(initial.fullName ?? "");
-  const [phone, setPhone] = useState(initial.phone ?? "");
+  // Stored E.164, shown local: the field only ever holds the 8 digits people read.
+  const [phone, setPhone] = useState(toLocal(initial.phone ?? ""));
+  const [showPhoneError, setShowPhoneError] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(initial.avatarUrl);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -96,6 +100,13 @@ export function ProfileEditor({
   }
 
   async function save() {
+    // Same rule as the walk-in form: blank is a decision, half-typed is a typo.
+    const phoneProblem = bhutanPhoneError(phone);
+    if (phoneProblem) {
+      setShowPhoneError(true);
+      toast.error(phoneProblem);
+      return;
+    }
     setSaving(true);
     try {
       const supabase = createClient();
@@ -109,7 +120,13 @@ export function ProfileEditor({
         // someone who has never set one, and sending "" would store a blank string
         // that reads as a phone number to the outbox query.
         fullName: name.trim() === "" ? null : name.trim(),
-        phone: phone.trim() === "" ? null : phone.trim(),
+        /*
+          E.164, always. `wa.me`, `tel:` links and the notification outbox all want the
+          dialable form, and the field hands over local digits. `toE164` is null for anything
+          it cannot dial, so a half-typed number is refused above rather than stored as
+          something nobody can ring.
+        */
+        phone: phone.trim() === "" ? null : toE164(phone),
       });
       toast.success("Saved.");
     } catch {
@@ -156,14 +173,10 @@ export function ProfileEditor({
           placeholder="Your name"
           autoComplete="name"
         />
-        <Field
-          id="profile-phone"
-          label="Phone"
+        <BhutanPhoneField
           value={phone}
           onChange={setPhone}
-          placeholder="+975 17 000 000"
-          type="tel"
-          autoComplete="tel"
+          showError={showPhoneError}
           hint="Salons use this to reach you about a booking. Text-message alerts aren't switched on yet."
         />
       </div>

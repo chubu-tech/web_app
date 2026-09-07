@@ -1005,12 +1005,12 @@ function BookingsPanel() {
             {/*
               `bg-surface-soft`, not `bg-canvas` — the mock's own surface is paper
               white, so a "background" inside this card has to be a step away from
-              white rather than white again. It used to be the sharper version of the
-              same bug: `--color-canvas` was itself white out here, so the track
-              resolved to the exact colour already behind it and vanished. The public
-              pages are cream now (`data-shell="marketing"`) and `surface-soft` is a
-              warm tint of it, so this reads as a track either way — but the rule that
-              produced it is unchanged: inside a card, reach for `surface-soft`.
+              white rather than white again. `bg-canvas` here was the sharper version of
+              the same bug: it resolved to the exact colour already behind the track,
+              which therefore vanished. Note the canvas is white again after the port —
+              so that bug is one class change away, and `surface-soft` (`#f7f7f7`) is
+              what keeps the step. Faint by design: it is the app's own pairing of
+              `surfaceSoft` on `canvas`. Inside a card, reach for `surface-soft`.
               `rounded-md` too: `rounded-lg` here is `--radius-lg`, **20px**, which on
               a 36px track is very nearly a pill.
             */}

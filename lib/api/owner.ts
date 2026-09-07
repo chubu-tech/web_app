@@ -4,6 +4,7 @@ import type { QueueEntry, QueueStatus } from "../types/queue";
 import type { Business } from "../types/salon";
 import { BOOKING_SELECT } from "./booking";
 import { toBooking, toBusiness, toQueueEntry } from "./mappers";
+import { oneRow } from "./one-row";
 
 /**
  * The owner console's reads and writes — the salon's side of data the customer side
@@ -235,7 +236,7 @@ export async function callNext(
     p_staff: staffId,
   });
   if (error) throw error;
-  return toQueueEntry(oneRow(data), businessId);
+  return toQueueEntry(oneRow(data, "queue RPC"), businessId);
 }
 
 /**
@@ -257,14 +258,5 @@ export async function setQueueStatus(
     p_status: status,
   });
   if (error) throw error;
-  return toQueueEntry(oneRow(data));
-}
-
-/**
- * These RPCs return `SETOF queue_entries`, which PostgREST hands back as a single object
- * or a one-element array depending on the call. Same normalisation `./queue.ts` does.
- */
-function oneRow(data: unknown): Record<string, unknown> {
-  if (Array.isArray(data)) return (data[0] ?? {}) as Record<string, unknown>;
-  return (data ?? {}) as Record<string, unknown>;
+  return toQueueEntry(oneRow(data, "queue RPC"));
 }

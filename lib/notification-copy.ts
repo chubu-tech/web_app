@@ -1,5 +1,6 @@
 import { THIMPHU_TZ } from "./time";
 import { isUnread, type AppNotification, type NotificationKind } from "./types/notification";
+import { dayTimeLabel } from "./clock";
 
 /**
  * What a notification looks like and what it says.
@@ -398,14 +399,9 @@ function formatWhen(startTs: unknown, timeZone: string): string {
   if (typeof startTs !== "string") return "";
   const d = new Date(startTs);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("en-GB", {
-    timeZone,
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // The zone is threaded through rather than defaulted: this one formatter has to match what
+  // the worker actually sent, and `payload.tz` is where that is recorded.
+  return dayTimeLabel(d, timeZone);
 }
 
 /** `payload.tz` wins if present, as it does in the worker — for a future multi-zone world. */

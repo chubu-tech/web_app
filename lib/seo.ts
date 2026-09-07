@@ -453,8 +453,67 @@ export const SHARE_CARD = {
 /** The share card's alt text. Read by `app/opengraph-image.tsx` and by `shareCard`. */
 export const SHARE_CARD_ALT = `${brand.name} — ${brand.tagline}`;
 
+/**
+ * `/app`'s own card. Same shape and density as the site card; different composition.
+ *
+ * ## Why a second card rather than reusing the first
+ *
+ * `/app` answers a different question. The site card sells the product — *"Book your
+ * chair. Skip the wait."* over a line of body copy — to somebody who has not decided
+ * anything. `/app` is shared at the moment somebody has *already* decided and is being
+ * handed the download, and the one fact it has to carry is that the thing exists on both
+ * phones. A card that does not say so leaves the reader to guess whether the link is for
+ * theirs.
+ *
+ * ## Centred, and that is the cropping decision
+ *
+ * The site card is a left-aligned composition, which is correct at 1.91:1 and loses its
+ * logo entirely in a centre-square crop — WhatsApp Web takes roughly the middle 630×630,
+ * i.e. x from 285 to 915 of 1200, so anything left of 285 is gone. This card is composed
+ * on the centre line for that reason: the mark, the headline and the platform line all
+ * survive both the full-width unfurl and the square thumbnail.
+ *
+ * `version` is independent of `SHARE_CARD.version` because the two images are cached
+ * separately, against their own URLs — bumping one must not invalidate the other, and a
+ * shared counter would mean every site-card redraw also re-fetched this one.
+ */
+export const APP_SHARE_CARD = {
+  /*
+    A route handler at an explicit path, not an `opengraph-image.tsx` file convention.
+    Next appends a content hash to a *nested* metadata route — the co-located version of
+    this built as `/app/opengraph-image-19nk79` — so the URL cannot be written down, and a
+    URL that cannot be written down cannot be handed to `shareCard`. The root card escapes
+    this only because a metadata route at the app root keeps its plain name.
+  */
+  path: "/app/share-card",
+  scale: SHARE_CARD.scale,
+  /** Bump when this card's pixels change. See `SHARE_CARD.version`. */
+  version: 1,
+  width: SHARE_CARD.width,
+  height: SHARE_CARD.height,
+  contentType: SHARE_CARD.contentType,
+} as const;
+
+/** `/app`'s card alt text. Read by its route and by its `shareCard` call. */
+export const APP_SHARE_CARD_ALT = `${brand.name} — free on iPhone and Android`;
+
 /** One image in a share card, as both Open Graph and Twitter want it. */
 type ShareImage = { url: string; alt?: string; width?: number; height?: number };
+
+/**
+ * `/app`'s card, absolute — passed explicitly by that page.
+ *
+ * It has to be passed rather than left to the `opengraph-image.tsx` file convention:
+ * `shareCard` always sets `openGraph.images`, for the reason its own doc comment gives, so
+ * a page that does not name an image gets `BRANDED_IMAGE` and the co-located route is
+ * simply never referenced.
+ */
+export const APP_CARD_IMAGE: ShareImage = {
+  url: absoluteUrl(`${APP_SHARE_CARD.path}?v=${APP_SHARE_CARD.version}`),
+  width: APP_SHARE_CARD.width,
+  height: APP_SHARE_CARD.height,
+  alt: APP_SHARE_CARD_ALT,
+};
 
 /**
  * The branded card, absolute. Every page falls back to this when it has no photo of

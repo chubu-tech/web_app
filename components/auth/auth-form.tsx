@@ -8,7 +8,14 @@ import { Icons, IconSize } from "@/components/ui/icons";
 import { friendlyAuthError, homeForRole, type Role } from "@/lib/auth";
 import { DEFAULT_NEXT, safeNext } from "@/lib/next-path";
 import { createClient } from "@/lib/supabase/client";
+import { Field, FieldIcon } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
+import {
+  emailError,
+  nameError,
+  newPasswordError,
+  signInPasswordError,
+} from "@/lib/credentials";
 
 /**
  * Email and password sign-in / sign-up, ported from
@@ -53,16 +60,46 @@ export function AuthForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  /*
+    **Per field, and all judged in one pass.** A form with three problems reports three, and
+    each message names the field it belongs to rather than putting one line at the foot of the
+    page about a field the person has already scrolled past.
+  */
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string | null;
+    email?: string | null;
+    password?: string | null;
+  }>({});
 
   const signUp = mode === "sign-up";
   const target = safeNext(next);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!email.trim() || !password) {
-      setError("Enter your email and password.");
+
+    /*
+      Judged here rather than left to the server, because the server answers about the
+      *request*: `a@` comes back as "Unable to validate email address: invalid format", which
+      says nothing about what to type instead. `lib/credentials.ts` is the one place these
+      rules live, and it is shared with the guest wall.
+
+      **The password rule differs by mode, and that is not an oversight.** Sign-up applies the
+      8-character rule; sign-in checks only that the box is filled. Somebody who set a
+      6-character password before that rule existed still has to be able to get in, and
+      telling them their correct password is too short would be a lie about why they cannot.
+    */
+    const problems = {
+      name: signUp ? nameError(fullName) : null,
+      email: emailError(email),
+      password: signUp ? newPasswordError(password) : signInPasswordError(password),
+    };
+    setFieldErrors(problems);
+    if (problems.name || problems.email || problems.password) {
+      setError(null);
+      setInfo(null);
       return;
     }
+
     setBusy(true);
     setError(null);
     setInfo(null);
@@ -114,10 +151,14 @@ export function AuthForm({
       {signUp ? (
         <Field
           label="Your name"
-          hint="Optional"
           value={fullName}
-          onChange={setFullName}
+          onChange={(v) => {
+            setFullName(v);
+            if (fieldErrors.name) setFieldErrors((e) => ({ ...e, name: null }));
+          }}
+          error={fieldErrors.name}
           autoComplete="name"
+          prefix={<FieldIcon icon={Icons.person} />}
         />
       ) : null}
 
@@ -125,20 +166,32 @@ export function AuthForm({
         label="Email"
         type="email"
         value={email}
-        onChange={setEmail}
+        onChange={(v) => {
+          setEmail(v);
+          if (fieldErrors.email) setFieldErrors((e) => ({ ...e, email: null }));
+        }}
+        error={fieldErrors.email}
         autoComplete="email"
         placeholder="you@example.com"
         required
+        prefix={<FieldIcon icon={Icons.mail} />}
       />
 
       <Field
         label="Password"
         type={reveal ? "text" : "password"}
         value={password}
-        onChange={setPassword}
+        onChange={(v) => {
+          setPassword(v);
+          if (fieldErrors.password) setFieldErrors((e) => ({ ...e, password: null }));
+        }}
+        error={fieldErrors.password}
         autoComplete={signUp ? "new-password" : "current-password"}
-        hint={signUp ? "At least 6 characters" : undefined}
+        // States the whole rule up front rather than letting somebody discover the letter and
+        // the digit one refusal at a time.
+        hint={signUp ? "At least 8 characters, with a letter and a number" : undefined}
         required
+        prefix={<FieldIcon icon={Icons.locked} />}
         suffix={
           <button
             type="button"
@@ -160,7 +213,11 @@ export function AuthForm({
       {error ? <Note kind="error">{error}</Note> : null}
       {info ? <Note kind="success">{info}</Note> : null}
 
-      <Button type="submit" busy={busy} fullWidth className="mt-sm">
+      {/* `shadow-cta-glow` is the one place in the product that shadow appears: this form has
+          exactly one action, and on a white page under the warm wash the glow is what says
+          so. See the utility's own note in `globals.css` for why it is not for a button
+          among buttons. */}
+      <Button type="submit" busy={busy} fullWidth className="mt-sm shadow-cta-glow">
         {signUp ? "Create account" : "Sign in"}
       </Button>
 
@@ -287,7 +344,7 @@ function RolePicker({
                 "transition-colors duration-[var(--duration-fast)]",
                 "has-focus-visible:outline-ink has-focus-visible:outline-2 has-focus-visible:outline-offset-2",
                 selected
-                  ? "border-rausch bg-[#FFF5F7] border-2"
+                  ? "border-rausch bg-rausch-soft border-2"
                   : "border-hairline hover:border-border-strong",
               )}
             >
@@ -311,45 +368,6 @@ function RolePicker({
         })}
       </div>
     </fieldset>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  value,
-  onChange,
-  type = "text",
-  suffix,
-  ...rest
-}: {
-  label: string;
-  hint?: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  suffix?: React.ReactNode;
-} & Omit<React.ComponentPropsWithoutRef<"input">, "value" | "onChange" | "type">) {
-  return (
-    <label className="block">
-      <span className="text-caption text-muted block">{label}</span>
-      <span
-        className={cn(
-          "border-hairline mt-xs flex items-center rounded-sm border bg-canvas",
-          "focus-within:border-ink focus-within:border-2",
-        )}
-      >
-        <input
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="text-body-md text-ink placeholder:text-muted-soft px-md min-h-14 w-full bg-transparent outline-none"
-          {...rest}
-        />
-        {suffix}
-      </span>
-      {hint ? <span className="text-caption-sm text-muted mt-xxs block">{hint}</span> : null}
-    </label>
   );
 }
 

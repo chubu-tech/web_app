@@ -9,7 +9,13 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { groupWeekByDay, openMinutesForWeekday, perDayCounts } from "@/lib/calendar-logic";
 import { hasFeature } from "@/lib/entitlements";
 import { addDays, thimphuWeekday, toIsoDay } from "@/lib/time";
-import { bookingTab, type Booking, type WorkingHour } from "@/lib/types/booking";
+import {
+  asBookingSegment,
+  bookingSegmentCounts,
+  bookingsForSegment,
+  type Booking,
+  type WorkingHour,
+} from "@/lib/types/booking";
 import type { Business } from "@/lib/types/salon";
 import { cn } from "@/lib/utils";
 import { OwnerBookingCard } from "./owner-booking-card";
@@ -447,9 +453,14 @@ function ListBody({
   capped: boolean;
   onSegment: (seg: number) => void;
 }) {
-  const counts = [0, 0, 0];
-  for (const b of bookings) counts[bookingTab(b)]!++;
-  const shown = bookings.filter((b) => bookingTab(b) === segment);
+  const counts = bookingSegmentCounts(bookings);
+  /*
+    Sorted, not just filtered. This list is fed by an ascending read (right for the day view
+    it shares), so its two history tabs were reading oldest-first — the mirror image of the
+    fault the customer's list had. `bookingsForSegment` owns the direction for all three
+    surfaces so no read has to be right for every tab.
+  */
+  const shown = bookingsForSegment(bookings, asBookingSegment(segment));
 
   return (
     <>

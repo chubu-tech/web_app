@@ -1,7 +1,7 @@
 import { SectionHeader } from "@/components/ui/section-header";
 import type { Order } from "@/lib/types/back-office";
 import { orderFulfilment } from "@/lib/analytics";
-import { formatNu } from "@/lib/utils";
+import { cn, formatNu } from "@/lib/utils";
 
 /**
  * An order's lines and what they add up to — shared by the customer's receipt
@@ -108,13 +108,16 @@ function Row({
     <li className="gap-sm flex items-baseline">
       <span className="text-body-sm text-muted min-w-0 flex-1">{label}</span>
       {/*
-        A template literal rather than `cn`, deliberately: this carries a size class and a
-        colour class, and `twMerge` files both under *colour* and silently drops one — the trap
-        `lib/utils.ts` documents and the one that turned a label on a photograph into an
-        unreadable black box. Nothing here needs merging, so nothing merges it.
+        `cn` now, rather than a template literal. It used to be one because `twMerge` filed a
+        size and a colour under the same group and silently dropped one — the trap that turned
+        a label on a photograph into an unreadable black box. `lib/utils.ts` teaches it the
+        scale, so the two coexist and this can merge like everything else.
       */}
       <span
-        className={`text-body-sm tabular-nums ${tone === "success" ? "text-success-text" : "text-body"}`}
+        className={cn(
+          "text-body-sm tabular-nums",
+          tone === "success" ? "text-success-text" : "text-body",
+        )}
       >
         {value}
       </span>

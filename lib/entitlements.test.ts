@@ -29,10 +29,15 @@ const GROWTH: Feature[] = [
   "clientBook",
   "productStore",
   "loyalty",
-  "walkInQueue",
 ];
 
-const PRO_ONLY: Feature[] = ["commissions", "deposits", "stylePicker", "servicePacks"];
+const PRO_ONLY: Feature[] = [
+  "commissions",
+  "deposits",
+  "stylePicker",
+  "servicePacks",
+  "reminderChannel",
+];
 
 describe("the tier split mirrors entitlements.dart", () => {
   it("unlocks nothing at Basic — it is the entry price, not a free tier", () => {
@@ -41,12 +46,12 @@ describe("the tier split mirrors entitlements.dart", () => {
     }
   });
 
-  it("unlocks the eight _growthAdds at Growth, and no Pro perk", () => {
+  it("unlocks the seven _growthAdds at Growth, and no Pro perk", () => {
     for (const feature of GROWTH) expect(hasFeature("growth", feature)).toBe(true);
     for (const feature of PRO_ONLY) expect(hasFeature("growth", feature)).toBe(false);
   });
 
-  it("inherits Growth at Pro and adds the four _proAdds", () => {
+  it("inherits Growth at Pro and adds the five _proAdds", () => {
     for (const feature of [...GROWTH, ...PRO_ONLY]) {
       expect(hasFeature("pro", feature)).toBe(true);
     }
@@ -62,11 +67,21 @@ describe("the tier split mirrors entitlements.dart", () => {
     expect(ALL_FEATURES).not.toContain("priorityPlacement");
   });
 
+  /*
+    The same direction, for the flag this pass removed. `walkInQueue` was deleted rather than
+    granted on every tier when `20260902000003_queue_for_all_plans.sql` dropped the server gate,
+    because a `Feature` nobody checks is how `priorityPlacement` went on being sold. Re-adding it
+    would put a paywall back in front of a surface the server serves to every plan.
+  */
+  it("has no walk-in-queue flag — the queue is on every plan", () => {
+    expect(ALL_FEATURES).not.toContain("walkInQueue");
+  });
+
   it("fails locked on a null, unknown or wrong-case plan", () => {
     expect(planFromString(null)).toBe("basic");
     expect(planFromString("Pro")).toBe("basic");
     expect(planFromString("enterprise")).toBe("basic");
-    expect(hasFeature(undefined, "walkInQueue")).toBe(false);
+    expect(hasFeature(undefined, "loyalty")).toBe(false);
   });
 
   it("derives the stylist cap from the entitlement rather than repeating it", () => {

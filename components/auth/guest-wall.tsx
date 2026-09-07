@@ -6,9 +6,16 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/sheet";
-import { GUEST_ACTIONS, upgradeGuest, type GuestAction } from "@/lib/auth";
+import {
+  GUEST_ACTIONS,
+  resumeUpgrade,
+  upgradeGuest,
+  type GuestAction,
+  type GuestUpgrade,
+} from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { emailError, nameError, newPasswordError } from "@/lib/credentials";
 
 /**
  * The wall a guest meets when they try to do something that commits them (THO-24),
@@ -49,7 +56,12 @@ export function GuestWall({
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
+  /*
+    `null` while the sheet is still asking for details. Once an account exists the fields
+    come **off** the sheet — leaving them there invites a second `updateUser` for an account
+    that is already made, which is what "Continue" exists to avoid.
+  */
+  const [madeAccount, setMadeAccount] = useState<Exclude<GuestUpgrade, "ready"> | null>(null);
 
   const signInHref = `/sign-in?next=${encodeURIComponent(
     next ?? (typeof window === "undefined" ? "/" : window.location.pathname + window.location.search),
@@ -57,36 +69,51 @@ export function GuestWall({
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
-    if (!email.trim() || !password) {
-      setError("Enter an email and a password.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("Use at least 6 characters for your password.");
+    /*
+      The same rules as the sign-up screen, from the same module. This used to check only
+      non-emptiness and a 6-character floor, so a guest upgrading here was held to a weaker
+      standard than somebody signing up two routes away — for the same account.
+    */
+    const problem = nameError(fullName) ?? emailError(email) ?? newPasswordError(password);
+    if (problem) {
+      setError(problem);
       return;
     }
     setBusy(true);
     setError(null);
-    setInfo(null);
 
-    const supabase = createClient();
-    const result = await upgradeGuest(supabase, email.trim(), password, fullName.trim());
+    const result = await upgradeGuest(createClient(), email.trim(), password, fullName.trim());
+    setBusy(false);
 
     if (!result.ok) {
-      setBusy(false);
       setError(result.error ?? "Couldn't create your account. Please try again.");
       return;
     }
-    if (!result.confirmed) {
-      // Supabase needs the email round-trip before the user stops counting as
-      // anonymous, so the sheet cannot hand back "you're in". Say what has to
-      // happen next — `guest_wall.dart:91` makes exactly the same distinction.
-      setBusy(false);
-      setInfo(`Check ${email.trim()} to confirm your address, then come back and finish.`);
+    settle(result.outcome);
+  }
+
+  /**
+   * Re-check without writing anything — the "Continue" path.
+   *
+   * Separate from {@link create} because a second `updateUser` would try to make the account
+   * again for somebody who already has one.
+   */
+  async function check() {
+    setBusy(true);
+    setError(null);
+    const outcome = await resumeUpgrade(createClient());
+    setBusy(false);
+    settle(outcome);
+  }
+
+  function settle(outcome: GuestUpgrade) {
+    if (outcome !== "ready") {
+      // The account exists; only this browser's session does not prove it yet. Keep the
+      // sheet open on its second face rather than closing on a success the RPCs will refuse.
+      setMadeAccount(outcome);
       return;
     }
-
-    setBusy(false);
+    setMadeAccount(null);
     // Role lives in a server component, so the shell has to re-render before the
     // caller retries against the new session.
     router.refresh();
@@ -95,7 +122,13 @@ export function GuestWall({
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={`Create an account to ${GUEST_ACTIONS[action]}`}>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={
+        madeAccount == null ? `Create an account to ${GUEST_ACTIONS[action]}` : "One more step"
+      }
+    >
       <form onSubmit={create} className="p-base gap-base flex flex-col">
         <div className="flex flex-col items-center text-center">
           <span className="bg-surface-soft flex size-16 items-center justify-center rounded-full">
@@ -106,43 +139,81 @@ export function GuestWall({
             />
           </span>
           <p className="text-body-sm text-muted mt-md">
-            It takes a moment, and you keep everything you&apos;ve saved so far.
+            {madeAccount == null
+              ? "It takes a moment, and you keep everything you've saved so far."
+              : "Your account is made — we just need this browser signed in to it."}
           </p>
         </div>
 
-        <WallField label="Your name" hint="Optional" value={fullName} onChange={setFullName} />
-        <WallField
-          label="Email"
-          type="email"
-          value={email}
-          onChange={setEmail}
-          autoComplete="email"
-          required
-        />
-        <WallField
-          label="Password"
-          type="password"
-          value={password}
-          onChange={setPassword}
-          autoComplete="new-password"
-          hint="At least 6 characters"
-          required
-        />
+        {madeAccount == null ? (
+          <>
+            {/*
+              **No longer "Optional".** The salon sees this name on the booking — and until
+              `20260902000004` it was the *only* way it reached `profiles` at all, because
+              `handle_new_user` is AFTER INSERT and an anonymous user's INSERT carries no
+              metadata. That is why a salon used to see "Guest" against a booking somebody had
+              put their name to.
+            */}
+            <WallField
+              label="Your name"
+              hint="The salon sees this on your booking"
+              value={fullName}
+              onChange={setFullName}
+              required
+            />
+            <WallField
+              label="Email"
+              type="email"
+              value={email}
+              onChange={setEmail}
+              autoComplete="email"
+              required
+            />
+            <WallField
+              label="Password"
+              type="password"
+              value={password}
+              onChange={setPassword}
+              autoComplete="new-password"
+              hint="At least 8 characters, with a letter and a number"
+              required
+            />
+          </>
+        ) : null}
 
         {error ? (
           <p role="alert" className="text-body-sm text-error-text">
             {error}
           </p>
         ) : null}
-        {info ? (
-          <p role="status" className="text-body-sm text-success-text">
-            {info}
+
+        {madeAccount === "awaitingEmailConfirmation" ? (
+          <p role="status" className="text-body-sm text-body">
+            Account created. Confirm your address from the email we sent to{" "}
+            <strong className="text-ink font-medium">{email.trim()}</strong>, then tap Continue.
+          </p>
+        ) : null}
+        {madeAccount === "sessionStale" ? (
+          /*
+            Not phrased as a failure to create the account, because the account exists. What
+            failed is this browser proving it — and the fix is one more tap, not a second
+            sign-up.
+          */
+          <p role="alert" className="text-body-sm text-error-text">
+            Your account is ready, but this browser couldn&apos;t finish signing you in. Tap
+            Continue to try again.
           </p>
         ) : null}
 
-        <Button type="submit" busy={busy} fullWidth>
-          Create account
-        </Button>
+        {madeAccount == null ? (
+          <Button type="submit" busy={busy} fullWidth>
+            Create account
+          </Button>
+        ) : (
+          <Button type="button" busy={busy} fullWidth onClick={() => void check()}>
+            Continue
+          </Button>
+        )}
 
         <p className="text-body-sm text-muted text-center">
           Already have an account?{" "}
@@ -152,7 +223,7 @@ export function GuestWall({
         </p>
 
         <Button variant="quiet" fullWidth onClick={onClose} disabled={busy}>
-          Keep looking around
+          {madeAccount == null ? "Keep looking around" : "Not now"}
         </Button>
       </form>
     </Sheet>

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { StatusPill } from "@/components/ui/status-pill";
-import { THIMPHU_TZ } from "@/lib/time";
+import { timeLabel } from "@/lib/clock";
 import {
   bookingCode,
   customerName,
@@ -69,7 +69,6 @@ export function OwnerBookingCard({
   const status = optimistic ?? booking.status;
 
   const dead = status === "cancelled" || status === "no_show";
-  const tz = { timeZone: THIMPHU_TZ } as const;
 
   return (
     <article
@@ -83,11 +82,7 @@ export function OwnerBookingCard({
     >
       <span className="w-14 shrink-0 text-center">
         <span className="text-title text-ink block font-semibold tabular-nums">
-          {booking.startTs.toLocaleTimeString("en-GB", {
-            hour: "2-digit",
-            minute: "2-digit",
-            ...tz,
-          })}
+          {timeLabel(booking.startTs)}
         </span>
         <span className="text-caption-sm text-muted block tabular-nums">
           {totalMinutes(booking)} min

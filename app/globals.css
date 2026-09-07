@@ -45,24 +45,24 @@
    in it: white canvas, 8/14px radii, because it is a dense operational tool somebody
    works at a till.
 
-   The **type scale is not a port** — see the block below. `theme.dart`'s phone metrics
-   were the wrong numbers for a browser.
+   **The type scale is a port too, now** — see the block below. It was a web scale for most
+   of this file's life, on the reasoning that `theme.dart`'s phone metrics were the wrong
+   numbers for a browser; that divergence was deliberately reversed, because the app is the
+   source of truth for the design language. The one exception is the public documents, which
+   keep the web scale under `[data-shell="marketing"]` — `/privacy` is the URL both app stores
+   link to and is read end to end.
 
-   `[data-shell="customer"]` re-points three colours to the marketing site's editorial
-   layer (cream canvas) so a visitor arriving from bhutansalons.com sees one continuous
-   product rather than a website and then an app. This file used to say "do not reach for
-   landing_page's globals.css"; that changed deliberately, for the customer side only.
+   **There is no colour scope any more either.** `[data-shell]` used to re-point the canvas
+   and its two surface tints to the marketing site's cream; all three are `tokens.dart`'s
+   values now, so every shell and the public pages render on the app's white.
 
-   **The typeface is not part of that split.** `--font-sans` below puts Inter on all 51
-   routes, and it is the same face `../landing_page` and the Flutter app use. The scope
-   block decides colour and nothing else.
+   **The typeface never was part of that split.** `--font-sans` below puts Inter on all 51
+   routes, and it is the same face `../landing_page` and the Flutter app use.
 
    THE RULE FOR ADDING A TOKEN:
 
      Override a shared name only when both shells mean the same *role* and differ
      only in *value*. When they mean different *sizes*, add a new name.
-
-   `--color-canvas` is "the page behind everything" in both → overridden below.
    `--radius-slab` (2rem) and `--radius-md` (14px) are different *sizes* → two names,
    opted into per element. Re-pointing `--radius-md` at the slab value would have
    reshaped every shared card, Sheet, Chip and SelectTile with nothing in the diff to
@@ -87,6 +87,16 @@
      style preference: using rausch for a filled button reintroduces the bug. */
   --color-rausch-cta: #e00b41;
   --color-rausch-cta-pressed: #be0937; /* 6.40:1 on white */
+
+  /* The crimson field the gold brand mark sits on.
+     `tokens.dart:47`.
+
+     **Scoped to brand surfaces, and not an in-app accent** — rausch carries the brand
+     everywhere else. It exists so that arriving at the product does not jump hue away from
+     the launcher icon, whose adaptive background is this exact value. Upstream keeps three
+     copies of it in step (`@color/notification_accent`, `adaptive_icon_background`, and the
+     token); this is the fourth, so a change to it is a change to all four. */
+  --color-brand-field: #b8091e;
 
   /* --- Ink / text -------------------------------------------------------- */
   --color-ink: #222222; /* headlines, body, most links — never pure black */
@@ -141,28 +151,49 @@
      A named size resolves against the **spacing** namespace first and only falls
      through to `--container-*` when there is no spacing key of that name. So with
      `--spacing-lg` declared here, `max-w-lg` compiles to `max-width:
-     var(--spacing-lg)` — 24px, not 32rem. Read out of the emitted stylesheet.
+     var(--spacing-lg)` — 20px, not 32rem. Read out of the emitted stylesheet.
 
      It cost a broken booking flow: `Sheet` was `tablet:max-w-lg`, so every dialog in
-     the app was a 24px sliver at 744 and up, with its title and buttons spilling out
-     beside it. Phones were fine, because the variant never applied there, which is
+     the app was a sliver a couple of dozen pixels wide at 744 and up, with its title
+     and buttons spilling out beside it. Phones were fine, because the variant never applied there, which is
      why it survived so long. `max-w-sm` (8px) and `max-w-md` (12px) were wrong at
      three more call sites for the same reason; `4xl` was accidentally correct only
      because no `--spacing-4xl` exists.
 
      Renaming these was the alternative and it is the wrong trade: they are the
      project's spacing vocabulary at hundreds of call sites, and `p-lg` / `gap-lg`
-     have to keep meaning 24px. An arbitrary width is four characters longer and
-     cannot be misread. */
+     have to keep meaning one step on the ladder. An arbitrary width is four
+     characters longer and cannot be misread. */
   --spacing-xxs: 2px;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 12px;
   --spacing-base: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --spacing-xxl: 48px;
-  --spacing-section: 64px;
+  /* The top of the ladder was pulled in by `f468e57` upstream, and the reasoning transfers:
+     at 24, `lg` was only 1.5x the base, so a screen that padded its edges at `lg` and stacked
+     its blocks at `lg` had no contrast between "these belong together" and "these are
+     different things" — one interval repeated until everything weighed the same. 12 / 16 / 20
+     are three distinguishable grouping steps; everything above 28 exists to separate sections
+     or to clear a sticky bar, which does not need 64px of it. */
+  --spacing-lg: 20px;
+  --spacing-xl: 28px;
+  --spacing-xxl: 40px;
+  --spacing-section: 48px;
+
+  /*
+    **No `--spacing-gutter` / `--spacing-gutter-tight`, and that is a deliberate divergence.**
+
+    Upstream added `gutter` because "how wide is a page margin" was being answered 16 in 95
+    files and 24 in 22 more — one product decision, three answers. This repo does not have
+    that problem in the same shape: its page inset is *responsive*, `px-base` on a phone and
+    `px-lg` from `tablet:` up, written the same way in 71 files. A single 16px token called
+    `gutter` would name half of a pair and read as the whole thing, which is the "different
+    sizes get different names" rule above, inverted.
+
+    `gutterTight` is not ported for a simpler reason: upstream's own token comment records it
+    as unused, because every surface that reached for it sat under a header at `gutter` and
+    read 4px out. A token nobody may use is one more thing to misread.
+  */
 
   /* --- Motion ----------------------------------------------------------- */
   /* The rule these tiers encode: the smaller the thing, the faster it moves.
@@ -177,79 +208,80 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* easeOutBack */
 
   /* --- Type scale -------------------------------------------------------
-     **A web scale, not a port.** This used to be `theme.dart`'s `AppText`
-     one-to-one: 14px titles, 12px secondary text, 11px captions, line-heights
-     from 1.18 to 1.29. Those are the numbers THO-57 arrived at for a phone held
-     at arm's length, and they are the wrong numbers for a browser window — 762
-     usages across ten tokens rendered the whole product a size too small with
-     the leading pulled tight, which is most of what read as dense and generic.
+     **`theme.dart`'s `AppText`, ported one-to-one.**
 
-     Same deliberate divergence already made for the breakpoints and the
-     editorial canvas: the Flutter screens are phone-only, so their metrics are
-     not the web's. Ten tokens carry all 762 call sites, so this file is the only
-     place the scale exists and not one class string changes.
+     This was a web scale for most of its life — 32/24/20/18px displays, a 15px UI voice and
+     16px prose — on the reasoning that `theme.dart`'s numbers were arrived at for a phone
+     held at arm's length and were the wrong numbers for a browser. That divergence has been
+     deliberately reversed: the app is the source of truth for the design language, and two
+     products that disagree about what a card title weighs are two products.
 
-     Three rules the numbers follow:
+     Ten tokens carry every call site, so this is the only place the scale exists and not one
+     class string changes.
 
-     1. **Leading opens as size drops.** 1.15 at 32px up to 1.6 at 16px. Long
-        measures of small text need the room; a headline does not.
-     2. **Tracking tightens as size grows, and only above 18px.** Inter is drawn
-        for negative tracking at display sizes and needs none below that. The two
-        smallest steps go slightly *positive*, which is what keeps 11-12px legible.
-     3. **16px is the prose floor.** `body-md` is what paragraphs use, so it is
-        the one step that may not go below the accessibility floor.
+     Three things to know before touching these numbers:
 
-     `badge` holds at 11px, as it did: it lives inside count pills whose size is
-     fixed by the glyph beside them. It earns its legibility from 600 weight and
-     +0.02em instead. */
+     1. **`--text-body-md` is 14px and it sets `body`'s font-size** in `@layer base`, so it is
+        the size of every element that never names a `text-` utility. That is below the 16px
+        floor this file used to hold for prose, and it is the deliberate consequence of the
+        port rather than an oversight. The public documents do not follow it — see the
+        `[data-shell="marketing"]` block below.
+     2. **Tracking is only where `AppText` has it**, which is two steps: `displayLg` and
+        `displaySm`. Flutter states those in logical pixels at a known size, so they convert —
+        `-0.44px` at 19px is `-0.023em`, `-0.18px` at 17px is `-0.011em`. Expressed in `em`
+        rather than `px` so they hold their proportion when a reader zooms. Every other step
+        carried tracking here and now carries none, because `AppText` sets none.
+     3. **The leading is tight** — 1.18 to 1.5, where this file previously opened it to 1.6 at
+        the small end. Smaller type with tighter leading moves every wrap point in the
+        product, which is what the 320px and 200%-zoom sweep exists to catch.
+  */
 
-  /* Page hero, and the one or two big figures in the console. */
-  --text-display-xl: 2rem; /* 32px */
-  --text-display-xl--line-height: 1.15;
-  --text-display-xl--letter-spacing: -0.02em;
+  /* Page hero, and the one or two big figures in the console. `displayXl`, w700. */
+  --text-display-xl: 1.5rem; /* 24px */
+  --text-display-xl--line-height: 1.2;
 
-  /* Page title. */
-  --text-display-lg: 1.5rem; /* 24px */
-  --text-display-lg--line-height: 1.2;
-  --text-display-lg--letter-spacing: -0.018em;
+  /* Page title. `displayLg`, w500. */
+  --text-display-lg: 1.1875rem; /* 19px */
+  --text-display-lg--line-height: 1.18;
+  --text-display-lg--letter-spacing: -0.023em; /* -0.44px at 19px */
 
-  /* Section title. */
-  --text-display-md: 1.25rem; /* 20px */
+  /* Section title. `displayMd`, w700 — same size as displayLg, distinguished by weight. */
+  --text-display-md: 1.1875rem; /* 19px */
   --text-display-md--line-height: 1.25;
-  --text-display-md--letter-spacing: -0.012em;
 
-  /* Card and sub-section title. */
-  --text-display-sm: 1.125rem; /* 18px */
-  --text-display-sm--line-height: 1.3;
-  --text-display-sm--letter-spacing: -0.008em;
+  /* Card and sub-section title. `displaySm`, w600. */
+  --text-display-sm: 1.0625rem; /* 17px */
+  --text-display-sm--line-height: 1.2;
+  --text-display-sm--letter-spacing: -0.011em; /* -0.18px at 17px */
 
-  /* The UI voice: nav, buttons, labels, table headers. Carries 500 or 600. */
-  --text-title: 0.9375rem; /* 15px */
-  --text-title--line-height: 1.4;
-  --text-title--letter-spacing: -0.006em;
+  /* The UI voice: nav, buttons, labels, table headers.
+     `titleMd` is this at 600, `titleSm` and `buttonMd` at 500 — weight is what separates
+     them, which is why there is no fourth token. */
+  --text-title: 0.875rem; /* 14px */
+  --text-title--line-height: 1.25;
 
-  /* Prose. The accessibility floor — do not take this below 16px. */
-  --text-body-md: 1rem; /* 16px */
-  --text-body-md--line-height: 1.6;
+  /* Prose. `bodyMd`, w400. Also `body`'s own size — see note 1 above. */
+  --text-body-md: 0.875rem; /* 14px */
+  --text-body-md--line-height: 1.5;
 
-  /* Secondary prose and dense rows. */
-  --text-body-sm: 0.875rem; /* 14px */
-  --text-body-sm--line-height: 1.55;
+  /* Secondary prose and dense rows. `bodySm`, w400. */
+  --text-body-sm: 0.75rem; /* 12px */
+  --text-body-sm--line-height: 1.43;
 
-  /* Captions and metadata, usually in `text-muted`. */
-  --text-caption: 0.8125rem; /* 13px */
-  --text-caption--line-height: 1.45;
+  /* Captions and metadata, usually in `text-muted`. `caption`, w500. */
+  --text-caption: 0.75rem; /* 12px */
+  --text-caption--line-height: 1.29;
 
-  /* The smallest label. Positive tracking is what keeps it readable. */
-  --text-caption-sm: 0.75rem; /* 12px */
-  --text-caption-sm--line-height: 1.4;
-  --text-caption-sm--letter-spacing: 0.01em;
+  /* The smallest label. `captionSm`, w400. */
+  --text-caption-sm: 0.6875rem; /* 11px */
+  --text-caption-sm--line-height: 1.23;
 
-  /* Count pills only. Fixed by the glyph beside it, so it earns legibility from
-     weight and tracking rather than size. */
+  /* Count pills only. `badge`, w600. Holds at 11px — it is the smallest text in the product
+     and lives inside pills whose size is fixed by the glyph beside them, so it earns its
+     legibility from weight rather than size. */
   --text-badge: 0.6875rem; /* 11px */
-  --text-badge--line-height: 1.2;
-  --text-badge--letter-spacing: 0.02em;
+  --text-badge--line-height: 1.18;
+
 
   /* --- Animation -------------------------------------------------------- */
   /* The skeleton sweep. `app_skeleton.dart` runs a ShaderMask across a grey
@@ -284,10 +316,10 @@
   --breakpoint-desktop: 1128px;
   --breakpoint-wide: 1440px;
 
-  /* --- The customer shell's editorial layer -------------------------------
-     From landing_page's `@theme`. Declared globally so the utilities exist;
-     applied only under `[data-shell="customer"]` (below) or by being named
-     explicitly in a customer component.
+  /* --- The editorial layer ------------------------------------------------
+     From landing_page's `@theme`. Declared globally so the utilities exist; reached now only
+     by being named explicitly in a component, since the shell scope that used to apply them
+     wholesale is gone with the canvas port.
 
      Unused tokens cost nothing — Tailwind prunes any theme variable no utility
      and no rule references. Measured in the compiled sheet: `--radius-xl` and
@@ -300,7 +332,16 @@
   --color-paper: #ffffff;
   --color-canvas-deep: #efe9e1;
   --color-sand: #e6ded2;
-  --color-rausch-soft: #ffe8ec;
+  /* The palest brand tint: a *selected* fill carrying rausch's own label on top of it, not
+     white. Selected chips, the business-type picker, the product category plate, the "packed"
+     availability badge.
+
+     **`#fff0f3`, the product value, not the editorial `#ffe8ec` this used to hold.** Same
+     collision `--color-star` had — one role declared at two values in two systems — and
+     resolved the same way, in favour of `tokens.dart`. The two are three points apart and
+     nothing distinguishes them at a glance; what does matter is that a selected chip in the
+     console and a selected chip on the marketing site are the same colour. */
+  --color-rausch-soft: #fff0f3;
   --color-obsidian: #141312;
   --color-obsidian-soft: #201e1c;
 
@@ -543,83 +584,77 @@
 }
 
 /* ---------------------------------------------------------------------------
-   The customer shell. Same utilities, different values.
+   There is no colour scope any more, and that is the canvas port.
 
-   Every generated colour utility resolves through `var()` — verified in the
-   compiled stylesheet: `.bg-canvas { background-color: var(--color-canvas) }`.
-   So re-pointing three variables re-skins 86 call sites (62 in customer files,
-   24 in the shared UI kit) with **no class strings changed**, and the shared kit
-   adapts to whichever shell renders it.
+   `[data-shell]` used to re-point three variables to the marketing site's editorial layer —
+   `--color-canvas` to cream `#f6f3ee`, and the two surface tints to `#efe9e1` / `#e6ded2` —
+   so that every shell rendered on the same ground the public pages did. Those three are now
+   `tokens.dart`'s values in `@theme` above (`#ffffff`, `#f7f7f7`, `#f2f2f2`), which is what
+   the app draws on, so the block became three no-ops and is gone rather than left to be
+   misread.
 
-   `:root` above IS the product system, so the owner console needs no attribute
-   and gets no override. An attribute that changes nothing is a thing to misread.
+   **What that block was protecting is worth keeping in mind.** It was widened from
+   `[data-shell="customer"]` to attribute-presence precisely because a seam had appeared:
+   `/` rendered on white while all 51 product routes rendered on cream, so crossing from the
+   homepage to Discover changed the colour of the page. Moving *everything* to white closes
+   the same seam from the other side — but if any surface is ever put back on cream, it has
+   to be all of them or none.
 
-   Two things here are load-bearing:
+   **The consequence to watch is `--color-paper`.** It means "a thing lifted off the page" and
+   is `#ffffff`, so with a white canvas it no longer contrasts with the ground — exactly the
+   state the owner console was always in, where the file already noted those reclassifications
+   are a no-op. A surface that needs to read as lifted therefore needs `shadow-card`, which is
+   how the app does it too (`AppShadows.card`, and never a border alongside it — that pairing
+   is the ghost card).
 
-   1. The `body:has()` half is what makes the whole viewport cream.
-      `body { background: var(--color-canvas) }` resolves the variable *on body*,
-      so body must be inside the scope or iOS overscroll reveals white.
-
-   2. Unlayered on purpose. `@theme` lands in `@layer theme`, and an unlayered
-      rule beats a layered one whatever the specificity — which matters, because
-      `:root` and `[data-shell="customer"]` are both (0,1,0) and specificity
-      alone would leave this to source order.
-
-   And never add `@theme inline` to this file: it substitutes declared values
-   into utilities instead of `var()`, which would make this entire block a no-op.
+   `--color-canvas-deep` and `--color-sand` stay declared. They are separate names for
+   deliberate editorial tints rather than overrides of a shared role, and Tailwind prunes any
+   token no rule references.
 --------------------------------------------------------------------------- */
+
 /* ---------------------------------------------------------------------------
-   Every shell, not just the customer's.
+   The public documents keep the web type scale.
 
-   This selector used to be `[data-shell="customer"]` alone, on the reasoning that
-   "a dense operational console loses legibility on an editorial canvas". That was
-   asserted, never measured, and it left the product visibly split down the middle:
-   a customer arriving from bhutansalons.com saw one continuous design language and
-   an owner saw a different one, on the same domain, from the same nav.
+   `@theme` above is `theme.dart`'s scale, ported: 14px prose, 12px secondary, 11px captions.
+   Those are the right numbers for the product, which is what the port was for — and they are
+   the wrong numbers for `/privacy`, `/legal/terms`, `/help` and `/for-salons`.
 
-   It is now attribute-*presence*, so any shell that declares itself gets the
-   editorial layer — `customer`, `owner`, `staff`, and now `marketing`. The attribute
-   still records which shell is rendering, because `not-found.tsx` and the layouts read
-   as documentation and a bare `data-shell` would say less.
+   Three reasons this exception is drawn here and not argued case by case:
 
-   Nothing about the mechanism changed, which is the point: every colour utility
-   resolves through `var()`, so this re-skins the console with **no class strings
-   touched** in 26 routes' worth of components. It is also one line to revert.
+   - **Those pages are long-form reading, not a console.** 14px prose at 1.5 over a
+     paragraph-width measure is a different job from 14px on a booking card.
+   - **`/privacy` is the URL both app stores link to.** A store reviewer and a customer
+     exercising a data right read it end to end.
+   - **They are indexable and public**, so they are also the pages a stranger meets first.
 
-   ## `marketing` joined last, and it is what the widening was always for
+   Only the six *shared* steps are restored. The editorial display steps are already separate
+   names (`--text-editorial-*`, `--text-heading`, `--text-subheading`, `--text-body-lg`,
+   `--text-display-2xl` in `marketing-tokens.css`) and were never part of the port.
 
-   The paragraph above closed the split between the customer app and the console and
-   left the public site on the other side of it: `app/(marketing)` declared no attribute,
-   so `/` rendered on `#ffffff` while all 51 product routes rendered on `#f6f3ee`.
-   Crossing from the homepage to Discover changed the colour of the page — which is the
-   exact defect this block exists to prevent, one boundary further out, and it survived
-   because the two decisions were taken months apart and neither knew about the other.
-
-   The marketing layout used to justify its absence by saying the public pages "are what
-   that editorial layer was copied *from*, so they want the base tokens exactly as
-   declared". That was true when the cream came from `../landing_page`. It stopped being
-   true when the marketing redesign moved those pages onto a white canvas and the product
-   kept the cream — after which the sentence described the old world and the seam it
-   licensed was invisible from either side.
-
-   **The cost was one attribute and ~18 class strings**, not a redesign: a card that was
-   `bg-canvas` because canvas happened to be white is now `bg-paper`, which is what that
-   token has always meant — "a thing lifted off the page". In the console `--color-paper`
-   equals `--color-canvas`, so every one of those reclassifications is a no-op there and
-   the correct white-on-cream card here. If a marketing surface looks flat after a change,
-   check that it is asking for `paper` and not for `canvas`.
+   Unlayered and after the block above, for the same reason that one is: `@theme` lands in
+   `@layer theme`, and an unlayered rule beats a layered one whatever the specificity.
 --------------------------------------------------------------------------- */
-[data-shell],
-body:has([data-shell]) {
-  --color-canvas: #f6f3ee;
-  --color-surface-soft: #efe9e1; /* canvas-deep: a tint OF cream, not of white */
-  --color-surface-strong: #e6ded2; /* sand */
+[data-shell="marketing"] {
+  --text-title: 0.9375rem; /* 15px */
+  --text-title--line-height: 1.4;
+  --text-title--letter-spacing: -0.006em;
 
-  /* No `font-family` here any more. This block used to set DM Sans directly,
-     which is what made the typeface a property of *one shell* and left the
-     console on the OS font. `--font-sans` in `@theme` now reaches both, so this
-     scope is purely about colour — which is the only thing the two shells were
-     ever meant to disagree about. */
+  --text-body-md: 1rem; /* 16px — the accessibility floor, and this is where it still holds */
+  --text-body-md--line-height: 1.6;
+
+  --text-body-sm: 0.875rem; /* 14px */
+  --text-body-sm--line-height: 1.55;
+
+  --text-caption: 0.8125rem; /* 13px */
+  --text-caption--line-height: 1.45;
+
+  --text-caption-sm: 0.75rem; /* 12px */
+  --text-caption-sm--line-height: 1.4;
+  --text-caption-sm--letter-spacing: 0.01em;
+
+  --text-badge: 0.6875rem; /* 11px */
+  --text-badge--line-height: 1.2;
+  --text-badge--letter-spacing: 0.02em;
 }
 
 @layer base {
@@ -724,6 +759,67 @@ body:has([data-shell]) {
   box-shadow:
     rgba(0, 0, 0, 0.02) 0 0 0 1px,
     rgba(0, 0, 0, 0.28) 0 18px 40px -12px;
+}
+
+/* `AppShadows.raised` — a control lifted off the page, where `shadow-card` is a *surface*
+   resting on it. Action circles, the header plane, the product taxonomy's plates.
+
+   **No spread layer**, which is the whole difference from `shadow-card` and the reason this
+   one composes with a border: `card`'s first layer is a zero-blur 1px spread standing in for
+   a hairline, so a surface using it must not also draw an edge (the ghost card). A surface
+   that genuinely needs an edge takes this instead.
+
+   Ported at the same 1:1 mapping the other two use — `0x0D` and `0x14` are 5% and 8%. */
+@utility shadow-raised {
+  box-shadow:
+    rgba(0, 0, 0, 0.05) 0 1px 2px,
+    rgba(0, 0, 0, 0.08) 0 6px 16px;
+}
+
+/* A *brand* shadow rather than an elevation tier — the one exception to the two
+   tiers above, and it is a different kind of thing: a crimson glow that says
+   "this is the action", not a height off the page.
+
+   `onboarding_screen.dart`'s `_CtaPill` — rausch at 35%, blur 22, offset 0 8 —
+   ported at the same 1:1 numeric mapping `shadow-card` uses (Flutter's
+   `blurRadius: 6` is the `6px` there, and those tokens were themselves derived
+   from this file). `--color-rausch`, not `--color-rausch-cta`: the glow is the
+   bright brand hue diffused under the deeper accessible fill, which is the
+   contrast that makes it read as light rather than as a second button behind
+   the first.
+
+   **Scoped to a surface whose whole job is one action** — the sign-in and
+   sign-up submit. It is not for a button among buttons: two of these on one
+   screen and neither is the CTA any more. */
+@utility shadow-cta-glow {
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--color-rausch) 35%, transparent);
+}
+
+/* The warm gradient that lifts the top of a surface off the canvas —
+   `WarmWash` from `onboarding/onboarding_art.dart`, at its values: the brand tint
+   at 10%, a third of that by 32% down, gone into the canvas by 75%.
+
+   It **ends on `--color-canvas` rather than on `transparent`**, which is upstream's
+   own note. The pixels are identical over an opaque ground; a tint that terminates
+   on a named colour is the one that cannot develop a seam if the ground moves.
+
+   The **height belongs to the caller**, because the stops are fractions of whatever
+   box this paints. Upstream's box is a hero at roughly 40% of a phone screen; give it
+   a full-height container and its own comment applies — "a tint that runs the full
+   height reads as a pink screen".
+
+   Here rather than in a `style` prop for two reasons: this file's own rule about not
+   hardcoding a value in a component, and `color-mix`. Lightning CSS emits a flat
+   `rgba` fallback beside every `color-mix` it compiles, and it only sees stylesheets —
+   inline styles reach the browser unprocessed, so the same gradient in a `style`
+   attribute is all-or-nothing on `color-mix` support. */
+@utility warm-wash {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-rausch) 10%, transparent) 0%,
+    color-mix(in srgb, var(--color-rausch) 3%, transparent) 32%,
+    var(--color-canvas) 75%
+  );
 }
 
 /* Scrim behind sheets and dialogs — black at 50%, as applied at render time. */

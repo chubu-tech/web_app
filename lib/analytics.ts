@@ -12,9 +12,10 @@ import type {
   OrderFulfilment,
   OrderStatus,
 } from "./types/back-office";
-import { THIMPHU_TZ, thimphuToday } from "./time";
+import { thimphuToday } from "./time";
 import type { Offer } from "./types/salon";
 import { formatNu } from "./utils";
+import { fullDayTimeLabel } from "./clock";
 
 /**
  * The pure rules behind the owner back office — a port of
@@ -518,16 +519,7 @@ export function orderCode(id: string): string {
  * `lib/time.ts` — which is the file a zone change is supposed to land in.
  */
 export function orderPlacedLabel(placedAt: Date): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: THIMPHU_TZ,
-  }).format(placedAt);
+  return fullDayTimeLabel(placedAt);
 }
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {

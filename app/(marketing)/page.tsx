@@ -153,9 +153,11 @@ const jsonLd = {
 
         This comment used to say the field was deliberately absent because `brand.social`
         is three empty strings. Half of that is still true; the other half was never
-        checked. **`brand.appListing.url` is a real, live profile of this organisation** —
-        the App Store listing on the Bhutan storefront, v1.1.0, and the URL answers 200 —
-        and a third-party page that names the entity is exactly what `sameAs` is for.
+        checked. **Both `brand.appListing` URLs are real, live profiles of this
+        organisation** — the App Store listing on the Bhutan storefront and the Play
+        listing, and both answer 200 — and a third-party page that names the entity is
+        exactly what `sameAs` is for. Both are listed: they are two distinct pages about
+        the same entity, which is the case `sameAs` takes an array for.
 
         `sameAsBlock` keeps the original rule rather than discarding it: an empty string is
         invalid structured data, and an array filtered to nothing is a claim of "no
@@ -168,7 +170,11 @@ const jsonLd = {
         doc comment states. A `wa.me` deep link is still not a profile and still does not
         belong in it.
       */
-      ...sameAsBlock([...Object.values(brand.social), brand.appListing.url]),
+      ...sameAsBlock([
+        ...Object.values(brand.social),
+        brand.appListing.ios.url,
+        brand.appListing.android.url,
+      ]),
     },
     {
       "@type": "WebSite",

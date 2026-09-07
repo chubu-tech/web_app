@@ -5,13 +5,14 @@ import type {
   LoyaltyReward,
   Order,
 } from "../types/back-office";
-import type { Product } from "../types/salon";
+import type { Product, ProductCategory } from "../types/salon";
 import {
   toLoyaltyProgram,
   toLoyaltyRedemption,
   toLoyaltyReward,
   toOrder,
   toProduct,
+  toProductCategory,
 } from "./mappers";
 
 /**
@@ -40,36 +41,81 @@ import {
  * does exactly that.
  */
 
-/** Everything the browse and the Shop tab need: the salon's name for a cross-salon card. */
-const PRODUCT_SELECT = "*, businesses(name)";
+/**
+ * The `product_cards` columns every customer-facing product surface reads.
+ *
+ * **Named, not `*`.** The view holds table-level `SELECT` for `anon` — unlike `businesses`,
+ * whose grants are per column — so `*` would in fact work here for a signed-out visitor.
+ * Naming them anyway is the rule stated in `AGENTS.md` and it buys something concrete: a
+ * column added to the view later cannot start arriving in every card payload unasked.
+ *
+ * `business_name`, `discount_pct`, `rating_avg`, `rating_count` and `trending_views` are
+ * the view's own — computed or joined there — and are the reason this is not a table read.
+ * The view already restricts to `in_stock` and `not is_archived`, so neither is repeated by
+ * its callers.
+ *
+ * **One string literal, deliberately, rather than an array joined at runtime.** The client
+ * here is untyped, so `.select()` resolves its row type by *parsing the select string at
+ * the type level*; hand it anything but a literal and every caller's rows come back as
+ * `GenericStringError[]`. Reformatting this into something more readable is a compile
+ * error, not a style change.
+ */
+export const PRODUCT_CARD_SELECT =
+  "id,business_id,business_name,name,price_nu,compare_at_nu,discount_pct,description,volume,ingredients,how_to_use,tags,hair_types,concerns,in_stock,is_archived,sort_order,created_at,brand_id,brand_name,category_id,category_name,photo_url,rating_avg,rating_count,trending_views";
 
 /**
  * Every buyable product across every salon, newest first.
  *
- * **No search parameter, and no pagination.** The whole catalogue is loaded once and the name match
- * happens in the browser, alongside the price range and the sort — because Discover already filters
- * *salons* that way, and one search box serving two segments has to behave the same in both. It also
- * costs no round trip per keystroke.
+ * **Now `product_cards`, not `products`.** The old read was the bare table plus a
+ * `businesses(name)` join, which is why every card in this app was missing the rating, the
+ * markdown and the brand — not because the data was absent, but because the query never
+ * asked the view that computes it. The view also applies `in_stock` and `not is_archived`
+ * itself, so the two `.eq()` filters that used to be here are gone rather than duplicated.
  *
- * **This is now the last unbounded catalogue read on any platform, and the comparison it used to
- * draw is gone.** It said "unlike `Api.products`", which sent the term as a server-side `ilike`;
- * `ec8b8ce` **deleted** `Api.products` in favour of `browseProducts`, a paginated, sorted,
- * searched read over the `product_cards` view with `.range()`. Do not go looking for the method
- * this used to compare itself to.
+ * **Still no search parameter and still no pagination**, and that is now the only thing
+ * separating this from the app's `browseProducts`. The whole catalogue is loaded once and
+ * the name match happens in the browser, alongside the price range and the sort, because
+ * Discover owns one search box serving two segments and it has to behave the same in both.
  *
- * The trade still holds while the catalogue is small — 4 products live — but it is no longer a
- * considered divergence, just the older design. When the shop is ported (`PARITY.md` §5.1) this is
- * the first read to replace, and `lib/product-filter.ts`'s pipeline note changes with it.
+ * That trade holds at four products and will not hold at four hundred. Replacing it means
+ * server-side `search` / `categoryId` / `minNu` / `maxNu` / `onSale` / `sort` / `.range()`
+ * and a "Load more", which drags in the sort model and the category filter — so it lands
+ * with the rest of the shop rework (`PARITY.md` §5.1) rather than here. **Do not "fix" it
+ * in the meantime by adding a bare `.limit()`**: a silently truncated catalogue with no way
+ * to reach the rest is a worse failure than a slow one, and it is invisible in review.
  */
 export async function fetchProducts(supabase: SupabaseClient): Promise<Product[]> {
   const { data, error } = await supabase
-    .from("products")
-    .select(PRODUCT_SELECT)
-    .eq("in_stock", true)
-    .eq("is_archived", false)
+    .from("product_cards")
+    .select(PRODUCT_CARD_SELECT)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return ((data ?? []) as Record<string, unknown>[]).map(toProduct);
+}
+
+/**
+ * The eight shelves of the product taxonomy, in the order the owner-facing seed set.
+ *
+ * `product_categories` is read by neither `lib/` nor `components/` today, which is why
+ * `20260902000002`'s icon repoint — scissors and a settings cog off `hair-care`, `styling`
+ * and `tools` — was invisible on the web. `icon` is a glyph **name**, resolved at runtime
+ * by `categoryGlyph`, and an unrecognised one falls back rather than dropping the category:
+ * that is what lets the data migration ship before the client that knows the new names.
+ *
+ * Top level only. `parent_id` exists for a future sub-taxonomy and every live row is null;
+ * filtering on it here means a child category added later cannot silently double the strip.
+ */
+export async function fetchProductCategories(
+  supabase: SupabaseClient,
+): Promise<ProductCategory[]> {
+  const { data, error } = await supabase
+    .from("product_categories")
+    .select("id,name,slug,icon,sort")
+    .is("parent_id", null)
+    .order("sort", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map(toProductCategory);
 }
 
 // One salon's buyable products is `fetchProductsForBusiness` in `lib/api/salon.ts`, which the salon

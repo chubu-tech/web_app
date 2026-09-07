@@ -146,9 +146,10 @@ export function GuidePlayer({
         </div>
 
         {/*
-          Black behind the film rather than the canvas cream. A 16:9 video letterboxed on a
-          phone leaves bands above and below it, and cream bands read as a layout mistake
-          where black reads as the edge of the picture.
+          Black behind the film rather than the page's own ground. A 16:9 video letterboxed
+          on a phone leaves bands above and below it, and bands in the canvas colour read as
+          a layout mistake where black reads as the edge of the picture. That held when the
+          canvas was the editorial cream and holds harder now it is white.
         */}
         <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black tablet:aspect-video">
           {failed ? (

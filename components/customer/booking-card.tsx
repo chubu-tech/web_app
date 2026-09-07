@@ -9,6 +9,7 @@ import {
   relativeDayLabel,
   type Booking,
 } from "@/lib/types/booking";
+import { timeLabel } from "@/lib/clock";
 import { cn, formatNu } from "@/lib/utils";
 import { CancelBookingButton } from "./cancel-booking-button";
 import { ReminderToggle } from "./reminder-toggle";
@@ -196,7 +197,7 @@ function DateBlock({ start, dead }: { start: Date; dead: boolean }) {
         {start.toLocaleDateString("en-GB", { month: "short", ...tz })}
       </span>
       <span className={cn("text-badge mt-xxs font-semibold", dead ? "text-muted" : "text-rausch")}>
-        {start.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", ...tz })}
+        {timeLabel(start)}
       </span>
     </div>
   );

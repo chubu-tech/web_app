@@ -118,9 +118,13 @@ export function placeCopy({
       queue"* — caught in the rendered HTML, not in review. It matters more than a typo
       usually would: this sentence is published as an `acceptedAnswer` and is written to be
       quoted verbatim by an assistant, so the error would be repeated rather than skimmed
-      past. `runsQueue` is `queue_enabled && hasFeature(plan, 'walkInQueue')`, and the
-      queue is Growth-and-above, so **one of eight** is the ordinary Thimphu case rather
-      than an edge case — the singular branch is the one that renders today.
+      past. `runsQueue` is now `queue_enabled` alone — `20260902000003_queue_for_all_plans.sql`
+      removed the plan half — so the count follows the owners' own switches rather than the
+      tier. The rendered number did not move when that landed, because the same migration
+      switched the queue **off** for every salon already on Basic, so **one of eight** is
+      still the ordinary Thimphu case and the singular branch is still the one that renders
+      today. It will move as Basic owners opt in, which is the point of publishing a count
+      rather than a claim.
     */
     const subject =
       withQueue.length === n
