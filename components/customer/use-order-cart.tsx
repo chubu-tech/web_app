@@ -39,20 +39,37 @@ import { useCart } from "@/lib/use-cart";
  */
 export function useOrderCart() {
   const { cart, add, setQty, replace } = useCart();
-  const [pending, setPending] = useState<{ product: Product; replacement: Cart } | null>(null);
+  const [pending, setPending] = useState<{
+    product: Product;
+    replacement: Cart;
+    /** What they had asked for, so answering the question does not lose the count. */
+    qty: number;
+  } | null>(null);
 
   const qtyOf = useCallback(
     (productId: string) => cart.lines.find((l) => l.productId === productId)?.qty ?? 0,
     [cart.lines],
   );
 
+  /**
+   * Add `quantity` of `product` — one call, not an add followed by a set.
+   *
+   * The quantity matters because the product sheet lets somebody dial 3 *before* committing
+   * to anything. Doing that as `add()` then `setQty(3)` would ask the one-salon question and
+   * then immediately ask it again, because `setProductQty`'s own guard routes a raise from
+   * zero back through here. One entry point, one question.
+   */
   const addProduct = useCallback(
-    (product: Product) => {
+    (product: Product, quantity = 1) => {
       const result = add(product);
       // The cart is left exactly as it was; nothing is written until the answer.
-      if (!result.ok) setPending({ product, replacement: result.replacement });
+      if (!result.ok) {
+        setPending({ product, replacement: result.replacement, qty: quantity });
+        return;
+      }
+      if (quantity > 1) setQty(product.id, quantity);
     },
-    [add],
+    [add, setQty],
   );
 
   /** Guard 1. Takes the product rather than an id precisely so it can fall back to `add`. */
@@ -72,7 +89,11 @@ export function useOrderCart() {
       product={pending?.product ?? null}
       onKeep={() => setPending(null)}
       onStart={() => {
-        if (pending) replace(pending.replacement);
+        if (pending) {
+          replace(pending.replacement);
+          // The replacement holds one; restore the count they had actually chosen.
+          if (pending.qty > 1) setQty(pending.product.id, pending.qty);
+        }
         setPending(null);
       }}
     />

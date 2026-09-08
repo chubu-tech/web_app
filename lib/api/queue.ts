@@ -95,6 +95,62 @@ export async function leaveQueue(
 }
 
 /**
+ * Step out and hold the place, or come back — one RPC, both directions.
+ *
+ * `minutes` is clamped 0–60 server-side, and **`0` clears the hold**, which is what "I'm
+ * back" sends. Callable by the entry's own customer *or* any business member, so the same
+ * writer serves the customer's own controls and the owner board's Hold gesture.
+ *
+ * The hold is a **sort term, not a status**: the row keeps its `joined_at` and its
+ * `priority_at`, sorts behind everyone present while `deferred_until > now()`, and returns
+ * to its natural place when that stops being true. Nothing reaps it, so there is no state to
+ * unwind and no job that has to have run. `call_next` skips anyone currently held.
+ *
+ * Raises `P0018` when the entry is not `waiting` — which is a race with the barber, not a
+ * mistake; see `queueDeferralErrorMessage`.
+ */
+export async function setQueueDeferral(
+  supabase: SupabaseClient,
+  entryId: string,
+  minutes: number,
+): Promise<QueueEntry> {
+  const { data, error } = await supabase.rpc("set_queue_deferral", {
+    p_entry: entryId,
+    p_minutes: minutes,
+  });
+  if (error) throw error;
+  return toQueueEntry(oneRow(data, "queue RPC"));
+}
+
+/**
+ * Start serving **one named entry** with one named barber — the owner board's "Start", as
+ * against `call_next`, which picks the front of the line itself.
+ *
+ * It exists because the board needs to act on the row under the owner's thumb: swiping the
+ * third person right has to serve *that* person, and `call_next` would have taken the first.
+ *
+ * **It overrides a stated barber preference on purpose.** Somebody who asked for Sonam and
+ * is standing in front of Dechen with Sonam mid-colour is served by Dechen — the person at
+ * the counter has already made that decision in the room, and the app refusing it would be
+ * arguing with what just happened.
+ *
+ * Raises `P0019` (that entry is no longer waiting) and `P0020` (that barber is already with
+ * someone), both of which are two people acting at one counter rather than a fault.
+ */
+export async function serveEntry(
+  supabase: SupabaseClient,
+  entryId: string,
+  staffMemberId: string,
+): Promise<QueueEntry> {
+  const { data, error } = await supabase.rpc("serve_entry", {
+    p_entry: entryId,
+    p_staff: staffMemberId,
+  });
+  if (error) throw error;
+  return toQueueEntry(oneRow(data, "queue RPC"));
+}
+
+/**
  * Hand a booking to the shop's line — "I'm here".
  *
  * The entry carries `priority_at = start_ts`, which is what puts an appointment

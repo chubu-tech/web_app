@@ -59,6 +59,21 @@ export type QueueEntry = {
    * none of which feed the ETA.
    */
   servingRemainingMinutes: number;
+  /**
+   * Seconds left on a **stepped-out hold**, or 0 when the guest is present.
+   *
+   * A hold keeps the entry — `joinedAt` and `priorityAt` are untouched — but sorts it
+   * behind everyone present, so the person is *skipped* rather than removed and drops back
+   * into their natural place the moment it lapses. Nothing reaps it;
+   * `deferred_until > now()` simply stops being true.
+   *
+   * **Server-computed on the customer path** (`queue_active_line.deferred_secs_left`) for
+   * the same reason `servingRemainingMinutes` is: the client sorts on this, and a device
+   * clock running slow must not be able to move anyone's place in the line. On the owner
+   * path it is derived from the raw `deferred_until` column, where the only clock involved
+   * is the owner's own and `call_next` remains the authority on who is actually picked.
+   */
+  deferredSecondsLeft: number;
   /** Only when the read joined `businesses(name)`. */
   businessName: string | null;
   /**
@@ -74,6 +89,40 @@ export type QueueEntry = {
   customerPhone: string | null;
   customerAvatarUrl: string | null;
 };
+
+/** Stepped out, with the hold still running. */
+export function isDeferred(entry: Pick<QueueEntry, "deferredSecondsLeft">): boolean {
+  return entry.deferredSecondsLeft > 0;
+}
+
+/**
+ * Whole minutes left on a hold, **rounded up**, so one second left still reads "1 min"
+ * rather than the "0 min" that looks like an expiry.
+ */
+export function deferredMinutesLeft(entry: Pick<QueueEntry, "deferredSecondsLeft">): number {
+  return Math.ceil(entry.deferredSecondsLeft / 60);
+}
+
+/**
+ * How long a step-out holds a place. `set_queue_deferral` clamps 0–60 server-side; this is
+ * the one length the buttons offer, and it is the number in their labels.
+ */
+export const QUEUE_STEP_OUT_MINUTES = 10;
+
+/**
+ * Who to put on the board for this entry: their profile name, then the walk-in card's typed
+ * name, then "Walk-in".
+ *
+ * `join_queue` records `customer_name` **only** for an entry a business member typed, so
+ * reading it alone labels every customer who joined from an app as a walk-in — the barber
+ * calling "Walk-in" to a line of people who had each given their name. The mapper already
+ * folds the joined profile name in ahead of the typed one, so this is the last step of that
+ * same rule rather than a second copy of it.
+ */
+export function queueDisplayName(entry: Pick<QueueEntry, "customerName">): string {
+  const name = entry.customerName?.trim();
+  return name && name.length > 0 ? name : "Walk-in";
+}
 
 /**
  * A projected place in line for someone who has **not** joined yet, and the

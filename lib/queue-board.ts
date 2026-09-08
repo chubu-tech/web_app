@@ -1,5 +1,5 @@
 import { orderedShopWide, queueShopSummary } from "./queue-logic";
-import type { QueueEntry } from "./types/queue";
+import { isDeferred, type QueueEntry } from "./types/queue";
 import type { StaffMember } from "./types/salon";
 
 /**
@@ -50,6 +50,15 @@ export type QueueBoardSummary = {
   barberNames: Record<string, string>;
   /** Minutes left across every service in progress. */
   servingRemainingMinutes: number;
+  /**
+   * How many of the waiting heads are currently stepped out.
+   *
+   * Counted, not filtered out: they are still in the line and still hold their place, and
+   * the ordering already puts them at the end of it. The strip states this **only when it
+   * is non-zero** — a permanent "· 0 stepped out" is a number nobody reads, and a shop with
+   * nobody out is the ordinary case.
+   */
+  steppedOut: number;
 };
 
 /**
@@ -89,6 +98,7 @@ export function queueBoardSummary(
       (sum, e) => sum + e.servingRemainingMinutes,
       0,
     ),
+    steppedOut: entries.filter((e) => e.status === "waiting" && isDeferred(e)).length,
   };
 }
 
@@ -121,4 +131,35 @@ export function etaForPositionIn(summary: QueueBoardSummary, index: number): num
     .slice(0, index)
     .reduce((sum, e) => sum + e.serviceMinutes, 0);
   return summary.servingRemainingMinutes + ahead;
+}
+
+/**
+ * Minutes waited past which a row's wait figure warms to `star`.
+ *
+ * Twenty is roughly one cut: beyond that a walk-in has watched a whole chair turn over
+ * without being called.
+ */
+export const LONG_WAIT_MINUTES = 20;
+
+/**
+ * How long this person has *already* waited — the board's only fairness signal.
+ *
+ * An ETA says when somebody will be seated and says nothing about the guest who has been
+ * sitting there for half an hour while barber-specific requests were called past them. The
+ * ordering is fair by construction; what it cannot show is that fair and *long* are
+ * different problems, and only one of them is visible from behind the counter.
+ *
+ * Capped at "1h+" rather than counting on: past an hour the exact figure stops changing
+ * what the owner should do, and a three-digit number in a 16px column is the row's width
+ * spent on precision nobody acts on.
+ *
+ * `now` is injected so this is testable without a clock — the same rule
+ * `lib/booking-status-rules.ts` follows.
+ */
+export function waitedLabel(joinedAt: Date, now: Date): { label: string; long: boolean } {
+  const minutes = Math.floor((now.getTime() - joinedAt.getTime()) / 60_000);
+  const long = minutes >= LONG_WAIT_MINUTES;
+  if (minutes < 1) return { label: "just joined", long };
+  if (minutes < 60) return { label: `waited ${minutes}m`, long };
+  return { label: "waited 1h+", long };
 }

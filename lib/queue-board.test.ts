@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { barberFor, etaForPositionIn, queueBoardSummary } from "./queue-board";
+import {
+  barberFor,
+  etaForPositionIn,
+  LONG_WAIT_MINUTES,
+  queueBoardSummary,
+  waitedLabel,
+} from "./queue-board";
 import { queueShopSummary } from "./queue-logic";
 import type { QueueEntry, QueueStatus } from "./types/queue";
 import type { StaffMember } from "./types/salon";
@@ -23,6 +29,7 @@ function entry(
     servingLeft = 0,
     priorityAt = null,
     name = null,
+    heldSecs = 0,
   }: {
     staff?: string | null;
     joined: Date;
@@ -31,6 +38,8 @@ function entry(
     servingLeft?: number;
     priorityAt?: Date | null;
     name?: string | null;
+    /** Seconds left on a step-out hold. 0 is present. */
+    heldSecs?: number;
   },
 ): QueueEntry {
   return {
@@ -46,6 +55,7 @@ function entry(
     joinedAt: joined,
     serviceMinutes: mins,
     servingRemainingMinutes: servingLeft,
+    deferredSecondsLeft: heldSecs,
     businessName: null,
     customerPhone: null,
     customerAvatarUrl: null,
@@ -196,5 +206,91 @@ describe("the owner's figure and the customer's badge", () => {
     const s = queueBoardSummary(entries, []);
     expect(s.totalBarbers).toBe(0);
     expect(s.etaMinutes).toBe(40);
+  });
+});
+
+/**
+ * The stepped-out tally, `20260902000005`.
+ *
+ * The board has to say it because the ordering hides it: a held row sorts to the end of the
+ * line, so a shop with three people out looks, from the top of the screen, like a shop with
+ * three people who joined late.
+ */
+describe("steppedOut", () => {
+  it("counts waiting heads that are currently held, and no others", () => {
+    const s = queueBoardSummary(
+      [
+        entry("present", { joined: at(0) }),
+        entry("out", { joined: at(1), heldSecs: 240 }),
+        entry("also-out", { joined: at(2), heldSecs: 30 }),
+        entry("lapsed", { joined: at(3), heldSecs: 0 }),
+        entry("in-chair", { joined: at(4), status: "serving", servingLeft: 10 }),
+      ],
+      [],
+    );
+    expect(s.steppedOut).toBe(2);
+  });
+
+  /*
+    Held heads stay in `waiting`, because they have not left — which is the whole point of a
+    hold. If this ever drops to 3 the strip and the list are counting different lines.
+  */
+  it("leaves them in the waiting count, since they still hold a place", () => {
+    const s = queueBoardSummary(
+      [
+        entry("present", { joined: at(0) }),
+        entry("out", { joined: at(1), heldSecs: 240 }),
+        entry("also-out", { joined: at(2), heldSecs: 30 }),
+        entry("another", { joined: at(3) }),
+      ],
+      [],
+    );
+    expect(s.waiting).toBe(4);
+    expect(s.steppedOut).toBe(2);
+    // And the ordering has put both of them at the back.
+    expect(s.nextUp.map((e) => e.id)).toEqual(["present", "another", "out", "also-out"]);
+  });
+
+  it("is zero in an ordinary shop, which is why the strip only states it when it is not", () => {
+    const s = queueBoardSummary([entry("a", { joined: at(0) })], []);
+    expect(s.steppedOut).toBe(0);
+  });
+});
+
+/**
+ * The fairness line. Injected clock, so these are exact rather than approximately true —
+ * the same reason `booking-status-rules.ts` takes a `now`.
+ */
+describe("waitedLabel", () => {
+  const now = new Date(Date.UTC(2026, 8, 8, 10, 0));
+  const ago = (m: number) => new Date(now.getTime() - m * 60_000);
+
+  it("says just joined under a minute, and counts minutes after that", () => {
+    expect(waitedLabel(ago(0), now).label).toBe("just joined");
+    expect(waitedLabel(ago(0.9), now).label).toBe("just joined");
+    expect(waitedLabel(ago(1), now).label).toBe("waited 1m");
+    expect(waitedLabel(ago(37), now).label).toBe("waited 37m");
+  });
+
+  /*
+    Capped rather than counting on. Past an hour the exact figure stops changing what the
+    owner should do, and a three-digit number is the row's width spent on precision nobody
+    acts on.
+  */
+  it("caps at an hour", () => {
+    expect(waitedLabel(ago(59), now).label).toBe("waited 59m");
+    expect(waitedLabel(ago(60), now).label).toBe("waited 1h+");
+    expect(waitedLabel(ago(600), now).label).toBe("waited 1h+");
+  });
+
+  it("warms at twenty minutes, which is about one cut", () => {
+    expect(waitedLabel(ago(19), now).long).toBe(false);
+    expect(waitedLabel(ago(LONG_WAIT_MINUTES), now).long).toBe(true);
+    expect(waitedLabel(ago(90), now).long).toBe(true);
+  });
+
+  // A clock that has drifted backwards must not produce "waited -3m".
+  it("does not go negative on a future join time", () => {
+    expect(waitedLabel(new Date(now.getTime() + 60_000), now).label).toBe("just joined");
   });
 });

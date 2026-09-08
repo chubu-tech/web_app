@@ -38,6 +38,10 @@ import type { Product, ProductCategory } from "@/lib/types/salon";
  *
  * The order they are tested in is the order the customer narrowed: a typo inside a category is
  * reported as the typo, because that is the thing they can fix in one keystroke.
+ *
+ * The category case is reachable in one way only — a shared or hand-edited `?cat=` for a shelf
+ * that has since emptied — because the strip offers no unstocked shelf in the first place. It is
+ * kept for exactly that arrival, and because a shelf can empty while somebody is looking at it.
  */
 export function ProductsBrowse({
   products,
@@ -70,6 +74,30 @@ export function ProductsBrowse({
   */
   const category = categories.find((c) => c.slug === categorySlug) ?? null;
 
+  /*
+    **Only shelves that have something on them.**
+
+    Upstream renders all eight, and has to: it pages the catalogue server-side, so it cannot
+    know which shelves are stocked without asking. This browse holds the whole catalogue
+    already — the same fact that puts the search and the price range in the browser — so it
+    can, and the difference is not cosmetic. Live today, every product has a null
+    `category_id`, which would make the strip eight doors onto eight empty rooms: a narrowing
+    control whose every option narrows to nothing is worse than no control, because the
+    customer has to try one to find that out.
+
+    Measured against `products`, never `visible` — the shelves must not appear and disappear
+    as somebody types in the search box or drags the price range.
+
+    The selected shelf is kept whatever its stock, so the tile a customer is standing on
+    cannot vanish underneath them and strand them with no way back to everything.
+
+    All of which self-heals: the moment an owner categorises one product, its shelf appears.
+  */
+  const shelves = useMemo(() => {
+    const stocked = new Set(products.map((p) => p.categoryId).filter(Boolean));
+    return categories.filter((c) => stocked.has(c.id) || c.slug === categorySlug);
+  }, [categories, products, categorySlug]);
+
   const q = query.trim().toLowerCase();
   const matching = useMemo(() => {
     const byCategory =
@@ -87,7 +115,7 @@ export function ProductsBrowse({
   */
   const strip = (
     <ProductCategoryStrip
-      categories={categories}
+      categories={shelves}
       selectedSlug={category?.slug ?? null}
       onSelect={onSelectCategory}
     />
@@ -147,7 +175,6 @@ export function ProductsBrowse({
   return (
     <>
       {strip}
-      <div className="mt-md" />
       {/*
         One auto-fill track at every width, replacing `grid-cols-1 tablet:grid-cols-2
         wide:[360px]` — a table written for the old row card, whose 360px minimum put a
@@ -164,7 +191,7 @@ export function ProductsBrowse({
         what makes every card in a row the same height, which is the job upstream needs a
         measured `mainAxisExtent` for.
       */}
-      <ul className="gap-md grid grid-cols-[repeat(auto-fill,minmax(min(45%,10rem),1fr))]">
+      <ul className="gap-md mt-md grid grid-cols-[repeat(auto-fill,minmax(min(45%,10rem),1fr))]">
         {visible.map((product) => (
           <li key={product.id}>
             <ProductGridCard
@@ -185,7 +212,7 @@ export function ProductsBrowse({
         product={open}
         qty={open ? qtyOf(open.id) : 0}
         onSetQty={(qty) => open && setProductQty(open, qty)}
-        onAdd={() => open && addProduct(open)}
+        onAdd={(n) => open && addProduct(open, n)}
         onClose={() => setOpen(null)}
       />
       {dialog}

@@ -438,6 +438,27 @@ export function toPayment(m: Row): Payment {
  * defaults to 20 — the same default `queue_active_line` coalesces to server-side,
  * so a service-less walk-in is costed identically on both sides.
  */
+/**
+ * Seconds left on a stepped-out hold, from **either shape a row arrives in**.
+ *
+ * `deferred_secs_left` is the server's own countdown and is the 8th column
+ * `queue_active_line` gained in `20260902000005`. It wins whenever present, because that is
+ * the path whose ordering a customer's device must not be able to influence. The owner
+ * board reads `queue_entries` directly, so there it is derived from the raw
+ * `deferred_until` timestamp.
+ *
+ * **A hold already in the past is not a hold**: both shapes floor at 0, which is exactly
+ * what `isDeferred` tests, so a lapsed hold sorts by `joined_at` again with no sweeper and
+ * nothing to reap it.
+ */
+function deferredSecondsFrom(m: Row): number {
+  const flat = numOrNull(m.deferred_secs_left);
+  if (flat != null) return Math.max(0, Math.trunc(flat));
+  const until = dateOrNull(m.deferred_until);
+  if (until == null) return 0;
+  return Math.max(0, Math.floor((until.getTime() - Date.now()) / 1000));
+}
+
 export function toQueueEntry(m: Row, fallbackBusinessId?: string): QueueEntry {
   const service = (m.services ?? null) as Row | null;
   const biz = (m.businesses ?? null) as Row | null;
@@ -472,6 +493,7 @@ export function toQueueEntry(m: Row, fallbackBusinessId?: string): QueueEntry {
     joinedAt: new Date(m.joined_at as string),
     serviceMinutes: embedded ?? numOrNull(m.service_minutes) ?? 20,
     servingRemainingMinutes: numOrNull(m.serving_remaining_min) ?? 0,
+    deferredSecondsLeft: deferredSecondsFrom(m),
     businessName: biz ? str(biz.name) : null,
     customerPhone: profile ? str(profile.phone) : null,
     customerAvatarUrl: profile ? str(profile.avatar_url) : null,

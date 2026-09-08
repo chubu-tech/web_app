@@ -8,16 +8,26 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { callNext, setQueueStatus } from "@/lib/api/owner";
+import { setQueueDeferral } from "@/lib/api/queue";
+import { queueDeferralErrorMessage } from "@/lib/api/queue-errors";
 import { ownerErrorMessage } from "@/lib/api/owner-errors";
 import {
   barberFor,
   etaForPositionIn,
   queueBoardSummary,
+  waitedLabel,
   type QueueBoardSummary,
 } from "@/lib/queue-board";
 import { canOwnerQueueTransition, orderedFor } from "@/lib/queue-logic";
 import { createClient } from "@/lib/supabase/client";
-import type { QueueEntry, QueueStatus } from "@/lib/types/queue";
+import {
+  deferredMinutesLeft,
+  isDeferred,
+  QUEUE_STEP_OUT_MINUTES,
+  queueDisplayName,
+  type QueueEntry,
+  type QueueStatus,
+} from "@/lib/types/queue";
 import type { Business, ServiceItem, StaffMember } from "@/lib/types/salon";
 import { cn } from "@/lib/utils";
 import { AddWalkInSheet } from "./add-walk-in-sheet";
@@ -124,6 +134,35 @@ export function QueueBoard({
       refresh();
     } finally {
       setCallingStaff(null);
+    }
+  }
+
+  /**
+   * Hold this row's place for ten minutes, or give it back.
+   *
+   * **The counter's own version of the customer's step-out**, and the reason the owner
+   * needs it is that most people who step out say so to the person behind the counter
+   * rather than opening an app. Before this the only thing an owner could do with
+   * "back in five" was `no_show`, which ends the entry — so the board's answer to a
+   * customer nipping to the ATM was to strike them off.
+   *
+   * No optimistic flip: the hold reorders the whole line, not one row, so a local patch
+   * would leave every position around it disagreeing until `router.refresh()` lands.
+   */
+  async function doDefer(entry: QueueEntry, minutes: number) {
+    setActingEntry(entry.id);
+    try {
+      await setQueueDeferral(createClient(), entry.id, minutes);
+      toast.success(
+        minutes > 0
+          ? `${queueDisplayName(entry)}'s place is held for ${minutes} min.`
+          : `${queueDisplayName(entry)} is back in line.`,
+      );
+      refresh();
+    } catch (caught) {
+      toast.error(queueDeferralErrorMessage(caught, minutes > 0 ? "out" : "back"));
+    } finally {
+      setActingEntry(null);
     }
   }
 
@@ -234,6 +273,8 @@ export function QueueBoard({
                       position={i + 1}
                       eta={etaForPositionIn(summary, i)}
                       barber={barberFor(summary, e)}
+                      onHold={() => doDefer(e, QUEUE_STEP_OUT_MINUTES)}
+                      onBack={() => doDefer(e, 0)}
                       busy={actingEntry === e.id}
                       clientIds={clients}
                       onNoShow={() => void doSetStatus(e, "no_show")}
@@ -287,7 +328,7 @@ function SummaryStrip({ summary: s }: { summary: QueueBoardSummary }) {
     ? "Walk straight in — every barber is free."
     : `~${s.etaMinutes} min wait · ${s.freeBarbers.length} of ${s.totalBarbers} ${
         s.totalBarbers === 1 ? "barber" : "barbers"
-      } free`;
+      } free${s.steppedOut > 0 ? ` · ${s.steppedOut} stepped out` : ""}`;
 
   return (
     <div className="border-hairline-soft bg-canvas shadow-card p-base rounded-md border">
@@ -399,6 +440,8 @@ function WaitingRow({
   busy,
   clientIds,
   onNoShow,
+  onHold,
+  onBack,
 }: {
   entry: QueueEntry;
   position: number;
@@ -407,10 +450,34 @@ function WaitingRow({
   busy: boolean;
   clientIds: ReadonlySet<string>;
   onNoShow: () => void;
+  onHold: () => void;
+  onBack: () => void;
 }) {
+  const held = isDeferred(entry);
+  const name = queueDisplayName(entry);
+  /*
+    Read at render rather than held in state. The board re-renders on its own 4s poll, so
+    the figure is never more than one tick stale — and a `now` in state would need a second
+    timer whose only job is to age a caption by a minute.
+  */
+  const waited = waitedLabel(entry.joinedAt, new Date());
+
   return (
-    <div className="py-xs gap-sm flex items-center">
-      <span className="bg-surface-soft text-caption-sm text-ink flex size-6 shrink-0 items-center justify-center rounded-full font-medium tabular-nums">
+    /* The row dims as one object while its occupant is out, and the **controls stay at full
+       strength** — an owner has to be able to read the button they are reaching for. */
+    <div className={cn("py-xs gap-sm flex items-center", held && "opacity-60")}>
+      {/*
+        The position pip stays drawn while held, in muted rather than being renumbered away.
+        The hold puts them at the end of the ordering, so their number *has* moved — but a
+        row that loses its pip reads as a row that has left, which is the one thing a hold
+        is not.
+      */}
+      <span
+        className={cn(
+          "text-caption-sm flex size-6 shrink-0 items-center justify-center rounded-full font-medium tabular-nums",
+          held ? "bg-surface-strong text-muted" : "bg-surface-soft text-ink",
+        )}
+      >
         #{position}
       </span>
       <Identity entry={entry} clientIds={clientIds} />
@@ -422,19 +489,71 @@ function WaitingRow({
       >
         {barber}
       </span>
-      {/* 'Up next' only when nothing is in progress. With a cut running, the front of the
-          line still has that cut to wait out, and saying 'Up next' beside a 20-minute wait
-          was the board's one outright lie. */}
-      <span className="text-caption-sm text-muted w-16 shrink-0 text-right tabular-nums">
-        {eta === 0 ? "Up next" : `~${eta} min`}
-      </span>
+      {held ? (
+        /*
+          The ETA is replaced rather than joined, because a held row has no meaningful one:
+          the hold is what decides when they are next, not the work in front of them. The
+          chip is the "I'm back" control, which is the action the counter actually performs
+          — somebody walks back in and says so.
+
+          `opacity-100` undoes the row's dimming for the same reason the × below does.
+        */
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onBack}
+          aria-label={`Stepped out, back in ${deferredMinutesLeft(entry)} minutes. Activate to put ${name} back in line.`}
+          className="bg-surface-strong text-badge text-ink border-star px-sm shrink-0 rounded-full border py-px font-medium opacity-100 tabular-nums disabled:opacity-50"
+        >
+          Back in {deferredMinutesLeft(entry)}m
+        </button>
+      ) : (
+        <>
+          {/*
+            The wait, and under it how long they have already had of it.
+
+            **The second line is the board's only fairness signal.** An ETA says when
+            somebody will be seated; it says nothing about the guest who has been sitting
+            there for half an hour while barber-specific requests were called past them. The
+            ordering is fair by construction — what it cannot show is that *fair* and *long*
+            are different problems, and only one of them is visible from behind the counter.
+
+            'Up next' only when nothing is in progress. With a cut running, the front of the
+            line still has that cut to wait out, and saying 'Up next' beside a 20-minute wait
+            was the board's one outright lie.
+          */}
+          <span className="w-16 shrink-0 text-right">
+            <span className="text-caption-sm text-muted block tabular-nums">
+              {eta === 0 ? "Up next" : `~${eta} min`}
+            </span>
+            <span
+              className={cn(
+                "text-badge block tabular-nums",
+                waited.long ? "text-star" : "text-muted-soft",
+              )}
+            >
+              {waited.label}
+            </span>
+          </span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onHold}
+            title={`Hold this place for ${QUEUE_STEP_OUT_MINUTES} minutes`}
+            aria-label={`Hold ${name}'s place for ${QUEUE_STEP_OUT_MINUTES} minutes`}
+            className="text-muted hover:text-ink flex size-8 shrink-0 items-center justify-center rounded-full opacity-100 disabled:opacity-50"
+          >
+            <Icons.timer style={{ width: IconSize.xs, height: IconSize.xs }} aria-hidden />
+          </button>
+        </>
+      )}
       <button
         type="button"
         disabled={busy}
         onClick={onNoShow}
         title="Mark no-show"
-        aria-label={`Mark ${entry.customerName ?? "walk-in"} as a no-show`}
-        className="text-muted hover:text-ink flex size-8 shrink-0 items-center justify-center rounded-full disabled:opacity-50"
+        aria-label={`Mark ${name} as a no-show`}
+        className="text-muted hover:text-ink flex size-8 shrink-0 items-center justify-center rounded-full opacity-100 disabled:opacity-50"
       >
         <Icons.close style={{ width: IconSize.xs, height: IconSize.xs }} aria-hidden />
       </button>

@@ -12,7 +12,14 @@ import {
   queuePreview,
   queueShopSummary,
 } from "./queue-logic";
-import { queueStatusFromWire, type QueueEntry, type QueueStatus } from "./types/queue";
+import {
+  deferredMinutesLeft,
+  isDeferred,
+  queueDisplayName,
+  queueStatusFromWire,
+  type QueueEntry,
+  type QueueStatus,
+} from "./types/queue";
 
 /**
  * A port of `../tho/app/test/queue_logic_test.dart`, case for case with the same
@@ -39,6 +46,7 @@ function entry(
     mins = 20,
     status = "waiting",
     servingLeft = 0,
+    heldSecs = 0,
   }: {
     staff?: string | null;
     priorityAt?: Date | null;
@@ -46,6 +54,8 @@ function entry(
     mins?: number;
     status?: QueueStatus;
     servingLeft?: number;
+    /** Seconds left on a step-out hold. 0 is present. */
+    heldSecs?: number;
   },
 ): QueueEntry {
   return {
@@ -61,6 +71,7 @@ function entry(
     joinedAt: joined,
     serviceMinutes: mins,
     servingRemainingMinutes: servingLeft,
+    deferredSecondsLeft: heldSecs,
     businessName: null,
     // Owner-board-only fields. Nothing in this file's arithmetic reads them — the
     // ordering and ETA rules are the same whether or not a name is attached.
@@ -477,5 +488,114 @@ describe("queueLockState", () => {
   it("reports unavailable rather than needs_scan when the queue is off", () => {
     // "Scan to join" would be a lie at a shop that is running no queue at all.
     expect(queueLockState(shop("basic", false, "qr_only"), false)).toBe("unavailable");
+  });
+});
+
+/**
+ * The step-out hold, `20260902000005`.
+ *
+ * These four are the properties that were **proved against the live database on synthetic
+ * rows** before the migration was applied, and this suite is what keeps the client's
+ * comparator agreeing with `private.queue_front`'s leading
+ * `(deferred_until is not null and deferred_until > now())` term. If the SQL's ordering ever
+ * changes, these change with it — the customer is shown this arithmetic twice, projected in
+ * the join form and recomputed in the live view seconds later.
+ */
+describe("the step-out hold in the ordering", () => {
+  it("sorts someone who stepped out behind everyone present, however early they joined", () => {
+    const line = [
+      entry("held", { joined: at(0), heldSecs: 300 }),
+      entry("b", { joined: at(5) }),
+      entry("c", { joined: at(10) }),
+    ];
+    expect(orderedShopWide(line).map((e) => e.id)).toEqual(["b", "c", "held"]);
+  });
+
+  /*
+    The property the whole design rests on. Nothing reaps a hold — `deferred_until > now()`
+    simply stops being true — and because the row kept its `joined_at` the whole time, it
+    lands back exactly where it was rather than at the back. That is what shops do for
+    somebody who stepped out, and it is why the hold is a sort term and not a status.
+  */
+  it("returns a lapsed hold to its natural place, ahead of anyone who joined meanwhile", () => {
+    const line = [
+      entry("lapsed", { joined: at(0), heldSecs: 0 }),
+      entry("joined-while-away", { joined: at(5) }),
+    ];
+    expect(orderedShopWide(line).map((e) => e.id)).toEqual(["lapsed", "joined-while-away"]);
+  });
+
+  it("puts a new joiner ahead of someone currently stepped out", () => {
+    const line = [
+      entry("held", { joined: at(0), heldSecs: 60 }),
+      entry("new", { joined: at(30) }),
+    ];
+    expect(orderedShopWide(line).map((e) => e.id)).toEqual(["new", "held"]);
+  });
+
+  /*
+    Presence beats priority, and this is the one case where a checked-in appointment loses.
+    It is deliberate: the hold term leads the comparator in the SQL too. Somebody with a
+    booking who walks out for ten minutes does not hold up the person standing at the
+    counter — and gets their booked precedence back the moment they return.
+  */
+  it("lets presence beat priority while the hold runs, and priority win again after", () => {
+    const held = entry("booked", { joined: at(0), priorityAt: at(0), heldSecs: 300 });
+    const walkIn = entry("walk-in", { joined: at(20) });
+    expect(orderedShopWide([held, walkIn]).map((e) => e.id)).toEqual(["walk-in", "booked"]);
+
+    const back = { ...held, deferredSecondsLeft: 0 };
+    expect(orderedShopWide([back, walkIn]).map((e) => e.id)).toEqual(["booked", "walk-in"]);
+  });
+
+  it("does not disturb the ordering of two people who have both stepped out", () => {
+    const line = [
+      entry("later", { joined: at(10), heldSecs: 100 }),
+      entry("earlier", { joined: at(0), heldSecs: 100 }),
+    ];
+    expect(orderedShopWide(line).map((e) => e.id)).toEqual(["earlier", "later"]);
+  });
+
+  it("moves a held entry's position and ETA, since both read the same ordering", () => {
+    const present = entry("present", { joined: at(5), mins: 30 });
+    const held = entry("held", { joined: at(0), heldSecs: 300, mins: 20 });
+    const line = [held, present];
+    expect(positionOf(held, line)).toBe(2);
+    // 30 minutes of the person now in front of them.
+    expect(etaMinutesFor(held, line)).toBe(30);
+  });
+});
+
+describe("deferral helpers", () => {
+  it("treats a lapsed or absent hold as present", () => {
+    expect(isDeferred({ deferredSecondsLeft: 0 })).toBe(false);
+    expect(isDeferred({ deferredSecondsLeft: 1 })).toBe(true);
+  });
+
+  /*
+    Rounded **up**, so a hold with one second on it reads "1 min" rather than the "0 min"
+    that looks like it has already expired — on a countdown the customer is racing, the
+    difference between those two is whether they think they still have a place.
+  */
+  it("rounds the minutes left up", () => {
+    expect(deferredMinutesLeft({ deferredSecondsLeft: 1 })).toBe(1);
+    expect(deferredMinutesLeft({ deferredSecondsLeft: 60 })).toBe(1);
+    expect(deferredMinutesLeft({ deferredSecondsLeft: 61 })).toBe(2);
+    expect(deferredMinutesLeft({ deferredSecondsLeft: 600 })).toBe(10);
+  });
+});
+
+describe("queueDisplayName", () => {
+  /*
+    The board read `customerName ?? "Walk-in"` on both platforms, and `join_queue` only
+    records `customer_name` for an entry a business member typed — so the barber called
+    "Walk-in" to a line of people who had each given their name. The mapper folds the joined
+    profile name in ahead of the typed one; this is the last step of the same rule.
+  */
+  it("falls back to Walk-in only when there is genuinely no name", () => {
+    expect(queueDisplayName({ customerName: "Sonam" })).toBe("Sonam");
+    expect(queueDisplayName({ customerName: "  Dechen  " })).toBe("Dechen");
+    expect(queueDisplayName({ customerName: "   " })).toBe("Walk-in");
+    expect(queueDisplayName({ customerName: null })).toBe("Walk-in");
   });
 });

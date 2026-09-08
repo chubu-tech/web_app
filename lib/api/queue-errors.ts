@@ -33,6 +33,20 @@ export const QUEUE_ERROR = {
   refusedP0004: "P0004",
   /** A guest tried to commit — `private.is_real_user()` refused. */
   guestRefused: "P0010",
+
+  /* --- the step-out rework, `20260902000005` --------------------------------- */
+
+  /**
+   * `set_queue_deferral`: you can only step out while **waiting**.
+   *
+   * Reachable by racing your own screen — the barber calls you between the poll that drew
+   * the button and the tap on it. So the copy says what happened, not what you did wrong.
+   */
+  notWaiting: "P0018",
+  /** `serve_entry`: that entry is no longer waiting — somebody else took it, or it left. */
+  entryNotWaiting: "P0019",
+  /** `serve_entry`: that barber is already with someone. */
+  barberBusy: "P0020",
 } as const;
 
 /**
@@ -100,4 +114,47 @@ export function checkInErrorMessage(error: unknown): string {
 /** `leave_queue` has one interesting failure — someone was called while they tapped. */
 export function leaveQueueErrorMessage(): string {
   return "Couldn't leave the queue.";
+}
+
+/**
+ * What to show when a step-out, or coming back, is refused.
+ *
+ * Both directions go through `set_queue_deferral` — minutes to hold, `0` to clear — so both
+ * refusals arrive here and the caller says which way it was going. `P0018` is the live one:
+ * the barber called you in the gap between the poll that drew the button and your tap on
+ * it, which is nobody's mistake and is worth saying plainly.
+ */
+export function queueDeferralErrorMessage(error: unknown, going: "out" | "back"): string {
+  switch (errorCode(error)) {
+    case QUEUE_ERROR.notWaiting:
+      // The same sentence either way, deliberately: whichever direction they were going,
+      // the fact that matters is that their turn has arrived and they should stop reading
+      // the screen and walk over.
+      return "You've already been called — head to the counter.";
+    case QUEUE_ERROR.unauthenticated:
+      return "Please sign in and try again.";
+    default:
+      return going === "out"
+        ? "Couldn't hold your place."
+        : "Couldn't put you back in line.";
+  }
+}
+
+/**
+ * What to show when starting a service on a named barber is refused.
+ *
+ * Both codes are races between two people at the same counter, which is exactly the shape
+ * a busy shop produces — so neither reads as an error the owner caused.
+ */
+export function serveEntryErrorMessage(error: unknown): string {
+  switch (errorCode(error)) {
+    case QUEUE_ERROR.entryNotWaiting:
+      return "That customer is no longer waiting.";
+    case QUEUE_ERROR.barberBusy:
+      return "That barber is already with someone.";
+    case QUEUE_ERROR.unauthenticated:
+      return "You have been signed out. Sign in again to finish this.";
+    default:
+      return "Couldn't start that service.";
+  }
 }

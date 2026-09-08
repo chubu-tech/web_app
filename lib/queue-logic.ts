@@ -1,5 +1,6 @@
 import {
   isActiveQueueStatus,
+  isDeferred,
   type QueueEntry,
   type QueueLockState,
   type QueueProjection,
@@ -43,14 +44,28 @@ export function orderedShopWide(all: QueueEntry[]): QueueEntry[] {
 }
 
 /**
- * The server's ordering: checked-in appointments first by their booked start, then
- * walk-ins FIFO by join time. Mirrors `order by (priority_at is null), priority_at
- * nulls last, joined_at` in `private.queue_front`.
+ * The server's ordering, mirrored term for term: `order by (deferred_until is not null and
+ * deferred_until > now()), (priority_at is null), priority_at nulls last, joined_at` in
+ * `private.queue_front`.
  *
- * Shared by both orderings above so a single barber's line and the shop-wide line
- * can never sort differently.
+ * Shared by both orderings above so a single barber's line and the shop-wide line can never
+ * sort differently.
+ *
+ * **The hold leads, and it is the only term that can move somebody backwards.** Someone who
+ * stepped out sorts behind everyone present while their hold runs, but keeps their row,
+ * their `joinedAt` and their `priorityAt` — so when it lapses they drop straight back into
+ * the place those two give them, still ahead of anyone who joined while they were away.
+ * That is what shops actually do for someone who stepped out, and it is why the hold is a
+ * sort term rather than a status: nothing has to reap it, and no state has to be unwound.
+ *
+ * Verified against the live database on synthetic rows before this shipped: an active hold
+ * sorts last however early it joined, a **lapsed** hold returns to its natural FIFO place
+ * ahead of later joiners, and priority still beats presence order.
  */
 function byPriorityThenFifo(a: QueueEntry, b: QueueEntry): number {
+  const aHeld = isDeferred(a);
+  const bHeld = isDeferred(b);
+  if (aHeld !== bHeld) return aHeld ? 1 : -1;
   const aPriority = a.priorityAt != null;
   const bPriority = b.priorityAt != null;
   if (aPriority !== bPriority) return aPriority ? -1 : 1;
@@ -214,6 +229,10 @@ export function queuePreview({
     joinedAt: ghostJoinedAt,
     serviceMinutes,
     servingRemainingMinutes: 0,
+    // Somebody about to join is by definition present, so the ghost never carries a hold —
+    // which also keeps it ahead of anyone who has stepped out, exactly as the real join
+    // would place them.
+    deferredSecondsLeft: 0,
     businessName: null,
     // Nobody yet — this entry does not exist, so there is no profile to have joined.
     customerPhone: null,

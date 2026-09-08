@@ -77,6 +77,7 @@ function waiting(id: string, minutes = 20): QueueEntry {
     joinedAt: new Date("2026-08-10T04:00:00.000Z"),
     serviceMinutes: minutes,
     servingRemainingMinutes: 0,
+    deferredSecondsLeft: 0,
   };
 }
 

@@ -6,13 +6,19 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
+import { QueueLineStrip } from "@/components/ui/queue-line-strip";
 import { QueuePositionCard } from "@/components/ui/queue-position-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { leaveQueue } from "@/lib/api/queue";
-import { leaveQueueErrorMessage } from "@/lib/api/queue-errors";
+import { leaveQueue, setQueueDeferral } from "@/lib/api/queue";
+import { leaveQueueErrorMessage, queueDeferralErrorMessage } from "@/lib/api/queue-errors";
 import { canCustomerLeave, etaMinutesFor, isTerminal, positionOf } from "@/lib/queue-logic";
 import { createClient } from "@/lib/supabase/client";
-import type { QueueEntry } from "@/lib/types/queue";
+import {
+  deferredMinutesLeft,
+  isDeferred,
+  QUEUE_STEP_OUT_MINUTES,
+  type QueueEntry,
+} from "@/lib/types/queue";
 import { useQueueLine } from "./use-queue-line";
 
 /**
@@ -46,6 +52,14 @@ export function QueuePosition({
 }) {
   const [left, setLeft] = useState(false);
   const [busy, setBusy] = useState(false);
+  /**
+   * Which write is in flight, so each control shows its own progress.
+   *
+   * One shared `busy` flag would put a spinner on Leave while somebody was stepping out —
+   * the same per-row-not-per-screen rule the owner board needs, applied to three buttons
+   * that mean very different things.
+   */
+  const [pending, setPending] = useState<"out" | "back" | null>(null);
 
   // Terminal from the server read is terminal already — don't poll a finished place.
   const startedTerminal = isTerminal(entry.status);
@@ -58,7 +72,7 @@ export function QueuePosition({
    * A *failed* read never counts as gone. Treating it as terminal would tell a customer
    * still standing in the shop that their turn had finished.
    */
-  const { line, loaded, stopped } = useQueueLine({
+  const { line, loaded, stopped, refresh } = useQueueLine({
     businessId: entry.businessId,
     intervalMs: 4_000,
     initial: initialLine,
@@ -68,6 +82,26 @@ export function QueuePosition({
 
   const mine = line?.find((e) => e.id === entry.id) ?? null;
   const terminal = startedTerminal || left || stopped;
+
+  /**
+   * Step out, or come back — one RPC either way, `0` minutes being "I'm back".
+   *
+   * **No optimistic flip.** The hold is a sort term the whole line reads, and the poll is
+   * four seconds away; showing a held card that the next read contradicts would tell
+   * somebody standing outside the shop that their place was kept when it was not. The
+   * button's own spinner covers the gap instead.
+   */
+  async function setDeferral(minutes: number, going: "out" | "back") {
+    setPending(going);
+    try {
+      await setQueueDeferral(createClient(), entry.id, minutes);
+      await refresh();
+    } catch (caught) {
+      toast.error(queueDeferralErrorMessage(caught, going));
+    } finally {
+      setPending(null);
+    }
+  }
 
   async function leave() {
     setBusy(true);
@@ -122,6 +156,7 @@ export function QueuePosition({
 
   // Present in the line, or the server's own row until the next poll lands.
   const current = mine ?? entry;
+  const held = isDeferred(current);
 
   return (
     <div className="gap-lg flex flex-col">
@@ -129,6 +164,7 @@ export function QueuePosition({
         serving={current.status === "serving"}
         position={positionOf(current, line)}
         etaMinutes={etaMinutesFor(current, line, { barberCount })}
+        heldMinutes={held ? deferredMinutesLeft(current) : null}
         // The polled rows are PII-free and carry no salon name, so it comes from
         // the server-read entry instead.
         businessName={entry.businessName}
@@ -139,10 +175,61 @@ export function QueuePosition({
         }
       />
 
+      {/*
+        The line itself, under the number that summarises it. Only while waiting: a customer
+        already in the chair has no place in the waiting line to draw, and the strip returns
+        null for that anyway — this keeps the intent at the call site rather than relying on
+        the component's own guard to hide it.
+      */}
+      {current.status === "waiting" ? <QueueLineStrip line={line} mine={current} /> : null}
+
+      {/*
+        **Step out is promoted and Leave is demoted**, which is the whole point of the
+        rework rather than a layout preference. Before the hold existed, somebody who had
+        to nip out had exactly one control, and it ended their place — so the app's only
+        answer to "I'll be five minutes" was "start again at the back". Now the reversible
+        thing is the filled button and the irreversible one is a quiet text button
+        underneath it.
+
+        `/faq` has promised this since before it was buildable — *"the salon can hold your
+        place or pass it to the next person, and you will see that on the page"* — and that
+        answer feeds `faqSchema`, so it is a published claim in structured data. This is
+        what makes it true.
+      */}
       {canCustomerLeave(current.status) ? (
-        <Button variant="outlined" fullWidth busy={busy} onClick={leave}>
-          Leave queue
-        </Button>
+        <div className="gap-sm flex flex-col">
+          {held ? (
+            <Button
+              fullWidth
+              busy={pending === "back"}
+              disabled={pending != null}
+              onClick={() => setDeferral(0, "back")}
+            >
+              {pending === "back" ? "Just a moment…" : "I'm back"}
+            </Button>
+          ) : (
+            <Button
+              fullWidth
+              busy={pending === "out"}
+              disabled={pending != null}
+              onClick={() => setDeferral(QUEUE_STEP_OUT_MINUTES, "out")}
+            >
+              {pending === "out"
+                ? "Holding your place…"
+                : `Step out · hold my place ${QUEUE_STEP_OUT_MINUTES} min`}
+            </Button>
+          )}
+
+          <Button
+            variant="quiet"
+            fullWidth
+            busy={busy}
+            disabled={pending != null}
+            onClick={leave}
+          >
+            Leave queue
+          </Button>
+        </div>
       ) : null}
     </div>
   );

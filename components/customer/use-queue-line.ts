@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchActiveLine } from "@/lib/api/queue";
 import { createClient } from "@/lib/supabase/client";
 import type { QueueEntry } from "@/lib/types/queue";
@@ -52,7 +52,23 @@ export function useQueueLine({
   paused?: boolean;
   /** Stop once this entry leaves the active line. Omit to poll the shop indefinitely. */
   watchEntryId?: string;
-}): { line: QueueEntry[] | null; loaded: boolean; stopped: boolean } {
+}): {
+  line: QueueEntry[] | null;
+  loaded: boolean;
+  stopped: boolean;
+  /**
+   * Re-read now, without waiting for the next tick.
+   *
+   * For the moment straight after a write of the caller's own — stepping out, coming back.
+   * The line those writes change is this one, and four seconds of a card that still says
+   * the opposite of what the customer just did reads as the tap not having landed.
+   *
+   * A re-read rather than an optimistic patch on purpose: the hold is a **sort term the
+   * whole line reads**, so one row changing moves other people's positions too. Patching
+   * the one row would leave the rest of the list disagreeing with it until the next poll.
+   */
+  refresh: () => void;
+} {
   const [state, setState] = useState<{
     line: QueueEntry[] | null;
     loaded: boolean;
@@ -63,6 +79,11 @@ export function useQueueLine({
     // A server snapshot that already lacks the entry is as good as a poll saying so.
     stopped: initial != null && watchEntryId != null && !hasEntry(initial, watchEntryId),
   }));
+  // Bumped by `refresh`. A plain counter in the effect's deps is the whole mechanism —
+  // the same shape `tick` already is, so the two paths cannot behave differently.
+  const [nonce, setNonce] = useState(0);
+  const refresh = useCallback(() => setNonce((n) => n + 1), []);
+
   const halted = paused || state.stopped;
   const tick = usePollTick(intervalMs, halted);
 
@@ -88,9 +109,9 @@ export function useQueueLine({
     return () => {
       live = false;
     };
-  }, [businessId, tick, halted, watchEntryId]);
+  }, [businessId, tick, nonce, halted, watchEntryId]);
 
-  return state;
+  return { ...state, refresh };
 }
 
 function hasEntry(line: QueueEntry[], id: string): boolean {

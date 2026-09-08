@@ -73,7 +73,7 @@ export function SalonShop({ products }: { products: Product[] }) {
         product={open}
         qty={open ? qtyOf(open.id) : 0}
         onSetQty={(qty) => open && setProductQty(open, qty)}
-        onAdd={() => open && addProduct(open)}
+        onAdd={(n) => open && addProduct(open, n)}
         onClose={() => setOpen(null)}
       />
       {dialog}
