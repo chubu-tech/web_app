@@ -8,14 +8,12 @@ import {
   daysSinceVisit,
   deltaLabel,
   deltaPct,
-  earnSentence,
   estimateIncomeTax,
   glanceStats,
   goalFraction,
   goalReading,
   heatGrid,
   isLapsed,
-  loyaltyPointsForBooking,
   offerHiddenReason,
   opsReading,
   orderCode,
@@ -25,10 +23,8 @@ import {
   orderSegmentFor,
   orderStatusLabel,
   ORDER_STATUS_LABEL,
-  progressToNext,
   retentionReading,
   revenuePace,
-  rewardValueLabel,
   sortClients,
   ticketsToGoal,
   type ClientSegment,
@@ -36,7 +32,7 @@ import {
 } from "./analytics";
 import type { DashboardData } from "./types/analytics";
 import { ORDER_STATUSES, orderStatusFromWire } from "./types/back-office";
-import type { ClientSummary, LoyaltyProgram, LoyaltyReward } from "./types/back-office";
+import type { ClientSummary } from "./types/back-office";
 
 /**
  * The cases of `dashboard_logic_test.dart` (7) and `client_book_logic_test.dart` (18),
@@ -746,113 +742,6 @@ describe("offerHiddenReason", () => {
     expect(
       offerHiddenReason({ isActive: true, startsOn: d("2026-08-06"), endsOn: null }, lateUtc, day),
     ).toBe("Starts 6 Aug");
-  });
-});
-
-// =================================================================== loyalty ===
-
-const PROGRAM: LoyaltyProgram = {
-  businessId: "b1",
-  isActive: true,
-  earnMode: "per_visit",
-  pointsPerVisit: 10,
-  nuPerPoint: 10,
-};
-
-describe("loyalty earning", () => {
-  it("per visit ignores the ticket entirely", () => {
-    expect(loyaltyPointsForBooking(PROGRAM, 0)).toBe(10);
-    expect(loyaltyPointsForBooking(PROGRAM, 5000)).toBe(10);
-  });
-
-  it("per spend floors, so a part-point is not a point", () => {
-    const spend: LoyaltyProgram = { ...PROGRAM, earnMode: "per_spend", nuPerPoint: 100 };
-    expect(loyaltyPointsForBooking(spend, 950)).toBe(9);
-    expect(loyaltyPointsForBooking(spend, 99)).toBe(0);
-  });
-
-  it("never divides by zero even though the CHECK forbids it", () => {
-    const broken: LoyaltyProgram = { ...PROGRAM, earnMode: "per_spend", nuPerPoint: 0 };
-    expect(loyaltyPointsForBooking(broken, 500)).toBe(0);
-  });
-
-  it("describes the rule in the customer's terms", () => {
-    expect(earnSentence(PROGRAM)).toBe("Customers earn 10 points every visit.");
-    expect(earnSentence({ ...PROGRAM, earnMode: "per_spend", nuPerPoint: 50 })).toBe(
-      "Customers earn 1 point per Nu 50 spent.",
-    );
-  });
-});
-
-function reward(over: Partial<LoyaltyReward> = {}): LoyaltyReward {
-  return {
-    id: "r1",
-    businessId: "b1",
-    name: "Reward",
-    description: null,
-    rewardType: "percent_discount",
-    percentOff: 10,
-    amountNu: null,
-    serviceRef: null,
-    productRef: null,
-    pointCost: 50,
-    isActive: true,
-    isArchived: false,
-    sortOrder: 0,
-    ...over,
-  };
-}
-
-describe("rewardValueLabel", () => {
-  it("labels each of the four shapes", () => {
-    expect(rewardValueLabel(reward())).toBe("10% off");
-    expect(
-      rewardValueLabel(
-        reward({ rewardType: "fixed_discount", percentOff: null, amountNu: 100 }),
-      ),
-    ).toBe("Nu 100 off");
-    expect(
-      rewardValueLabel(
-        reward({ rewardType: "free_service", percentOff: null, serviceRef: "Haircut" }),
-      ),
-    ).toBe("Free: Haircut");
-    expect(
-      rewardValueLabel(reward({ rewardType: "free_product", percentOff: null })),
-    ).toBe("Free goodie");
-  });
-});
-
-describe("progressToNext", () => {
-  it("an empty menu has no goal and no progress", () => {
-    expect(progressToNext([], 100)).toEqual({ target: null, progress: 0 });
-  });
-
-  it("targets the cheapest reward out of reach", () => {
-    const out = progressToNext(
-      [reward({ id: "cheap", pointCost: 30 }), reward({ id: "dear", pointCost: 80 })],
-      50,
-    );
-    expect(out.target?.id).toBe("dear");
-    expect(out.progress).toBeCloseTo(50 / 80, 9);
-  });
-
-  it("is complete when everything is affordable", () => {
-    expect(progressToNext([reward({ pointCost: 10 })], 50)).toEqual({
-      target: null,
-      progress: 1,
-    });
-  });
-
-  it("ignores paused and archived rewards — an unredeemable goal is not a goal", () => {
-    const out = progressToNext(
-      [
-        reward({ id: "paused", pointCost: 30, isActive: false }),
-        reward({ id: "gone", pointCost: 40, isArchived: true }),
-        reward({ id: "live", pointCost: 90 }),
-      ],
-      20,
-    );
-    expect(out.target?.id).toBe("live");
   });
 });
 

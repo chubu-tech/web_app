@@ -766,6 +766,7 @@ export default async function SalonPage({
             balance={loyaltyBalance}
             signedIn={account.state === "registered"}
             isGuest={account.state === "guest"}
+            accountId={account.state === "registered" ? account.user.id : null}
           />
         </div>
 

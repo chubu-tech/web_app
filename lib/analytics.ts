@@ -7,8 +7,6 @@ import type {
 } from "./types/analytics";
 import type {
   ClientSummary,
-  LoyaltyProgram,
-  LoyaltyReward,
   OrderFulfilment,
   OrderStatus,
 } from "./types/back-office";
@@ -22,6 +20,10 @@ import { fullDayTimeLabel } from "./clock";
  * `tho/app/lib/business/insights/dashboard_logic.dart`,
  * `business/clients/client_book_logic.dart`, `data/team.dart`'s tax bands and the order
  * half of `data/models.dart`.
+ *
+ * **Loyalty lives in `lib/loyalty.ts`**, not here. Four of its helpers were in this file and
+ * half of them are customer-facing — a stamp card and a streak are things a customer sees and
+ * an owner never does — which made the sentence above wrong about its own contents.
  *
  * No React, no Supabase, no copy that isn't a rule. Tested in `lib/analytics.test.ts`
  * against the same cases as `dashboard_logic_test.dart` and `client_book_logic_test.dart`,
@@ -674,63 +676,6 @@ export function offerHiddenReason(
 /** A `date` column's midnight, in the same frame `thimphuToday` returns. */
 function dayOf(d: Date): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-}
-
-// =================================================================== loyalty ===
-
-/** Points a completed booking of `total` Nu would earn — mirrors the earn trigger. */
-export function loyaltyPointsForBooking(program: LoyaltyProgram, total: number): number {
-  if (program.earnMode === "per_spend") {
-    return program.nuPerPoint <= 0 ? 0 : Math.floor(total / program.nuPerPoint);
-  }
-  return program.pointsPerVisit;
-}
-
-/** The customer-facing description of the earn rule, and the form's live preview. */
-export function earnSentence(program: LoyaltyProgram): string {
-  return program.earnMode === "per_spend"
-    ? `Customers earn 1 point per Nu ${program.nuPerPoint} spent.`
-    : `Customers earn ${program.pointsPerVisit} points every visit.`;
-}
-
-/** Short human label for a reward's value — "10% off", "Nu 100 off", "Free: Haircut". */
-export function rewardValueLabel(
-  r: Pick<LoyaltyReward, "rewardType" | "percentOff" | "amountNu" | "serviceRef" | "productRef" | "name">,
-): string {
-  switch (r.rewardType) {
-    case "percent_discount":
-      return `${r.percentOff ?? 0}% off`;
-    case "fixed_discount":
-      return `Nu ${r.amountNu ?? 0} off`;
-    case "free_service":
-      return r.serviceRef ? `Free: ${r.serviceRef}` : "Free service";
-    case "free_product":
-      return r.productRef ? `Free: ${r.productRef}` : "Free goodie";
-    default:
-      return r.name;
-  }
-}
-
-/**
- * The cheapest reward a customer cannot yet afford, and how far along they are.
- *
- * All affordable → `(null, 1)`; an empty menu → `(null, 0)`. Archived and paused rewards are
- * excluded, because a goal nobody can redeem is not a goal.
- */
-export function progressToNext(
-  rewards: LoyaltyReward[],
-  available: number,
-): { target: LoyaltyReward | null; progress: number } {
-  const live = rewards
-    .filter((r) => r.isActive && !r.isArchived)
-    .sort((a, b) => a.pointCost - b.pointCost);
-  if (live.length === 0) return { target: null, progress: 0 };
-  for (const r of live) {
-    if (r.pointCost > available) {
-      return { target: r, progress: Math.min(Math.max(available / r.pointCost, 0), 1) };
-    }
-  }
-  return { target: null, progress: 1 };
 }
 
 // ======================================================================= tax ===

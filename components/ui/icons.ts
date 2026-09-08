@@ -31,6 +31,7 @@ import {
   Filter,
   FilterX,
   Footprints,
+  Flame,
   Gift,
   Grid3x3,
   Hand,
@@ -270,6 +271,12 @@ export const Icons = {
   gift: Gift,
   offer: Tag,
   reward: Trophy,
+  /**
+   * A run of visits kept going — the loyalty streak. Deliberately distinct from `reward`, which
+   * is the thing collected toward: a streak is about not stopping, and upstream picks a flame
+   * for the same reason.
+   */
+  streak: Flame,
   shopBag: ShoppingBag,
   /**
    * The cart itself, as distinct from `shopBag` — which is the *shop*, and already means "orders"

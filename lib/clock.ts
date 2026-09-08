@@ -68,6 +68,17 @@ export function fullDayTimeLabel(instant: Date, timeZone: string = THIMPHU_TZ): 
 }
 
 /**
+ * `3 Sep 2026` — a date with no time and no weekday.
+ *
+ * The **year is the reason this exists** rather than being `dateTimeLabel` without its time
+ * half: the surfaces that want it are records that outlive a year, like a loyalty ledger, where
+ * "3 Sep" alone is ambiguous the moment the customer has been coming for two of them.
+ */
+export function dateLabel(instant: Date, timeZone: string = THIMPHU_TZ): string {
+  return datePart(instant, timeZone, "dated");
+}
+
+/**
  * `3 Sep · 2:00 PM` — a dated stamp with no weekday, for lists of records (payments, order
  * events) where the day of the week carries nothing.
  */
@@ -121,13 +132,17 @@ function hourMinuteIn(instant: Date, timeZone: string): { hour: number; minute: 
  * current month. The order is assembled here rather than taken from the locale, so US date
  * order never reaches the output.
  */
-function datePart(instant: Date, timeZone: string, shape: "compact" | "full" | "dateOnly"): string {
+function datePart(
+  instant: Date,
+  timeZone: string,
+  shape: "compact" | "full" | "dateOnly" | "dated",
+): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
     weekday: shape === "full" ? "long" : shape === "compact" ? "short" : undefined,
     day: "numeric",
     month: "short",
-    year: shape === "full" ? "numeric" : undefined,
+    year: shape === "full" || shape === "dated" ? "numeric" : undefined,
   }).formatToParts(instant);
 
   const value = (type: string) => parts.find((p) => p.type === type)?.value ?? "";

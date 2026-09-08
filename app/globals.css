@@ -520,6 +520,28 @@
     }
   }
 
+  /* A loyalty stamp landing. The same spring as the medallion above and for the
+     same reason — a stamp is pressed onto a card, not faded onto one — but
+     square-on rather than rotated, because these are a countable row and a tilt
+     would read as one of them being crooked.
+
+     No delay of its own: `StampCard` sets `animation-delay` inline per stamp, so
+     a run of them arrives one after another. `prefers-reduced-motion` is handled
+     by the app-wide rule at the foot of this file, and truncating to the `to`
+     keyframe is exactly right here — the card arrives already stamped. */
+  --animate-stamp-in: stamp-in 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+
+  @keyframes stamp-in {
+    from {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
   /* One diagonal specular pass over the cover, once, on arrival. It runs on a
      skewed pseudo-element inside `overflow-hidden`, so `left` is travelling from
      outside one edge to outside the other. */

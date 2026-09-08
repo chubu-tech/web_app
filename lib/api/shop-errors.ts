@@ -57,6 +57,17 @@ export function shopErrorMessage(action: ShopAction, error: unknown): string {
   const code = errorCode(error);
   const fallback = FALLBACK[action];
 
+  /*
+    No SQLSTATE at all means the request never reached Postgres — a dropped mobile link, which on
+    a Bhutanese connection is the ordinary case rather than the exotic one. Saying "couldn't
+    redeem that reward" there blames the reward for the network, and the customer retries the
+    thing that was never the problem. Redemption only, because it is the one action a customer
+    performs standing at a counter with somebody waiting.
+  */
+  if (code == null && action === "redeem") {
+    return "Couldn't redeem just now. Check your connection and try again.";
+  }
+
   if (code === SHOP_ERROR.unauthenticated) {
     return "Your session expired. Sign in and try again.";
   }

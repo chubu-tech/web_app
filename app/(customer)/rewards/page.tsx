@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
-import { fetchMyLoyaltySummary } from "@/lib/api/shop";
+import { fetchMyLoyaltySummary, fetchMyPendingRedemptions } from "@/lib/api/shop";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 
@@ -25,6 +25,18 @@ export const metadata: Metadata = {
  * `next_reward_*` is the cheapest reward they cannot yet afford, so it is null in two different
  * situations: an empty reward menu, and a customer who can already afford everything. The second
  * deserves saying out loud.
+ *
+ * ## Why a zero-point row is not a bug
+ *
+ * That "or a redemption is pending" arm is what puts a salon here with **0 points to spend**: a
+ * pending claim holds its cost, so somebody who claimed a 50-point reward and has not yet shown
+ * the code has a balance of 50 and nothing available. Without the waiting marker below, that row
+ * reads as a mistake — which is exactly what it did until now, on this database, for a real
+ * customer.
+ *
+ * Rows go to `/rewards/salon/[businessId]`, not to the salon. The salon page sells the programme;
+ * this one is the record behind the number, and it is where the pending claim's code is reachable
+ * from.
  */
 export default async function MyRewardsPage() {
   const account = await getAccount();
@@ -48,16 +60,28 @@ export default async function MyRewardsPage() {
 
   const supabase = await createClient();
   /*
-    **No catch.** This used to be `.catch(() => [])`, which turned an outage into the empty
-    state below — somebody with a full list was told they had nothing, in the app's own
-    encouraging words. There was no `error.tsx` anywhere when that was written, so swallowing
-    was the only alternative to Next's default error page; now the segment has a boundary and a
-    failed read can say it failed.
+    Two reads, and only one of them is allowed to fail quietly.
 
-    The session is already established above, so nothing here fails for a signed-out visitor:
+    **The list is uncaught.** It used to be `.catch(() => [])`, which turned an outage into the
+    empty state below — somebody with a full list was told they had nothing, in the app's own
+    encouraging words. There was no `error.tsx` anywhere when that was written; the segment has a
+    boundary now, so a failed read can say it failed. The session is already established above, so
     a throw means the read itself broke.
+
+    **The markers are caught**, because they are decoration on a row rather than the row. A marker
+    that cannot be read is a missing explanation; a list that cannot be read is a customer told
+    they have no points. The row loses its marker, never itself.
   */
-  const entries = await fetchMyLoyaltySummary(supabase);
+  const [entries, waiting] = await Promise.all([
+    fetchMyLoyaltySummary(supabase),
+    // One read for every salon, where the app issues one per salon and documents that N+1 as the
+    // price of staying migration-free. The same policy admits them all, so the business filter
+    // was the only thing making it N.
+    fetchMyPendingRedemptions(supabase, account.user.id).catch(() => []),
+  ]);
+
+  const waitingAt = new Map<string, number>();
+  for (const r of waiting) waitingAt.set(r.businessId, (waitingAt.get(r.businessId) ?? 0) + 1);
 
   if (entries.length === 0) {
     return (
@@ -90,7 +114,7 @@ export default async function MyRewardsPage() {
           return (
             <li key={entry.businessId}>
               <Link
-                href={`/salon/${entry.businessId}`}
+                href={`/rewards/salon/${entry.businessId}`}
                 className="border-hairline-soft p-base gap-base hover:bg-surface-soft flex items-center rounded-md border"
               >
                 <Ring progress={progress} />
@@ -106,6 +130,16 @@ export default async function MyRewardsPage() {
                       ? `${entry.nextRewardCost! - entry.available} more → ${entry.nextRewardName}`
                       : "Enough for everything on their menu"}
                   </span>
+                  {/* The reason a balance is lower than the customer expects, said on the row
+                      where they will see it. They have no reason to go looking: the points went
+                      quiet, and nothing on this page said where. */}
+                  {(waitingAt.get(entry.businessId) ?? 0) > 0 ? (
+                    <span className="text-body-sm text-rausch-cta mt-xxs block">
+                      {waitingAt.get(entry.businessId) === 1
+                        ? "1 reward waiting at the counter"
+                        : `${waitingAt.get(entry.businessId)} rewards waiting at the counter`}
+                    </span>
+                  ) : null}
                 </span>
                 <Icons.chevronRight
                   className="text-muted-soft shrink-0"
@@ -118,8 +152,8 @@ export default async function MyRewardsPage() {
         })}
       </ul>
       <p className="text-caption-sm text-muted mt-lg">
-        Open a salon to see its rewards and claim one. Points are held when you claim and spent when
-        the salon confirms.
+        Open a salon here for its full record, or the salon&rsquo;s own page to claim a reward.
+        Points are held when you claim and spent when the salon confirms.
       </p>
     </Shell>
   );

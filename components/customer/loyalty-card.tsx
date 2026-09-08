@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -7,9 +8,10 @@ import { GuestWall } from "@/components/auth/guest-wall";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
+import { StampCard } from "@/components/ui/stamp-card";
 import { requestRedemption } from "@/lib/api/shop";
 import { shopErrorMessage } from "@/lib/api/shop-errors";
-import { earnSentence, progressToNext, rewardValueLabel } from "@/lib/analytics";
+import { earnSentence, progressToNext, rewardValueLabel, stampCardFor } from "@/lib/loyalty";
 import type { LoyaltyBalance, LoyaltyProgram, LoyaltyReward } from "@/lib/types/back-office";
 import { createClient } from "@/lib/supabase/client";
 
@@ -27,6 +29,17 @@ import { createClient } from "@/lib/supabase/client";
  * public and the number is not — which is the honest split, and it lets the rewards do the
  * advertising the programme exists for.
  *
+ * ## A card where the numbers allow one, a ring everywhere else
+ *
+ * A `per_visit` programme whose cheapest reward costs a whole number of visits **is** a stamp
+ * card, and has been all along — nothing is stored for it and no salon opts in. `stampCardFor`
+ * decides; the ring is the fallback for everything it refuses, not the other way round. Both live
+ * salons running loyalty today qualify: 10 points a visit toward 50 and toward 100, so a
+ * five-stamp card and a ten-stamp one.
+ *
+ * A completed card's Claim goes through **the same `redeem` path** as the menu below it. A second
+ * claim route is how one reward ends up with two idempotency tokens.
+ *
  * ## The token, again
  *
  * `request_redemption` de-duplicates on `client_token`, and this is the call the Flutter app gets
@@ -41,6 +54,7 @@ export function LoyaltyCard({
   balance,
   signedIn,
   isGuest,
+  accountId,
 }: {
   businessId: string;
   /** Null when the salon has no active programme — then this renders nothing. */
@@ -50,6 +64,13 @@ export function LoyaltyCard({
   balance: LoyaltyBalance | null;
   signedIn: boolean;
   isGuest: boolean;
+  /**
+   * The signed-in account, or null for a visitor or a guest.
+   *
+   * Only the stamp card wants it, and only to key what this person has already watched arrive.
+   * A guest has a uid but no account and no points to have missed, so it is null for them too.
+   */
+  accountId: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -62,6 +83,7 @@ export function LoyaltyCard({
 
   const available = balance?.available ?? 0;
   const { target, progress } = progressToNext(rewards, available);
+  const card = stampCardFor({ program, rewards, available });
 
   async function redeem(reward: LoyaltyReward) {
     if (!signedIn || isGuest) {
@@ -92,28 +114,54 @@ export function LoyaltyCard({
     <section className="mt-xl">
       <SectionHeader title="Loyalty" />
 
-      <div className="border-hairline bg-canvas p-base gap-base mb-md flex flex-wrap items-center rounded-md border">
-        <Ring progress={progress} value={available} showValue={balance != null} />
-        <div className="min-w-0 flex-1">
-          <p className="text-body-sm text-muted">{earnSentence(program)}</p>
-          {balance == null ? (
-            <p className="text-title text-ink mt-sm font-medium">
-              Sign in to see your points here.
-            </p>
-          ) : target ? (
-            <p className="text-title text-ink mt-sm font-medium">
-              {target.pointCost - available} more to {target.name}
-            </p>
-          ) : rewards.length > 0 ? (
-            <p className="text-title text-rausch-cta mt-sm font-medium">All rewards unlocked</p>
-          ) : null}
-          {balance != null && balance.held > 0 ? (
-            <p className="text-caption-sm text-muted mt-xs">
-              {balance.held} held by a reward you have already claimed.
-            </p>
-          ) : null}
+      {card ? (
+        <div className="mb-md">
+          <StampCard
+            filled={card.filled}
+            total={card.total}
+            rewardName={card.reward.name}
+            accountId={accountId}
+            businessId={businessId}
+            onClaim={() => void redeem(card.reward)}
+            claiming={busy === card.reward.id}
+          />
+          <p className="text-body-sm text-muted mt-sm">{earnSentence(program)}</p>
         </div>
-      </div>
+      ) : (
+        <div className="border-hairline bg-canvas p-base gap-base mb-md flex flex-wrap items-center rounded-md border">
+          <Ring progress={progress} value={available} showValue={balance != null} />
+          <div className="min-w-0 flex-1">
+            <p className="text-body-sm text-muted">{earnSentence(program)}</p>
+            {balance == null ? (
+              <p className="text-title text-ink mt-sm font-medium">
+                Sign in to see your points here.
+              </p>
+            ) : target ? (
+              <p className="text-title text-ink mt-sm font-medium">
+                {target.pointCost - available} more to {target.name}
+              </p>
+            ) : rewards.length > 0 ? (
+              <p className="text-title text-rausch-cta mt-sm font-medium">All rewards unlocked</p>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {/*
+        Outside the branch, because it is the explanation for whichever number is above it —
+        and on the card it is the *only* explanation. A card that reads 0 of 5 for somebody who
+        has been five times is otherwise inexplicable from this page; the points are held by the
+        claim they made and have not yet shown at the counter.
+      */}
+      {balance != null && balance.held > 0 ? (
+        <p className="text-caption-sm text-muted mt-xs mb-md">
+          {balance.held} points are held by a reward you have already claimed —{" "}
+          <Link href={`/rewards/salon/${businessId}`} className="text-rausch-cta underline">
+            see the code
+          </Link>
+          .
+        </p>
+      ) : null}
 
       {rewards.length === 0 ? (
         <p className="text-body-sm text-muted">

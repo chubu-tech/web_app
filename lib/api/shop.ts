@@ -3,6 +3,7 @@ import type {
   LoyaltyProgram,
   LoyaltyRedemption,
   LoyaltyReward,
+  LoyaltyTransaction,
   Order,
 } from "../types/back-office";
 import type { Product, ProductCategory } from "../types/salon";
@@ -10,6 +11,7 @@ import {
   toLoyaltyProgram,
   toLoyaltyRedemption,
   toLoyaltyReward,
+  toLoyaltyTransaction,
   toOrder,
   toProduct,
   toProductCategory,
@@ -341,6 +343,60 @@ export async function fetchMyRedemptions(
     .select("*")
     .eq("business_id", businessId)
     .eq("customer_profile_id", userId)
+    .order("requested_at", { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map(toLoyaltyRedemption);
+}
+
+/**
+ * The caller's points ledger at one salon, newest first — every earn, spend and adjustment.
+ *
+ * **The one loyalty table the web has never read.** `loyalty_transactions` is append-only and its
+ * migration calls it *"the source of truth + audit trail"*; `loyalty_transactions_select` already
+ * admits `customer_profile_id = auth.uid()`, so the customer's own history has been readable all
+ * along and nothing ever asked. That is what made a confirmed reward vanish the moment it was
+ * confirmed.
+ *
+ * Scoped to the caller explicitly rather than leaning on RLS alone, for the reason
+ * `fetchMyRedemptionById` gives: the policy also admits the salon's staff, which is right for the
+ * owner's console and wrong on a page about one customer.
+ */
+export async function fetchLoyaltyTransactions(
+  supabase: SupabaseClient,
+  userId: string,
+  businessId: string,
+): Promise<LoyaltyTransaction[]> {
+  const { data, error } = await supabase
+    .from("loyalty_transactions")
+    .select("id,business_id,kind,points,booking_id,redemption_id,order_id,reason,created_at")
+    .eq("business_id", businessId)
+    .eq("customer_profile_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map(toLoyaltyTransaction);
+}
+
+/**
+ * Every claim of the caller's still waiting at a counter, across all salons, in one read.
+ *
+ * **A deliberate departure from the app**, which issues one `myRedemptions` per salon in the
+ * summary list and documents that N+1 as the price of staying migration-free. No migration is
+ * needed for either shape: the same policy that admits one salon's rows admits them all, so the
+ * business filter was the only thing making it N reads. One round trip, whatever the customer's
+ * history looks like.
+ *
+ * Pending is the only status worth the read. A pending redemption **holds** its points, so it is
+ * the one that explains a balance lower than the customer expects.
+ */
+export async function fetchMyPendingRedemptions(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<LoyaltyRedemption[]> {
+  const { data, error } = await supabase
+    .from("loyalty_redemptions")
+    .select("*")
+    .eq("customer_profile_id", userId)
+    .eq("status", "pending")
     .order("requested_at", { ascending: false });
   if (error) throw error;
   return ((data ?? []) as Record<string, unknown>[]).map(toLoyaltyRedemption);

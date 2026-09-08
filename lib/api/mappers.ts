@@ -46,6 +46,8 @@ import type {
   LoyaltyRedemptionStatus,
   LoyaltyReward,
   LoyaltyRewardType,
+  LoyaltyTransaction,
+  LoyaltyTransactionKind,
   Order,
   OrderItem,
   PayrollRow,
@@ -812,6 +814,26 @@ export function toLoyaltyReward(m: Row): LoyaltyReward {
 
 export function toLoyaltyBalance(m: Row): LoyaltyBalance {
   return { balance: num(m.balance), held: num(m.held), available: num(m.available) };
+}
+
+/**
+ * One row of the append-only points ledger.
+ *
+ * `points` is left **signed as stored** — negating a redeem here would make the balance the sum
+ * of absolute values, and the ledger's own contract is that the balance is `sum(points)`.
+ */
+export function toLoyaltyTransaction(m: Row): LoyaltyTransaction {
+  return {
+    id: m.id as string,
+    businessId: m.business_id as string,
+    kind: (str(m.kind) ?? "earn") as LoyaltyTransactionKind,
+    points: num(m.points),
+    bookingId: str(m.booking_id),
+    redemptionId: str(m.redemption_id),
+    orderId: str(m.order_id),
+    reason: str(m.reason),
+    createdAt: new Date(m.created_at as string),
+  };
 }
 
 export function toLoyaltyRedemption(m: Row): LoyaltyRedemption {

@@ -234,6 +234,38 @@ export type LoyaltyBalance = {
   available: number;
 };
 
+/** What moved the points: a visit, a reward, or the owner correcting the books. */
+export type LoyaltyTransactionKind = "earn" | "redeem" | "adjust";
+
+/**
+ * One row of the append-only points ledger, which its own migration calls *"the source of
+ * truth + audit trail"*.
+ *
+ * `points` is **signed as stored**: positive for an `earn` or a credit `adjust`, negative for
+ * a `redeem` or a debit. The balance is their sum, which is why nothing here is ever edited or
+ * deleted — and why a history is a read rather than something to maintain.
+ */
+export type LoyaltyTransaction = {
+  id: string;
+  businessId: string;
+  kind: LoyaltyTransactionKind;
+  points: number;
+  bookingId: string | null;
+  /** Set on the `redeem` written when a salon confirms — how the timeline de-duplicates. */
+  redemptionId: string | null;
+  /**
+   * Set when the points came from a product order rather than a booking.
+   *
+   * The app's own model predates the column and does not carry it. Mapped here rather than
+   * silently dropped, because a hand-written copy quietly losing a field it did not name is
+   * exactly the regression upstream logged against its own business mapper.
+   */
+  orderId: string | null;
+  /** The owner's stated reason on an `adjust` — the only record of why the number moved. */
+  reason: string | null;
+  createdAt: Date;
+};
+
 export type LoyaltyRedemptionStatus = "pending" | "confirmed" | "cancelled" | "expired";
 
 /**

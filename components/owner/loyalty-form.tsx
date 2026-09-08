@@ -17,8 +17,9 @@ import {
   upsertLoyaltyProgram,
 } from "@/lib/api/owner-back-office";
 import { ownerErrorMessage } from "@/lib/api/owner-errors";
-import { earnSentence, rewardValueLabel } from "@/lib/analytics";
+import { earnSentence, rewardValueLabel, stampCardExplanation } from "@/lib/loyalty";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 import type {
   LoyaltyEarnMode,
   LoyaltyProgram,
@@ -36,8 +37,13 @@ import type {
  * the customer's own loyalty card will use in 2f, so an owner reading "1 point per Nu 50 spent"
  * here is reading exactly what a customer will be told.
  *
- * `pointsForBooking` in `lib/analytics.ts` mirrors the earn **trigger**, not this form, which is
- * what makes the preview a claim about the database rather than about the UI.
+ * `loyaltyPointsForBooking` in `lib/loyalty.ts` mirrors the earn **trigger**, not this form,
+ * which is what makes the preview a claim about the database rather than about the UI.
+ *
+ * A second line under it says what shape the customer actually sees — a stamp card, or the ring
+ * and why. Without it the card is a feature only reachable by accident: it needs a per-visit
+ * programme whose cheapest reward costs a whole number of visits, and nothing else on this screen
+ * would ever mention that.
  *
  * ## Removing a reward restores its previous state, not "on"
  *
@@ -75,13 +81,24 @@ export function LoyaltyForm({
 
   const ppv = Number.parseInt(pointsPerVisit.trim(), 10);
   const npp = Number.parseInt(nuPerPoint.trim(), 10);
-  const preview = earnSentence({
+  const draft = {
     businessId,
     isActive,
     earnMode,
     pointsPerVisit: Number.isFinite(ppv) ? ppv : 10,
     nuPerPoint: Number.isFinite(npp) ? npp : 10,
-  });
+  };
+  const preview = earnSentence(draft);
+  /*
+    What these numbers actually produce for a customer.
+
+    **The stamp card is invisible to the only person who can bring one about.** It is drawn when a
+    per-visit programme's cheapest live reward costs a whole number of visits — a rule nothing on
+    this screen states, and one most salons would never accidentally satisfy. Read off the *draft*
+    rather than the saved programme, so an owner typing 45 into a box sees why that will not be a
+    card before they save it.
+  */
+  const shape = stampCardExplanation(draft, rewards);
 
   async function save() {
     setError(null);
@@ -226,6 +243,19 @@ export function LoyaltyForm({
         />
       )}
       <p className="text-body-sm text-muted mt-sm">{preview}</p>
+      <p
+        className={cn(
+          "text-body-sm mt-xs gap-xs flex items-start",
+          shape.isCard ? "text-success-text" : "text-muted",
+        )}
+      >
+        <Icons.gift
+          className="mt-0.5 shrink-0"
+          style={{ width: IconSize.xs, height: IconSize.xs }}
+          aria-hidden
+        />
+        <span>{shape.text}</span>
+      </p>
 
       {error ? <p className="text-body-sm text-error-text mt-sm">{error}</p> : null}
 
