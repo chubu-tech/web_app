@@ -180,6 +180,26 @@ describe("notificationText", () => {
     }
   });
 
+  /*
+    The one event with two names, pinned against `private.notification_copy` — which sends
+    "Your order is packed" on a delivery and "Your order is ready" on a pickup. `ready` is
+    the only state both fulfilment paths pass through, so it is the only one that needs
+    two, and a fallback whose *title* disagreed with the stored copy would be the inbox and
+    the push saying different things about one order.
+
+    Pickup is also what a row from before the column existed must read as, matching the
+    server's own `coalesce(v_o.fulfilment, 'pickup')`.
+  */
+  it("names a packed delivery and a ready pickup apart", () => {
+    expect(notificationText("order_ready", { fulfilment: "delivery" }).title).toBe(
+      "Your order is packed",
+    );
+    expect(notificationText("order_ready", { fulfilment: "pickup" }).title).toBe(
+      "Your order is ready",
+    );
+    expect(notificationText("order_ready", {}).title).toBe("Your order is ready");
+  });
+
   it("falls back to the humanised title rather than a flat 'Update'", () => {
     const { title, body } = notificationText("some_new_thing", {});
     expect(title).toBe("Some new thing");

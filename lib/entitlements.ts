@@ -110,6 +110,20 @@ export function hasFeature(plan: string | null | undefined, feature: Feature): b
 }
 
 /**
+ * The lowest tier that includes a feature — what a locked surface should name.
+ *
+ * Derived from the same two tables `UNLOCKED` is built from, so *"Growth plan and up"* on a row
+ * and the tier that actually unlocks the screen behind it cannot drift. Every gated surface used
+ * to write its own tier string, which is how a settings row gated on `deposits` came to raise the
+ * *"Deposits & no-show cover"* paywall at an owner asking about reminder delivery.
+ */
+export function tierForFeature(feature: Feature): Plan {
+  if (GROWTH_ADDS.includes(feature)) return "growth";
+  if (PRO_ADDS.includes(feature)) return "pro";
+  return "basic";
+}
+
+/**
  * Max concurrently-active stylists; `null` means unlimited. Derived from the
  * unlimited-stylists entitlement so the cap cannot drift from the gate.
  */

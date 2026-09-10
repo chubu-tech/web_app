@@ -9,6 +9,7 @@ import type {
 } from "../types/booking";
 import type { Hairstyle } from "../types/salon";
 import { toBooking, toHairstyle, toPayment, toSlot } from "./mappers";
+import { oneRow } from "./one-row";
 
 /**
  * Booking reads and writes, ported from the booking section of
@@ -127,7 +128,7 @@ export async function createBooking(
     p_customer_phone: customerPhone ?? null,
   });
   if (error) throw error;
-  return toBooking(data as Record<string, unknown>);
+  return toBooking(oneRow(data, "create_booking"));
 }
 
 export async function cancelBooking(
@@ -188,7 +189,7 @@ export async function rescheduleBooking(
     p_new_staff_member_id: null,
   });
   if (error) throw error;
-  return toBooking(data as Record<string, unknown>);
+  return toBooking(oneRow(data, "reschedule_booking"));
 }
 
 /**
@@ -332,7 +333,7 @@ export async function recordPayment(
     p_note: note?.trim() ? note.trim() : null,
   });
   if (error) throw error;
-  return toPayment(data as Record<string, unknown>);
+  return toPayment(oneRow(data, "record_payment"));
 }
 
 /* --------------------------------------------------------------------------

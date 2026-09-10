@@ -43,6 +43,10 @@ import { createClient } from "@/lib/supabase/client";
  * address, when it lapses, and Revoke. **Neither** — the form. Sending while an invite is
  * outstanding is safe: the RPC revokes the old one itself, so re-sending is how you
  * correct a typo.
+ *
+ * All three are plain rows with no surface of their own: this renders **inside** the editor's
+ * "Login account" `SectionCard`, and a bordered box in a bordered card draws the same edge
+ * twice. The app's `_loginAccount()` is a bare `Row` for the same reason.
  */
 export function StaffLinkCard({
   staffId,
@@ -103,7 +107,7 @@ export function StaffLinkCard({
 
   if (linkedProfileId) {
     return (
-      <div className="border-hairline-soft bg-surface-soft p-base gap-sm flex items-center rounded-md border">
+      <div className="gap-sm flex items-center">
         <Icons.verified
           className="text-success-text shrink-0"
           style={{ width: IconSize.xs, height: IconSize.xs }}
@@ -119,7 +123,7 @@ export function StaffLinkCard({
 
   if (pendingInvite) {
     return (
-      <div className="border-hairline-soft bg-surface-soft p-base rounded-md border">
+      <div>
         <div className="gap-sm flex items-start">
           <Icons.mail
             className="text-muted mt-0.5 shrink-0"

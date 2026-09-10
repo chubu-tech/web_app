@@ -4,6 +4,7 @@ import { readySecondary } from "@/components/customer/destinations";
 import { ProfileEditor } from "@/components/customer/profile-editor";
 import { DeleteAccountCard } from "@/components/auth/delete-account";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { fetchMyProfile } from "@/lib/api/profile";
@@ -42,12 +43,7 @@ export default async function ProfilePage() {
           title="You're browsing as a visitor"
           message="Sign in to see your bookings and saved salons."
           action={
-            <Link
-              href="/sign-in?next=/profile"
-              className="bg-rausch-cta text-on-primary text-title hover:bg-rausch-cta-pressed inline-flex min-h-12 items-center rounded-sm px-4 font-medium"
-            >
-              Sign in
-            </Link>
+            <ButtonLink href="/sign-in?next=/profile">Sign in</ButtonLink>
           }
         />
         <About />
@@ -63,12 +59,7 @@ export default async function ProfilePage() {
           title="Browsing as a guest"
           message="Your saved salons and the stylists you follow are kept. Create an account and they come with you — booking, queues and messages unlock too."
           action={
-            <Link
-              href="/sign-up?next=/profile"
-              className="bg-rausch-cta text-on-primary text-title hover:bg-rausch-cta-pressed inline-flex min-h-12 items-center rounded-sm px-4 font-medium"
-            >
-              Create an account
-            </Link>
+            <ButtonLink href="/sign-up?next=/profile">Create an account</ButtonLink>
           }
         />
         {/* Written out rather than `max-w-sm`, which resolves to `--spacing-sm` — 8px,

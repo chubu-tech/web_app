@@ -10,6 +10,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Icons, IconSize } from "@/components/ui/icons";
+import { SectionCard } from "@/components/ui/section-card";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Sheet } from "@/components/ui/sheet";
 import { ownerErrorMessage } from "@/lib/api/owner-errors";
@@ -41,6 +42,18 @@ import { cn, formatDuration, formatNu } from "@/lib/utils";
 
 /**
  * Everything about one stylist — a port of `staff_edit_screen.dart`.
+ *
+ * **Everything except adding them.** Creating a chair moved to `staff-add-form.tsx`, which owns
+ * the name and the services in one gesture, because *which services they perform* is the single
+ * thing that decides whether a new stylist can be booked and it used to be four sections down
+ * this page. What is left here is what can genuinely wait.
+ *
+ * **Six titled cards, in the app's order.** This was one flat column — headers, fields,
+ * switches and a week grid all at one visual level, with nothing saying where one subject ended
+ * and the next began. The order carries an argument: who they are; then the two things that
+ * decide whether this chair appears in a customer's search at all, services and hours, adjacent
+ * and in that order; then their work; then their pay; and last the login account, which is the
+ * one section about somebody else's account rather than about this chair.
  *
  * **The save order is the app's, and it is deliberate.** Hours first: it is the only write
  * here with real server-side validation (`set_staff_working_hours` rejects overlaps, inverted
@@ -243,6 +256,8 @@ export function StaffEditor({
     void commit();
   }
 
+  const allServicesPicked = services.length > 0 && serviceIds.length === services.length;
+
   return (
     <div className="px-base py-lg mx-auto w-full max-w-[720px] tablet:px-lg">
       <Link
@@ -254,206 +269,189 @@ export function StaffEditor({
       </Link>
       <SectionHeader title={member.displayName} as="h1" />
 
-      {/* ---------------------------------------------------- who they are ---- */}
-      <div className="gap-base mt-base flex items-center">
-        <Avatar name={name || member.displayName} photoUrl={photoUrl} size={72} />
-        <div>
-          <input
-            ref={avatarInput}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) =>
-              void uploadFor(
-                e.target.files,
-                `staff-${member.id}`,
-                photoUrl,
-                async (url) => {
-                  await updateStaff(createClient(), member.id, { photoUrl: url });
-                  setPhotoUrl(url);
-                  toast.success("Photo updated.");
-                },
-                setUploading,
-                avatarInput.current,
-              )
-            }
-          />
-          <Button
-            variant="quiet"
-            busy={uploading}
-            onClick={() => avatarInput.current?.click()}
-            className="px-0"
-          >
-            <Icons.camera style={{ width: IconSize.xs, height: IconSize.xs }} aria-hidden />
-            {photoUrl ? "Change photo" : "Add photo"}
-          </Button>
-          <p className="text-caption-sm text-muted">Shown on your salon page.</p>
-        </div>
-      </div>
-
-      <div className="mt-base">
-        <Field label="Name" value={name} onChange={setName} />
-      </div>
-
       {/*
-        Activating is capped; deactivating never is.
-
-        `capReached` is about the *other* stylists, so turning this one **off** is always
-        allowed and turning it back on is refused only when the salon is already at its
-        limit. That asymmetry is the whole point: the paywall stops a new active stylist, it
-        does not undo an existing one — which matters because nine Basic salons are already
-        over the cap and would otherwise be locked out of editing anybody.
-
-        Checked here as well as in SQL. The trigger is the authority
-        (`20260807000004_basic_stylist_cap`); this is so the answer arrives before the write
-        rather than as a refusal, and the sentence names the cap instead of the plan.
-
-        **`!member.isActive` is the third condition, and it was missing.** Measured in the
-        browser on Menjong (Basic, two active stylists, cap one): the box unticked fine and
-        then **disabled itself**, so the owner could not put back the value they had just
-        taken off without reloading the page. Reading only local `isActive` made an *undo*
-        indistinguishable from an *activation*. It is not: the persisted row is already
-        active, so saving it active changes nothing and the trigger — which fires on
-        inactive → active — never sees an update. Gating on the persisted state as well is
-        what the comment above always claimed the code did.
+        Six titled cards, in the app's order, where this was one flat column of headers and
+        controls at a single visual level with nothing saying where one subject ended and the
+        next began. The order is an argument: who they are, then the two things that decide
+        whether this chair appears in a customer's search at all (services, then hours), then
+        their work, then their pay, and last the one section that is about somebody else's
+        account rather than about this chair.
       */}
-      <label
-        className={cn(
-          "gap-base mt-base flex items-start",
-          lockedOff ? "cursor-not-allowed" : "cursor-pointer",
-        )}
-      >
-        <input
-          type="checkbox"
-          checked={isActive}
-          disabled={lockedOff}
-          onChange={(e) => setIsActive(e.target.checked)}
-          className="accent-rausch-cta mt-1 size-5"
-        />
-        <span>
-          <span className="text-title text-ink block font-medium">Active</span>
-          <span className="text-body-sm text-muted block">
-            An inactive stylist can&apos;t be booked and doesn&apos;t count towards your plan&apos;s
-            stylist limit.
-          </span>
-          {lockedOff ? (
-            <span className="text-caption text-muted mt-xxs block">
-              {business.plan === "basic" ? "The Basic plan" : "Your plan"} allows{" "}
-              {activeCap === 1 ? "one active stylist" : `${activeCap} active stylists`}, and{" "}
-              {otherActiveCount === 1 ? "one is" : `${otherActiveCount} are`} already active.{" "}
-              <Link href="/business/plans" className="text-rausch-cta font-medium underline">
-                See plans
-              </Link>
-            </span>
-          ) : null}
-        </span>
-      </label>
-
-      {/* --------------------------------------------------- login account ---- */}
-      <div className="mt-xl">
-        <SectionHeader title="Login account" as="h2" />
-        <StaffLinkCard
-          staffId={member.id}
-          linkedProfileId={member.profileId}
-          pendingInvite={pendingInvite}
-        />
-      </div>
-
-      {/* -------------------------------------------------------------- pay ---- */}
-      <div className="mt-xl">
-        <SectionHeader title="Pay" as="h2" />
-        {canSetPay ? (
-          <>
-            <div className="gap-base grid grid-cols-2">
-              <Field
-                label="Commission %"
-                value={commission}
-                onChange={setCommission}
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={100}
+      <div className="gap-base mt-base flex flex-col">
+        {/* ------------------------------------------------- who they are ---- */}
+        {/* Untitled: the person's name is the page's own heading, so a card headed
+            "Profile" under it would be the same word twice. */}
+        <SectionCard>
+          <div className="gap-base flex items-center">
+            <Avatar name={name || member.displayName} photoUrl={photoUrl} size={72} />
+            <div>
+              <input
+                ref={avatarInput}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) =>
+                  void uploadFor(
+                    e.target.files,
+                    `staff-${member.id}`,
+                    photoUrl,
+                    async (url) => {
+                      await updateStaff(createClient(), member.id, { photoUrl: url });
+                      setPhotoUrl(url);
+                      toast.success("Photo updated.");
+                    },
+                    setUploading,
+                    avatarInput.current,
+                  )
+                }
               />
-              <Field
-                label="Base salary (Nu)"
-                value={salary}
-                onChange={setSalary}
-                type="number"
-                inputMode="numeric"
-                min={0}
-              />
+              <Button
+                variant="quiet"
+                busy={uploading}
+                onClick={() => avatarInput.current?.click()}
+                className="px-0"
+              >
+                <Icons.camera style={{ width: IconSize.xs, height: IconSize.xs }} aria-hidden />
+                {photoUrl ? "Change photo" : "Add photo"}
+              </Button>
+              <p className="text-caption-sm text-muted">Shown on your salon page.</p>
             </div>
-            <p className="text-caption-sm text-muted mt-xs">
-              Total pay = base salary + commission % of their completed-booking revenue.
-            </p>
-          </>
-        ) : (
-          // No salon on the platform is on Pro, so this is the branch every live salon sees.
-          // `set_staff_pay` refuses anything else in SQL ("payroll requires Pro"), and since
-          // 20260805000001 the two columns are out of the owner's UPDATE grant as well — so
-          // the gate holds on both paths, not just this one.
-          <div className="border-hairline-soft bg-surface-soft p-base gap-sm flex items-start rounded-md border">
-            <Icons.locked
-              className="text-muted mt-0.5 shrink-0"
-              style={{ width: IconSize.xs, height: IconSize.xs }}
-              aria-hidden
-            />
-            <p className="text-body-sm text-muted">
-              Commission and base salary are part of the Pro plan.
-            </p>
           </div>
-        )}
-      </div>
 
-      {/* ------------------------------------------------------- services ---- */}
-      <div className="mt-xl">
-        <SectionHeader title="Services performed" as="h2" />
-        {services.length === 0 ? (
-          <p className="text-body-sm text-muted">
-            <Link href="/business/services" className="text-rausch-cta font-medium">
-              Add a service first
-            </Link>{" "}
-            — a stylist with no services can&apos;t be booked.
-          </p>
-        ) : (
-          <ul className="divide-hairline-soft divide-y">
-            {services.map((s) => (
-              <li key={s.id}>
-                <label className="gap-base py-md flex cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={serviceIds.includes(s.id)}
-                    onChange={(e) =>
-                      setServiceIds((current) =>
-                        e.target.checked
-                          ? [...current, s.id]
-                          : current.filter((id) => id !== s.id),
-                      )
-                    }
-                    className="accent-rausch-cta size-5"
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="text-title text-ink block truncate font-medium">
-                      {s.name}
-                      {!s.isActive ? " (switched off)" : ""}
-                    </span>
-                    <span className="text-body-sm text-muted block">
-                      {formatDuration(s.durationMinutes)} · {formatNu(s.price)}
-                    </span>
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+          <div className="mt-base">
+            <Field label="Name" value={name} onChange={setName} />
+          </div>
 
-      {/* ------------------------------------------------------ portfolio ---- */}
-      <div className="mt-xl">
-        <SectionHeader
+          {/*
+            Activating is capped; deactivating never is.
+
+            `capReached` is about the *other* stylists, so turning this one **off** is always
+            allowed and turning it back on is refused only when the salon is already at its
+            limit. That asymmetry is the whole point: the paywall stops a new active stylist, it
+            does not undo an existing one — which matters because nine Basic salons are already
+            over the cap and would otherwise be locked out of editing anybody.
+
+            Checked here as well as in SQL. The trigger is the authority
+            (`20260807000004_basic_stylist_cap`); this is so the answer arrives before the write
+            rather than as a refusal, and the sentence names the cap instead of the plan.
+
+            **`!member.isActive` is the third condition, and it was missing.** Measured in the
+            browser on Menjong (Basic, two active stylists, cap one): the box unticked fine and
+            then **disabled itself**, so the owner could not put back the value they had just
+            taken off without reloading the page. Reading only local `isActive` made an *undo*
+            indistinguishable from an *activation*. It is not: the persisted row is already
+            active, so saving it active changes nothing and the trigger — which fires on
+            inactive → active — never sees an update. Gating on the persisted state as well is
+            what the comment above always claimed the code did.
+          */}
+          <label
+            className={cn(
+              "gap-base mt-base flex items-start",
+              lockedOff ? "cursor-not-allowed" : "cursor-pointer",
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={isActive}
+              disabled={lockedOff}
+              onChange={(e) => setIsActive(e.target.checked)}
+              className="accent-rausch-cta mt-1 size-5"
+            />
+            <span>
+              <span className="text-title text-ink block font-medium">Active</span>
+              <span className="text-body-sm text-muted block">
+                An inactive stylist can&apos;t be booked and doesn&apos;t count towards your
+                plan&apos;s stylist limit.
+              </span>
+              {lockedOff ? (
+                <span className="text-caption text-muted mt-xxs block">
+                  {business.plan === "basic" ? "The Basic plan" : "Your plan"} allows{" "}
+                  {activeCap === 1 ? "one active stylist" : `${activeCap} active stylists`}, and{" "}
+                  {otherActiveCount === 1 ? "one is" : `${otherActiveCount} are`} already active.{" "}
+                  <Link href="/business/plans" className="text-rausch-cta font-medium underline">
+                    See plans
+                  </Link>
+                </span>
+              ) : null}
+            </span>
+          </label>
+        </SectionCard>
+
+        {/* --------------------------------------------------- what they do ---- */}
+        <SectionCard
+          title="Services performed"
+          subtitle={
+            services.length === 0
+              ? undefined
+              : "Customers can only book them for what is ticked here."
+          }
+          trailing={
+            services.length === 0 ? undefined : (
+              <Button
+                variant="quiet"
+                className="px-sm"
+                onClick={() =>
+                  setServiceIds(allServicesPicked ? [] : services.map((s) => s.id))
+                }
+              >
+                {allServicesPicked ? "Clear" : "All"}
+              </Button>
+            )
+          }
+        >
+          {services.length === 0 ? (
+            <p className="text-body-sm text-muted">
+              <Link href="/business/services" className="text-rausch-cta font-medium">
+                Add a service first
+              </Link>{" "}
+              — a stylist with no services can&apos;t be booked.
+            </p>
+          ) : (
+            <ul className="divide-hairline-soft divide-y">
+              {services.map((s) => (
+                <li key={s.id}>
+                  <label className="gap-base py-md flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      checked={serviceIds.includes(s.id)}
+                      onChange={(e) =>
+                        setServiceIds((current) =>
+                          e.target.checked
+                            ? [...current, s.id]
+                            : current.filter((id) => id !== s.id),
+                        )
+                      }
+                      className="accent-rausch-cta size-5"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="text-title text-ink block truncate font-medium">
+                        {s.name}
+                        {!s.isActive ? " (switched off)" : ""}
+                      </span>
+                      <span className="text-body-sm text-muted block">
+                        {formatDuration(s.durationMinutes)} · {formatNu(s.price)}
+                      </span>
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+
+        {/* ------------------------------------------------- working hours ---- */}
+        <SectionCard
+          title="Working hours"
+          subtitle="These decide what can be booked. Split a day to add a lunch break — the gap stops new bookings."
+        >
+          <HoursEditor week={week} openWeekdays={openWeekdays} onChange={setWeek} />
+        </SectionCard>
+
+        {/* ---------------------------------------------------- their work ---- */}
+        <SectionCard
           title="Portfolio photos"
-          as="h2"
-          action={
+          subtitle="These show on their public page."
+          trailing={
             <>
               <input
                 ref={portfolioInput}
@@ -483,59 +481,108 @@ export function StaffEditor({
                 variant="quiet"
                 busy={addingPhoto}
                 onClick={() => portfolioInput.current?.click()}
+                className="px-sm"
               >
                 <Icons.addPhoto style={{ width: IconSize.xs, height: IconSize.xs }} aria-hidden />
                 Add
               </Button>
             </>
           }
-        />
-        {photos.length === 0 ? (
-          <p className="text-body-sm text-muted mt-sm">
-            No portfolio photos yet. These show on their public page.
-          </p>
-        ) : (
-          <ul className="gap-sm mt-sm flex overflow-x-auto">
-            {photos.map((p) => (
-              <li key={p.id} className="relative shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element -- a plain img: these are
-                    user uploads in a horizontal strip, and next/image's layout machinery buys
-                    nothing at 84px while making the delete overlay harder to place. */}
-                <img
-                  src={p.url}
-                  alt=""
-                  width={84}
-                  height={84}
-                  className="bg-surface-strong size-21 rounded-md object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => void removePhoto(p)}
-                  aria-label="Remove this photo"
-                  className="bg-canvas border-hairline text-muted hover:text-ink absolute -top-1 -right-1 grid size-7 place-items-center rounded-full border"
-                >
-                  <Icons.trash
-                    style={{ width: IconSize.xs, height: IconSize.xs }}
-                    aria-hidden
+        >
+          {photos.length === 0 ? (
+            <p className="text-body-sm text-muted">No portfolio photos yet.</p>
+          ) : (
+            <ul className="gap-sm flex overflow-x-auto">
+              {photos.map((p) => (
+                <li key={p.id} className="relative shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- a plain img: these are
+                      user uploads in a horizontal strip, and next/image's layout machinery buys
+                      nothing at 84px while making the delete overlay harder to place. */}
+                  <img
+                    src={p.url}
+                    alt=""
+                    width={84}
+                    height={84}
+                    className="bg-surface-strong size-21 rounded-md object-cover"
                   />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+                  <button
+                    type="button"
+                    onClick={() => void removePhoto(p)}
+                    aria-label="Remove this photo"
+                    className="bg-canvas border-hairline text-muted hover:text-ink absolute -top-1 -right-1 grid size-7 place-items-center rounded-full border"
+                  >
+                    <Icons.trash
+                      style={{ width: IconSize.xs, height: IconSize.xs }}
+                      aria-hidden
+                    />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+
+        {/* ----------------------------------------------- what they are paid --- */}
+        <SectionCard
+          title="Pay"
+          subtitle={
+            canSetPay
+              ? "Total pay = base salary + commission % of their completed-booking revenue."
+              : undefined
+          }
+        >
+          {canSetPay ? (
+            <div className="gap-base grid grid-cols-2">
+              <Field
+                label="Commission %"
+                value={commission}
+                onChange={setCommission}
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={100}
+              />
+              <Field
+                label="Base salary (Nu)"
+                value={salary}
+                onChange={setSalary}
+                type="number"
+                inputMode="numeric"
+                min={0}
+              />
+            </div>
+          ) : (
+            // No salon on the platform is on Pro, so this is the branch every live salon sees.
+            // `set_staff_pay` refuses anything else in SQL ("payroll requires Pro"), and since
+            // 20260805000001 the two columns are out of the owner's UPDATE grant as well — so
+            // the gate holds on both paths, not just this one.
+            //
+            // A plain row, not a bordered box: inside a titled card a second border is a card
+            // drawn twice, which is the same edge-drawn-twice rule `SectionCard` documents.
+            <div className="gap-sm flex items-start">
+              <Icons.locked
+                className="text-muted mt-0.5 shrink-0"
+                style={{ width: IconSize.xs, height: IconSize.xs }}
+                aria-hidden
+              />
+              <p className="text-body-sm text-muted">
+                Commission and base salary are part of the Pro plan.
+              </p>
+            </div>
+          )}
+        </SectionCard>
+
+        {/* --------------------------------------------------- their own login --- */}
+        <SectionCard title="Login account">
+          <StaffLinkCard
+            staffId={member.id}
+            linkedProfileId={member.profileId}
+            pendingInvite={pendingInvite}
+          />
+        </SectionCard>
       </div>
 
-      {/* ---------------------------------------------------- working hours --- */}
-      <div className="mt-xl">
-        <SectionHeader title="Working hours" as="h2" />
-        <p className="text-body-sm text-muted mb-base">
-          These decide what can be booked. Split a day to add a break — the gap stops new
-          bookings.
-        </p>
-        <HoursEditor week={week} openWeekdays={openWeekdays} onChange={setWeek} />
-      </div>
-
-      <div className="mt-xl">
+      <div className="mt-lg">
         <Button fullWidth busy={saving} onClick={save}>
           Save
         </Button>

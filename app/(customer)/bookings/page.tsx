@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { BookingsList } from "@/components/customer/bookings-list";
+import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
 import { fetchMyBookings } from "@/lib/api/booking";
@@ -23,12 +23,7 @@ export default async function BookingsPage() {
           title="Sign in to see your bookings"
           message="Your appointments live with your account, so they're on every device you sign in on."
           action={
-            <Link
-              href="/sign-in?next=/bookings"
-              className="bg-rausch-cta text-on-primary text-title hover:bg-rausch-cta-pressed inline-flex min-h-12 items-center rounded-sm px-4 font-medium"
-            >
-              Sign in
-            </Link>
+            <ButtonLink href="/sign-in?next=/bookings">Sign in</ButtonLink>
           }
         />
       </Shell>

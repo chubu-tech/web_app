@@ -12,7 +12,7 @@ import {
   fetchPlanRequests,
 } from "@/lib/api/owner-back-office";
 import { fetchServices, fetchStaff } from "@/lib/api/salon";
-import { offerHiddenReason } from "@/lib/analytics";
+import { offerVisibility } from "@/lib/analytics";
 import { hasFeature } from "@/lib/entitlements";
 import { getOwnerContext } from "@/lib/owner/context";
 import { createClient } from "@/lib/supabase/server";
@@ -71,9 +71,7 @@ export default async function OwnerSettingsPage() {
   );
 
   const now = new Date();
-  const liveOffers = offers.filter(
-    (o) => offerHiddenReason(o, now, () => "") == null,
-  ).length;
+  const liveOffers = offers.filter((o) => offerVisibility(o, now).visibility === "live").length;
 
   return (
     <SettingsHub

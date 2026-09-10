@@ -32,6 +32,7 @@ import {
   FilterX,
   Footprints,
   Flame,
+  BookUser,
   Gift,
   Grid3x3,
   Hand,
@@ -179,6 +180,15 @@ export const Icons = {
   haircut: Scissors,
   person: User,
   people: Users,
+  /**
+   * The salon's **client book**, as against `people`, which is the salon's own team.
+   *
+   * They shared `Users` until the Settings hub listed both, one group apart, and the two rows
+   * became distinguishable only by their labels — the same collision upstream found in its own
+   * drawer. A contacts book is the app's choice (`AppIcons.clientBook`) and is the right noun:
+   * this is a record of customers, not a roster of staff.
+   */
+  clientBook: BookUser,
   /** Add someone to the roster. Paired with `people`: the list, and adding to it. */
   personAdd: UserPlus,
   /**

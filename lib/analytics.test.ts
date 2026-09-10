@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { dayLabel } from "./clock";
 import {
   canCustomerCancel,
   canOwnerTransition,
@@ -14,11 +15,14 @@ import {
   goalReading,
   heatGrid,
   isLapsed,
-  offerHiddenReason,
+  offerStatusLine,
+  offerVisibility,
   opsReading,
   orderCode,
   orderFulfilment,
   orderItemCount,
+  ORDER_SEGMENTS,
+  orderSegmentCount,
   orderSegmentCoverage,
   orderSegmentFor,
   orderStatusLabel,
@@ -31,7 +35,11 @@ import {
   type ClientSort,
 } from "./analytics";
 import type { DashboardData } from "./types/analytics";
-import { ORDER_STATUSES, orderStatusFromWire } from "./types/back-office";
+import {
+  OPEN_ORDER_STATUSES,
+  ORDER_STATUSES,
+  orderStatusFromWire,
+} from "./types/back-office";
 import type { ClientSummary } from "./types/back-office";
 
 /**
@@ -653,95 +661,183 @@ describe("orderStatusFromWire", () => {
 
 describe("orderStatusLabel", () => {
   it("relabels `new` for the customer and leaves it alone for the salon", () => {
-    expect(orderStatusLabel("new", "customer")).toBe("Placed");
-    expect(orderStatusLabel("new", "owner")).toBe("New");
+    expect(orderStatusLabel("new", "customer", "pickup")).toBe("Placed");
+    expect(orderStatusLabel("new", "owner", "pickup")).toBe("New");
+  });
+
+  /**
+   * The one state both lifecycles pass through, and so the only one that needs two names. Both
+   * audiences get "Packed": the customer's own next-step line already said *"Packed and waiting
+   * to go out"* under a pill reading "Ready".
+   */
+  it("renames only `ready`, and only on a delivery order", () => {
+    expect(orderStatusLabel("ready", "owner", "pickup")).toBe("Ready");
+    expect(orderStatusLabel("ready", "owner", "delivery")).toBe("Packed");
+    expect(orderStatusLabel("ready", "customer", "delivery")).toBe("Packed");
+
+    for (const status of ALL_ORDER_STATUSES) {
+      if (status === "ready") continue;
+      expect(orderStatusLabel(status, "owner", "delivery")).toBe(
+        orderStatusLabel(status, "owner", "pickup"),
+      );
+    }
   });
 
   /*
-    The property that matters more than the one exception: the two audiences must not silently
+    The property that matters more than the two exceptions: the two audiences must not silently
     drift apart on any status nobody deliberately split. This is what a fifth copy of
     `status === "new" ? … : …` could not have given, and it walks the derived list, so a new
     status is covered the day it is added.
   */
   it("agrees with the base table on every status it does not deliberately relabel", () => {
     for (const status of ALL_ORDER_STATUSES) {
-      expect(orderStatusLabel(status, "owner")).toBe(ORDER_STATUS_LABEL[status]);
+      expect(orderStatusLabel(status, "owner", "pickup")).toBe(ORDER_STATUS_LABEL[status]);
       if (status !== "new") {
-        expect(orderStatusLabel(status, "customer")).toBe(ORDER_STATUS_LABEL[status]);
+        expect(orderStatusLabel(status, "customer", "pickup")).toBe(ORDER_STATUS_LABEL[status]);
       }
-      expect(orderStatusLabel(status, "customer")).toBeTruthy();
+      expect(orderStatusLabel(status, "customer", "pickup")).toBeTruthy();
     }
+  });
+});
+
+describe("orderSegmentCount", () => {
+  const counts = { new: 3, ready: 2, out_for_delivery: 1 };
+
+  it("puts each open status on its own tab", () => {
+    const on = (value: string) =>
+      orderSegmentCount(ORDER_SEGMENTS.find((s) => s.value === value)!, counts);
+    expect(on("new")).toBe(3);
+    expect(on("ready")).toBe(2);
+    expect(on("delivering")).toBe(1);
+  });
+
+  /**
+   * Done reads zero **because none of its statuses is open**, not because of a case that says
+   * so. A count there would be a lifetime total of finished orders: it never goes down, it names
+   * no work, and by the second month it is a four-digit number decorating a tab.
+   */
+  it("gives Done nothing, and does so by construction", () => {
+    const done = ORDER_SEGMENTS.find((s) => s.value === "done")!;
+    expect(done.statuses.some((s) => OPEN_ORDER_STATUSES.includes(s))).toBe(false);
+    expect(orderSegmentCount(done, counts)).toBe(0);
+  });
+
+  it("treats an unreadable tally as no numbers rather than as zeroes to argue with", () => {
+    for (const segment of ORDER_SEGMENTS) {
+      expect(orderSegmentCount(segment, {})).toBe(0);
+    }
+  });
+
+  /** Every open status has to reach a tab, or an order is counted nowhere. */
+  it("covers every open status exactly once across the segments", () => {
+    const counted = ORDER_SEGMENTS.flatMap((s) => s.statuses).filter((s) =>
+      OPEN_ORDER_STATUSES.includes(s),
+    );
+    expect([...counted].sort()).toEqual([...OPEN_ORDER_STATUSES].sort());
   });
 });
 
 // ==================================================================== offers ===
 
-describe("offerHiddenReason", () => {
-  const day = (d: Date) => `${d.getUTCDate()} Aug`;
+describe("offerVisibility", () => {
   const now = new Date("2026-08-05T06:00:00Z");
   const d = (iso: string) => new Date(iso);
+  const open = { isActive: true, startsOn: null, endsOn: null };
 
   it("names the pause before anything else", () => {
-    expect(
-      offerHiddenReason({ isActive: false, startsOn: null, endsOn: null }, now, day),
-    ).toBe("Paused");
+    expect(offerVisibility({ ...open, isActive: false }, now).visibility).toBe("paused");
+  });
+
+  /*
+    The precedence, as its own case rather than a comment. An offer that is switched off AND
+    past its end date reports **paused**, because that is the state the owner's own switch
+    controls: "Ended" beside a switch reading off names something the switch cannot fix.
+  */
+  it("reports a switched-off, lapsed offer as paused rather than ended", () => {
+    expect(offerVisibility({ isActive: false, startsOn: null, endsOn: d("2026-07-01") }, now)).toEqual(
+      { visibility: "paused", on: null },
+    );
   });
 
   it("is live when active and in window", () => {
+    expect(offerVisibility(open, now).visibility).toBe("live");
     expect(
-      offerHiddenReason({ isActive: true, startsOn: null, endsOn: null }, now, day),
-    ).toBeNull();
-    expect(
-      offerHiddenReason(
-        { isActive: true, startsOn: d("2026-08-01"), endsOn: d("2026-08-31") },
-        now,
-        day,
-      ),
-    ).toBeNull();
+      offerVisibility({ isActive: true, startsOn: d("2026-08-01"), endsOn: d("2026-08-31") }, now)
+        .visibility,
+    ).toBe("live");
   });
 
   it("counts a same-day end as still running, matching the read policy", () => {
-    expect(
-      offerHiddenReason({ isActive: true, startsOn: null, endsOn: d("2026-08-05") }, now, day),
-    ).toBeNull();
-    expect(
-      offerHiddenReason({ isActive: true, startsOn: null, endsOn: d("2026-08-04") }, now, day),
-    ).toBe("Ended 4 Aug");
+    expect(offerVisibility({ ...open, endsOn: d("2026-08-05") }, now).visibility).toBe("live");
+    expect(offerVisibility({ ...open, endsOn: d("2026-08-04") }, now).visibility).toBe("ended");
   });
 
   it("counts a same-day start as already running", () => {
-    expect(
-      offerHiddenReason({ isActive: true, startsOn: d("2026-08-05"), endsOn: null }, now, day),
-    ).toBeNull();
-    expect(
-      offerHiddenReason({ isActive: true, startsOn: d("2026-08-09"), endsOn: null }, now, day),
-    ).toBe("Starts 9 Aug");
+    expect(offerVisibility({ ...open, startsOn: d("2026-08-05") }, now).visibility).toBe("live");
+    expect(offerVisibility({ ...open, startsOn: d("2026-08-09") }, now).visibility).toBe(
+      "scheduled",
+    );
   });
 
-  /**
-   * The bug this pins down was found in the browser, not here: the first version compared UTC
-   * calendar days, so for the six hours of each Thimphu day that fall on the previous UTC one, an
-   * offer that had ended still read "Live" on the owner's page while `offers_public_read` had
-   * already hidden it from customers.
-   */
+  /*
+    Carries the date, and only where a date is what explains the state. The two states a switch
+    explains carry none, so a row rendering `on` cannot accidentally date a pause.
+  */
+  it("carries the date behind the state, and nothing behind the other two", () => {
+    expect(offerVisibility({ ...open, endsOn: d("2026-08-04") }, now).on).toEqual(d("2026-08-04"));
+    expect(offerVisibility({ ...open, startsOn: d("2026-08-09") }, now).on).toEqual(
+      d("2026-08-09"),
+    );
+    expect(offerVisibility(open, now).on).toBeNull();
+    expect(offerVisibility({ ...open, isActive: false }, now).on).toBeNull();
+  });
+
+  /*
+    The bug this pins down was found in the browser, not here: the first version compared UTC
+    calendar days, so for the six hours of each Thimphu day that fall on the previous UTC one, an
+    offer that had ended still read "Live" on the owner's page while `offers_public_read` had
+    already hidden it from customers.
+  */
   it("uses the salon's calendar day, not the server's", () => {
     // 2026-08-04T22:20Z is already 2026-08-05 04:20 in Thimphu. An offer ending 4 Aug has
     // therefore ended, even though the UTC date still says the 4th.
     const lateUtc = new Date("2026-08-04T22:20:00Z");
-    expect(
-      offerHiddenReason({ isActive: true, startsOn: null, endsOn: d("2026-08-04") }, lateUtc, day),
-    ).toBe("Ended 4 Aug");
+    expect(offerVisibility({ ...open, endsOn: d("2026-08-04") }, lateUtc).visibility).toBe("ended");
     // And one ending on the salon's today is still live.
-    expect(
-      offerHiddenReason({ isActive: true, startsOn: null, endsOn: d("2026-08-05") }, lateUtc, day),
-    ).toBeNull();
+    expect(offerVisibility({ ...open, endsOn: d("2026-08-05") }, lateUtc).visibility).toBe("live");
     // The same instant, one day either side of a start date.
-    expect(
-      offerHiddenReason({ isActive: true, startsOn: d("2026-08-05"), endsOn: null }, lateUtc, day),
-    ).toBeNull();
-    expect(
-      offerHiddenReason({ isActive: true, startsOn: d("2026-08-06"), endsOn: null }, lateUtc, day),
-    ).toBe("Starts 6 Aug");
+    expect(offerVisibility({ ...open, startsOn: d("2026-08-05") }, lateUtc).visibility).toBe("live");
+    expect(offerVisibility({ ...open, startsOn: d("2026-08-06") }, lateUtc).visibility).toBe(
+      "scheduled",
+    );
+  });
+});
+
+describe("offerStatusLine", () => {
+  it("says which date, and what the date means", () => {
+    expect(offerStatusLine({ visibility: "ended", on: new Date("2026-08-04") }, dayLabel)).toBe(
+      "Ended 4 Aug",
+    );
+    expect(offerStatusLine({ visibility: "scheduled", on: new Date("2026-08-09") }, dayLabel)).toBe(
+      "Starts 9 Aug",
+    );
+  });
+
+  /*
+    Live and Paused get no line. The pill has already said both words, and the row has one
+    subtitle to spend — repeating the pill there would push the offer's own description off it.
+  */
+  it("says nothing for the two states the pill already explains", () => {
+    expect(offerStatusLine({ visibility: "live", on: null }, dayLabel)).toBeNull();
+    expect(offerStatusLine({ visibility: "paused", on: null }, dayLabel)).toBeNull();
+  });
+
+  /* The sentence the row actually renders, composed through both functions and the real
+     formatter — the halves can each be right and still not meet. */
+  it("composes the row's line from a live offer record", () => {
+    const now = new Date("2026-08-05T06:00:00Z");
+    const lapsed = { isActive: true, startsOn: null, endsOn: new Date("2026-08-04") };
+    expect(offerStatusLine(offerVisibility(lapsed, now), dayLabel)).toBe("Ended 4 Aug");
   });
 });
 

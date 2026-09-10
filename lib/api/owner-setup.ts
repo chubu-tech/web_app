@@ -155,7 +155,25 @@ export async function setServiceActive(
  *
  * The two-step is the app's and it matters — without the lookup, an owner who switched a
  * catalogue service off and on again would end up with two rows of the same name, one of
- * them invisible.
+ * them invisible. `services_business_catalog_uniq` now makes that a `23505` rather than a
+ * silent duplicate, so the lookup is what keeps the switch working at all.
+ *
+ * ## The reactivate branch clears `deleted_at`, and that was a live bug
+ *
+ * It called `setServiceActive(id, true)`, which sets `is_active` and nothing else. But the
+ * row this branch finds can be **soft-deleted** — the lookup does not filter `deleted_at`,
+ * and one live row on this platform is in exactly that state today (soft-deleted, with a
+ * `catalog_id`). Every read of `services` excludes deleted rows, so the sequence was:
+ *
+ * 1. the catalogue shows the switch **off**, because the row is filtered out of `enabled`;
+ * 2. the owner flips it on, and the lookup finds the deleted row and reactivates it;
+ * 3. `is_active` is true, `deleted_at` is still set — so the switch reads on, the Services
+ *    page still does not list it, and **no customer can ever book it**.
+ *
+ * Restoring means both columns. `deleted_at` is in the owner's UPDATE grant (checked), so
+ * this is one statement rather than two, and it is written out here rather than by widening
+ * `setServiceActive`: that helper is also the Services page's switch, where the row on
+ * screen can never be a deleted one and un-deleting would be a thing its name does not say.
  */
 export async function enableCatalogService(
   supabase: SupabaseClient,
@@ -171,7 +189,11 @@ export async function enableCatalogService(
   if (lookupError) throw lookupError;
 
   if (existing) {
-    await setServiceActive(supabase, (existing as { id: string }).id, true);
+    const { error } = await supabase
+      .from("services")
+      .update({ is_active: true, deleted_at: null, updated_at: new Date().toISOString() })
+      .eq("id", (existing as { id: string }).id);
+    if (error) throw error;
     return;
   }
   await createService(supabase, businessId, {

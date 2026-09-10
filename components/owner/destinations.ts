@@ -1,5 +1,6 @@
 import { Icons } from "@/components/ui/icons";
 import type { NavMatch } from "@/lib/nav";
+import type { OwnerRowIcon } from "@/lib/owner/destinations";
 
 /**
  * The owner console's navigation, in one place — the mirror of
@@ -34,10 +35,19 @@ import type { NavMatch } from "@/lib/nav";
  * `InLineBar`. What they *do* share — how a path maps to a destination — is `lib/nav.ts`.
  *
  * **Nothing is left of the app's drawer.** Services and Staff arrived in 3b; Client book,
- * Product orders, Products, Offers, Loyalty, Payroll, Tax estimate and Plan & billing arrived
- * in 3c. `Add a walk-in` is deliberately not a destination in either place:
- * `/business/walk-in` is reached from the calendar, exactly as the app reaches it from a FAB,
- * because it is something you do *to* a day.
+ * Product orders, Products, Offers, Loyalty, Payroll, Tax estimate and Plans & pricing arrived
+ * in 3c. The rows themselves are now `lib/owner/destinations.ts` — pure data, so the two
+ * invariants a drawer keeps breaking can be tested; this file keeps the tabs and resolves the
+ * rows' glyph names.
+ *
+ * **`Add a walk-in` is deliberately not a hub row.** It is reached from the calendar, exactly as
+ * the app reaches it from a FAB, because it is something you do *to* a day — and every hub row
+ * carries the state of the thing it leads to, which an action has none of. The app added a
+ * drawer row for it as a second path, and that row's only distinguishing content is a subtitle
+ * this repo should not copy: it reads "Switched off in Settings" when `queue_enabled` is false,
+ * but the screen behind it calls `create_booking`, not `join_queue`. An owner with the walk-in
+ * *queue* switched off can still book a walk-in at the counter, so upstream's row tells them a
+ * thing they can do is unavailable. Reported rather than ported.
  */
 
 export type OwnerDestination = {
@@ -97,93 +107,31 @@ export const OWNER_TABS: OwnerDestination[] = [
 ];
 
 /**
- * The Settings hub's first group: what customers see, and what the booking engine works from.
+ * The glyph for one Settings hub row.
  *
- * Separate from `OWNER_TABS` because these are *destinations within* a tab — the nav
- * highlights Settings for all of them, and the hub is what distinguishes them.
+ * The rows themselves live in `lib/owner/destinations.ts` as pure data carrying an icon **name**,
+ * so their labels, blurbs and tier notes can be tested without dragging `lucide-react` and the
+ * `@/` alias into a node-only suite. This is the other half: names to components, typed
+ * `Record<OwnerRowIcon, …>` so a name with no glyph behind it is a compile error rather than a
+ * blank square on the page.
  */
-export const SETUP_DESTINATIONS = [
-  {
-    href: "/business/settings/salon",
-    label: "Salon details",
-    icon: Icons.salon,
-    blurb: "Name, type, address, contact, photos and the map pin",
-  },
-  {
-    href: "/business/hours",
-    label: "Opening hours",
-    icon: Icons.clock,
-    blurb: "When the shop is open, day by day",
-  },
-  {
-    href: "/business/services",
-    label: "Services",
-    icon: Icons.haircut,
-    blurb: "What you offer, how long it takes and what it costs",
-  },
-  {
-    href: "/business/staff",
-    label: "Staff",
-    icon: Icons.people,
-    blurb: "Your team, what each of them does, and when they work",
-  },
-] as const;
+const ROW_ICONS: Record<OwnerRowIcon, typeof Icons.salon> = {
+  salon: Icons.salon,
+  clock: Icons.clock,
+  haircut: Icons.haircut,
+  people: Icons.people,
+  clientBook: Icons.clientBook,
+  shopBag: Icons.shopBag,
+  product: Icons.product,
+  offer: Icons.offer,
+  reward: Icons.reward,
+  payroll: Icons.payroll,
+  tax: Icons.tax,
+  premium: Icons.premium,
+};
 
-/**
- * The hub's second group: running the business rather than setting it up.
- *
- * Two groups instead of one list of ten, because they answer different questions and get
- * opened on different days. Setup is what you finish once; this is what you come back to.
- */
-export const BACK_OFFICE_DESTINATIONS = [
-  {
-    href: "/business/clients",
-    label: "Client book",
-    icon: Icons.people,
-    blurb: "Your regulars, their spend, and who has quietly stopped coming",
-  },
-  {
-    href: "/business/orders",
-    label: "Product orders",
-    icon: Icons.shopBag,
-    blurb: "What customers have ordered and what is ready to collect",
-  },
-  {
-    href: "/business/products",
-    label: "Products",
-    icon: Icons.product,
-    blurb: "What you sell, and what is in stock",
-  },
-  {
-    href: "/business/offers",
-    label: "Offers",
-    icon: Icons.offer,
-    blurb: "Promotions on your salon page and in the customer feed",
-  },
-  {
-    href: "/business/loyalty",
-    label: "Loyalty",
-    icon: Icons.reward,
-    blurb: "Points, rewards, and the codes customers bring in",
-  },
-  {
-    href: "/business/payroll",
-    label: "Payroll",
-    icon: Icons.payroll,
-    blurb: "Commission and base pay, per stylist, per month",
-  },
-  {
-    href: "/business/tax",
-    label: "Tax estimate",
-    icon: Icons.tax,
-    blurb: "Turnover, presumptive income tax and the GST threshold",
-  },
-  {
-    href: "/business/plans",
-    label: "Plan & billing",
-    icon: Icons.premium,
-    blurb: "What you are on, what each tier costs, and how to move",
-  },
-] as const;
+export function rowIcon(name: OwnerRowIcon): typeof Icons.salon {
+  return ROW_ICONS[name];
+}
 
 export const readyOwnerTabs = () => OWNER_TABS.filter((d) => d.ready);

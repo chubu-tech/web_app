@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { AppHeader } from "@/components/ui/app-header";
 import { BrandLockup } from "@/components/ui/brand-lockup";
+import { ButtonLink } from "@/components/ui/button";
 import {
   CollapseNavButton,
   CollapseNavPanel,
@@ -140,13 +141,13 @@ export function CustomerHeader({ signedIn }: { signedIn: boolean }) {
                somebody looks for an account action once the nav collapsed into it. */
             <SignOutButton variant="outlined" fullWidth />
           ) : (
-            <Link
+            <ButtonLink
               href={`/sign-in?next=${encodeURIComponent(pathname)}`}
               onClick={nav.close}
-              className="bg-rausch-cta text-on-primary text-title hover:bg-rausch-cta-pressed flex min-h-12 w-full items-center justify-center rounded-sm px-4 font-medium"
+              fullWidth
             >
               Sign in
-            </Link>
+            </ButtonLink>
           )
         }
       >

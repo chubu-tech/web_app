@@ -5,7 +5,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { StatusPill } from "@/components/ui/status-pill";
 import { fetchMyOrders } from "@/lib/api/shop";
-import { orderCode, orderItemCount, orderStatusLabel } from "@/lib/analytics";
+import {
+  orderCode,
+  orderFulfilment,
+  orderItemCount,
+  orderStatusLabel,
+} from "@/lib/analytics";
 import { relativeAge } from "@/lib/chat-logic";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
@@ -104,10 +109,11 @@ export default async function MyOrdersPage() {
                     </span>
                     {/* Same split as the detail page: the value picks the tone, the label the
                         words. Passing the label as `status` is what rendered a delivery order
-                        as "Out_for_delivery" here. */}
+                        as "Out_for_delivery" here, and the fulfilment is what stops a delivery
+                        order reading "Ready" when nothing is ready to collect. */}
                     <StatusPill
                       status={order.status}
-                      label={orderStatusLabel(order.status, "customer")}
+                      label={orderStatusLabel(order.status, "customer", orderFulfilment(order))}
                     />
                   </span>
                   {order.businessName ? (

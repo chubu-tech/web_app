@@ -135,7 +135,7 @@ export async function setBookingStatus(
     p_reason: reason ?? null,
   });
   if (error) throw error;
-  return toBooking(data as Record<string, unknown>);
+  return toBooking(oneRow(data, "set_booking_status"));
 }
 
 /**
@@ -158,7 +158,7 @@ export async function reconcileBooking(
     p_new_status: status,
   });
   if (error) throw error;
-  return toBooking(data as Record<string, unknown>);
+  return toBooking(oneRow(data, "reconcile_booking"));
 }
 
 /* --------------------------------------------------------------------------

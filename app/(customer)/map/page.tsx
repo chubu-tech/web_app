@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { MapView } from "@/components/customer/map-view";
-import { fetchBusinesses } from "@/lib/api/discovery";
+import { fetchBusinesses, fetchCategories } from "@/lib/api/discovery";
+import { fromParams, hasPrice, serviceGenders } from "@/lib/salon-filters";
 import { createClient } from "@/lib/supabase/server";
 import { shareCard } from "@/lib/seo";
 
@@ -51,14 +52,54 @@ export const metadata: Metadata = {
  * that bar's height. Measuring chrome at runtime to avoid ~48px of scroll on one route,
  * for a bar that only appears while a place is held, is still the worse trade.
  */
-export default async function MapPage() {
+export default async function MapPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  /*
+    **The map now takes Discover's filters, through the same model and the same URL
+    parameters.** It had search and nothing else, so a customer who narrowed to "Women ·
+    under Nu 800" on Discover and switched to the map silently got everything back.
+
+    The split is Discover's, for Discover's reasons: category, gender and price are joins
+    and narrow in SQL; rating is an aggregate and distance has no PostGIS behind it, so
+    both are applied in the client against the list that returns. `canonical` stays `/map`
+    above, so a filtered view is shareable without minting an indexable URL per combination.
+  */
+  const raw = await searchParams;
+  const one = (key: string) => {
+    const v = raw[key];
+    return Array.isArray(v) ? v[0] : v;
+  };
+  const filters = fromParams({
+    gender: one("gender"),
+    category: one("category"),
+    minRating: one("minRating"),
+    kmMin: one("kmMin"),
+    kmMax: one("kmMax"),
+    priceMin: one("priceMin"),
+    priceMax: one("priceMax"),
+  });
+
   const supabase = await createClient();
-  const salons = await fetchBusinesses(supabase);
+  const [salons, categories] = await Promise.all([
+    fetchBusinesses(supabase, {
+      categoryId: filters.categoryId,
+      sort: filters.minRating != null ? "rating" : "name",
+      serviceGenders: serviceGenders(filters),
+      minPrice: hasPrice(filters) ? filters.price.start : null,
+      maxPrice: hasPrice(filters) ? filters.price.end : null,
+    }),
+    // The panel's category chips. A failed read costs the chips and nothing else — the
+    // panel renders "No categories yet", which is also the honest empty case.
+    fetchCategories(supabase).catch(() => []),
+  ]);
 
   return (
     <div className="h-[calc(100svh-var(--header-height))]">
       <h1 className="sr-only">Map</h1>
-      <MapView salons={salons} />
+      <MapView salons={salons} categories={categories} filters={filters} />
     </div>
   );
 }

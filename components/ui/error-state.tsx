@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
 
@@ -57,13 +58,12 @@ export function ErrorState({
         message={message}
         action={
           <div className="gap-sm flex flex-col items-center">
-            <button
-              type="button"
-              onClick={retry}
-              className="bg-rausch-cta text-on-primary text-title hover:bg-rausch-cta-pressed px-lg inline-flex min-h-12 items-center rounded-full font-medium"
-            >
+            {/* The kit's button, with this card's pill shape over it. It was hand-rolled
+                here, which is how it came to be the one filled control in the app with no
+                press feedback at all. */}
+            <Button onClick={retry} className="px-lg rounded-full">
               Try again
-            </button>
+            </Button>
             {digest ? (
               <span className="text-caption-sm text-muted-soft tabular-nums">
                 Reference {digest}

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { hasFeature, maxActiveStylists, planFromString, type Feature } from "./entitlements";
+import {
+  hasFeature,
+  maxActiveStylists,
+  planFromString,
+  tierForFeature,
+  type Feature,
+} from "./entitlements";
 import { FEATURE_COPY, PLAN_ORDER, PLAN_TIERS, planRank, planTierFor } from "./plans";
 
 /**
@@ -88,6 +94,29 @@ describe("the tier split mirrors entitlements.dart", () => {
     expect(maxActiveStylists("basic")).toBe(1);
     expect(maxActiveStylists("growth")).toBeNull();
     expect(maxActiveStylists("pro")).toBeNull();
+  });
+});
+
+describe("tierForFeature", () => {
+  it("names the tier each feature arrives at", () => {
+    for (const f of GROWTH) expect(tierForFeature(f)).toBe("growth");
+    for (const f of PRO_ONLY) expect(tierForFeature(f)).toBe("pro");
+  });
+
+  /**
+   * The property, rather than the table: the tier a locked surface **names** and the tier that
+   * actually unlocks it are one fact. Every gated row used to write its own tier string, which
+   * is how a settings row gated on `deposits` came to raise the "Deposits & no-show cover"
+   * paywall at an owner asking about reminder delivery.
+   */
+  it("names the lowest plan that has the feature, for every feature", () => {
+    for (const f of ALL_FEATURES) {
+      const tier = tierForFeature(f);
+      expect(hasFeature(tier, f)).toBe(true);
+      for (const below of PLAN_ORDER.slice(0, planRank(tier))) {
+        expect(hasFeature(below, f)).toBe(false);
+      }
+    }
   });
 });
 

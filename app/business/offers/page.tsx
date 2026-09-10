@@ -15,7 +15,9 @@ export const metadata: Metadata = { title: "Offers" };
  * salon can run a promotion, which is right: the offer feed is what brings customers to the
  * platform, so charging for the ability to advertise would work against the marketplace.
  *
- * `offers` has **0 rows platform-wide** today, so the empty state is the live case.
+ * `offers` has two rows platform-wide today, and between them they cover two of the four
+ * states the list draws: one switched off, one whose end date has passed. Neither is Live,
+ * so the customer-facing feed still shows nothing.
  */
 export default async function OwnerOffersPage() {
   const { active } = await getOwnerContext();

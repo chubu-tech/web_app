@@ -75,7 +75,10 @@ export default async function MyOrderPage({
           owner pages. Passing a label at all is what stopped a delivery order rendering as
           "Out_for_delivery".
         */}
-        <StatusPill status={order.status} label={orderStatusLabel(order.status, "customer")} />
+        <StatusPill
+          status={order.status}
+          label={orderStatusLabel(order.status, "customer", orderFulfilment(order))}
+        />
       </div>
       <p className="text-body-sm text-muted mb-base">{orderPlacedLabel(order.placedAt)}</p>
 

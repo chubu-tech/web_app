@@ -72,7 +72,7 @@ export function BusinessCard({
   chip,
   favourite,
   href,
-  sizes = "(min-width: 744px) 420px, 100vw",
+  sizes = "(min-width: 904px) 372px, (min-width: 744px) 422px, 100vw",
   compact = false,
   framed = false,
   priority = false,
@@ -135,6 +135,23 @@ export function BusinessCard({
    */
   chip?: React.ReactNode;
   favourite?: React.ReactNode;
+  /**
+   * Widths for the cover, defaulting to the `minmax(268px,1fr)` track every full-width
+   * grid of these uses (`/saved`, `SalonGrid`, Discover's browse list).
+   *
+   * **Derived from the track, not guessed.** With a 20px gap and a 20px page inset, that
+   * grid holds `floor((vw - 20) / 288)` columns, so a card is widest just before another
+   * column fits: **422px** at around 900px of viewport, **372px** at any width above
+   * that, and one full column below the tablet breakpoint. Every band is an upper bound,
+   * so nothing under-fetches.
+   *
+   * The old value declared a flat `420px` above 744 — a correct bound, but the *global*
+   * one. At 1280px a card is really 295px wide, so a 2× display asked for 840px, which
+   * snaps to the **1080** rung; the honest 372px asks for 744 and snaps to **750**. On a
+   * 1× desktop it is the difference between the 640 rung and the 384 one. That is the
+   * defect upstream measured on Discover — covers fetched at `w=1080` to be drawn 200pt
+   * wide — in the web's own idiom.
+   */
   sizes?: string;
   /**
    * Drops the 3:2 frame for a short banner. For the map preview, which is 560px

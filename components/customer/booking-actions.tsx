@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { checkInBooking } from "@/lib/api/queue";
 import { checkInErrorMessage } from "@/lib/api/queue-errors";
@@ -176,12 +175,9 @@ export function BookingActions({
               Reschedule
             </Button>
           ) : (
-            <Link
-              href={`/bookings/${booking.id}/reschedule`}
-              className="bg-rausch-cta text-on-primary text-title hover:bg-rausch-cta-pressed flex min-h-12 items-center justify-center rounded-sm font-medium"
-            >
+            <ButtonLink href={`/bookings/${booking.id}/reschedule`} fullWidth>
               Reschedule
-            </Link>
+            </ButtonLink>
           )}
           {/* The shared control — the card uses the same one. Disabled here rather than
               server-refused, because this page HAS read the business and knows the window. */}

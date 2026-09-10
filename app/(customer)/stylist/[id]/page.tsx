@@ -57,24 +57,63 @@ import type { Review } from "@/lib/types/salon";
  * take it down from inside `generateMetadata`, where the only honest fallback is a
  * generic title.
  */
+/*
+  ## Two waves, not four
+
+  This awaited in four steps — the staff row, then the business, then four reads, then
+  (in the page body) the two service reads. Only **one** of those boundaries is a real
+  dependency, and it is not where the awaits were.
+
+  Everything in the first wave below keys off the staff id, which comes from the URL: the
+  reviews, the photos, the follower count and the viewer's own follow state never needed
+  the staff row to be back. And the second wave keys off `staff.businessId` — a field on
+  the row, not the business *record* — so the salon's services can be read alongside the
+  salon itself rather than after it.
+
+  The `performs` reads moved in here from the page body for that reason: outside `load`
+  they were a fourth serial round trip; inside they are free, riding the wave the
+  business row is already in.
+
+  A staff id that does not resolve now costs five reads instead of one. That is the same
+  trade `/salon/[id]` documents and it is the right way round: a 404 here is rare, and
+  every real visitor was paying a serial round trip to prove the stylist exists.
+*/
 const load = cache(async (id: string) => {
   const supabase = await createClient();
 
-  const staff = await fetchStaffById(supabase, id);
-  if (!staff || !staff.isActive || !staff.businessId) return null;
-
-  const business = await fetchBusinessById(supabase, staff.businessId);
-  if (!business) return null;
-
-  const [reviews, photos, followers, following] = await Promise.all([
+  const [staff, reviews, photos, followers, following] = await Promise.all([
+    fetchStaffById(supabase, id),
     fetchReviewsForStaff(supabase, id).catch(() => [] as Review[]),
     fetchStaffPhotos(supabase, id).catch(() => [] as string[]),
     fetchStaffFollowerCount(supabase, id).catch(() => 0),
     // False for a visitor with no session: `follows_select` is authenticated-only.
     isFollowingStaff(supabase, id).catch(() => false),
   ]);
+  if (!staff || !staff.isActive || !staff.businessId) return null;
 
-  return { staff, business, reviews, photos, followers, following };
+  const [business, allServices, staffByService] = await Promise.all([
+    fetchBusinessById(supabase, staff.businessId),
+    /*
+      What this stylist actually performs, for `makesOffer`.
+
+      `service_staff` is the authority — and here that is the correct table, unlike on the
+      salon page, because the claim being made is *this person does this service* rather
+      than *this is on the menu*. It is also what `compute_availability` requires, so every
+      service listed is genuinely bookable with them.
+
+      Caught, not bare: this is decorative markup and a failed read must not take a
+      stylist's page down.
+    */
+    fetchServices(supabase, staff.businessId).catch(() => []),
+    fetchServiceStaff(supabase, staff.businessId).catch(
+      () => ({}) as Record<string, string[]>,
+    ),
+  ]);
+  if (!business) return null;
+
+  const performs = allServices.filter((service) => staffByService[service.id]?.includes(id));
+
+  return { staff, business, reviews, photos, followers, following, performs };
 });
 
 export async function generateMetadata({
@@ -158,30 +197,10 @@ export default async function StylistPage({
   const data = await load(id);
   if (!data) notFound();
 
-  const { staff, business, reviews, photos, followers, following } = data;
+  const { staff, business, reviews, photos, followers, following, performs } = data;
 
   const canonical = stylistPath(staff);
   if (!isCanonicalParam(param, canonical)) permanentRedirect(canonical);
-
-  /*
-    What this stylist actually performs, for `makesOffer`.
-
-    `service_staff` is the authority — and here that is the correct table, unlike on the
-    salon page, because the claim being made is *this person does this service* rather
-    than *this is on the menu*. It is also what `compute_availability` requires, so every
-    service listed is genuinely bookable with them.
-
-    Caught, not bare: this is decorative markup and a failed read must not take a
-    stylist's page down.
-  */
-  const supabase = await createClient();
-  const [allServices, staffByService] = await Promise.all([
-    fetchServices(supabase, business.id).catch(() => []),
-    fetchServiceStaff(supabase, business.id).catch(() => ({}) as Record<string, string[]>),
-  ]);
-  const performs = allServices.filter((service) =>
-    staffByService[service.id]?.includes(staff.id),
-  );
 
   const { town: staffTown } = placeOf(business);
   const trail = [

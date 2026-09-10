@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { ownerErrorMessage, type OwnerAction } from "@/lib/api/owner-errors";
 import { setOrderStatus } from "@/lib/api/owner-back-office";
-import { canOwnerTransition } from "@/lib/analytics";
+import { canOwnerTransition, orderStatusLabel } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import type { OrderFulfilment, OrderStatus } from "@/lib/types/back-office";
 
@@ -16,38 +16,48 @@ import type { OrderFulfilment, OrderStatus } from "@/lib/types/back-office";
  *
  * Order matters only in that at most one row is ever legal from a given status, so the filter
  * in `OrderActions` yields a single button — the table is a lookup, not a sequence.
+ *
+ * **The words are functions of the fulfilment**, because one of the four moves has two names.
+ * `ready` is the only status both lifecycles pass through, and on a delivery order nothing is
+ * ready *to collect* — it is packed and waiting for the driver. The button derives its verb from
+ * `orderStatusLabel`, the same rule the pill it produces uses, so the two cannot say different
+ * words about one press. The other three take the fulfilment and ignore it: a uniform signature
+ * beats a special case at the call site.
  */
 const MOVES: {
   target: OrderStatus;
-  label: string;
+  label: (fulfilment: OrderFulfilment) => string;
   action: OwnerAction;
-  done: string;
+  done: (fulfilment: OrderFulfilment) => string;
 }[] = [
   {
     target: "ready",
-    label: "Mark ready",
+    label: (f) => `Mark ${orderStatusLabel("ready", "owner", f).toLowerCase()}`,
     action: "orderReady",
-    done: "Marked ready — the customer knows.",
+    done: (f) =>
+      f === "delivery"
+        ? "Packed — the customer knows."
+        : "Marked ready — the customer knows.",
   },
   {
     target: "collected",
-    label: "Mark collected",
+    label: () => "Mark collected",
     action: "orderCollected",
-    done: "Collected. That's the lot.",
+    done: () => "Collected. That's the lot.",
   },
   {
     target: "out_for_delivery",
-    label: "Send out for delivery",
+    label: () => "Send out for delivery",
     action: "orderOutForDelivery",
     // The customer gets an `order_out_for_delivery` notification from this transition, which is
     // why the toast says so: it is the one move where pressing the button messages somebody.
-    done: "On its way — the customer has been told.",
+    done: () => "On its way — the customer has been told.",
   },
   {
     target: "delivered",
-    label: "Mark delivered",
+    label: () => "Mark delivered",
     action: "orderDelivered",
-    done: "Delivered. That's the lot.",
+    done: () => "Delivered. That's the lot.",
   },
 ];
 
@@ -171,9 +181,9 @@ export function OrderActions({
           key={m.target}
           fullWidth
           busy={busy}
-          onClick={() => void move(m.target, m.action, m.done)}
+          onClick={() => void move(m.target, m.action, m.done(fulfilment))}
         >
-          {m.label}
+          {m.label(fulfilment)}
         </Button>
       ))}
       {/*

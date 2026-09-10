@@ -104,7 +104,15 @@ export function SalonGallery({
           alt={`${name} salon — photo 1 of ${urls.length}`}
           onOpen={() => setOpenAt(0)}
           priority
-          sizes="(min-width: 744px) 66vw, 100vw"
+          /*
+            Capped at what the container can actually give. The page is `max-w-[1280px]`
+            with a 20px inset, so above 1280 the gallery stops growing at 1240px and this
+            hero — two of three columns plus the 8px gap — stops at **824px**. Uncapped,
+            `66vw` claimed 1267px on a 1920 display and snapped to the **1920** rung for
+            an image drawn at 824. It is this page's LCP element and it is `priority`, so
+            it was the single most expensive wrong number in the product.
+          */
+          sizes="(min-width: 1280px) 824px, (min-width: 744px) 66vw, 100vw"
           className={side.length > 0 ? "tablet:col-span-2 tablet:row-span-2" : undefined}
         />
 
@@ -117,7 +125,8 @@ export function SalonGallery({
             url={url}
             alt={`${name} salon — photo ${i + 2} of ${urls.length}`}
             onOpen={() => setOpenAt(i + 1)}
-            sizes="33vw"
+            // One of three columns: 408px once the container caps. See the hero above.
+            sizes="(min-width: 1280px) 408px, 33vw"
             className={cn(
               "hidden tablet:block",
               // Two side photographs fill the column; one stretches down it, rather than

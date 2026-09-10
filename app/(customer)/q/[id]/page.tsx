@@ -67,10 +67,33 @@ export default async function JoinQueuePage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const business = await loadBusiness(id);
+  /*
+    ## One wave, then the redirect check
+
+    A poster is scanned by somebody standing at a counter, so every serial round trip here
+    is one the customer feels. This awaited four times — the salon row, the account, the
+    caller's own entry, then the three reads for the form — and only the entry read is a
+    real dependency: everything else keys off the id in the URL or off nothing at all.
+
+    So the form's reads are paid up front rather than after the redirect check. On the
+    re-scan path (already in the line → redirected to `/queue/<entry>`) that spends three
+    reads nobody looks at; on the first-scan path, which is what a poster is for, it saves
+    a whole round trip. The redirect path is no slower either way, because it still waits
+    for the same two hops.
+  */
+  const [business, account, services, staff, line] = await Promise.all([
+    loadBusiness(id),
+    // Memoised and already resolved by the shell layout, so this costs nothing here.
+    getAccount(),
+    fetchServices(supabase, id),
+    fetchStaff(supabase, id),
+    // `queue_active_line` is revoked from `anon`, so this simply fails for a
+    // signed-out visitor. Caught on its own, and `null` reaches the badge as
+    // "Wait unknown" rather than a fabricated zero.
+    fetchActiveLine(supabase, id).catch(() => null as QueueEntry[] | null),
+  ]);
   if (!business) notFound();
 
-  const account = await getAccount();
   /**
    * Any session at all, guest included.
    *
@@ -92,15 +115,6 @@ export default async function JoinQueuePage({
     );
     if (mine) redirect(`/queue/${mine.id}`);
   }
-
-  const [services, staff, line] = await Promise.all([
-    fetchServices(supabase, id),
-    fetchStaff(supabase, id),
-    // `queue_active_line` is revoked from `anon`, so this simply fails for a
-    // signed-out visitor. Caught on its own, and `null` reaches the badge as
-    // "Wait unknown" rather than a fabricated zero.
-    fetchActiveLine(supabase, id).catch(() => null as QueueEntry[] | null),
-  ]);
 
   return (
     <div className="px-base py-lg mx-auto w-full max-w-[560px] tablet:px-lg">

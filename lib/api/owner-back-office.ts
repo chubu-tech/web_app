@@ -14,8 +14,10 @@ import type {
   OrderStatus,
   PayrollRow,
   PlanChangeRequest,
+  OrderStatusCounts,
   TaxEstimate,
 } from "../types/back-office";
+import { OPEN_ORDER_STATUSES } from "../types/back-office";
 import {
   toClientHistoryEntry,
   toClientSummary,
@@ -198,6 +200,35 @@ export async function fetchOrderById(
 }
 
 /** How many orders are waiting, for the Insights card's badge and the hub's one-liner. */
+/**
+ * How many orders sit at each **open** status — the numbers on the inbox's tabs.
+ *
+ * One read of one column over the three statuses that still name work, so it stays small for a
+ * salon with a year of history behind it: the closed statuses are the ones that accumulate, and
+ * none of them is counted. `orderSegmentCount` then folds them onto the tabs, and Done sums to
+ * zero without needing a case.
+ *
+ * The page reads this **in the same `Promise.all` as the list it labels**, so a count and the
+ * rows under it are never read at different moments — which is the whole reason it is not a
+ * separate client fetch.
+ */
+export async function fetchOpenOrderCounts(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<OrderStatusCounts> {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("status")
+    .eq("business_id", businessId)
+    .in("status", OPEN_ORDER_STATUSES);
+  if (error) throw error;
+  const counts: OrderStatusCounts = {};
+  for (const row of (data ?? []) as { status: OrderStatus }[]) {
+    counts[row.status] = (counts[row.status] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export async function countNewOrders(
   supabase: SupabaseClient,
   businessId: string,

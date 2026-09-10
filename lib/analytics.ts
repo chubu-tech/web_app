@@ -9,6 +9,7 @@ import type {
   ClientSummary,
   OrderFulfilment,
   OrderStatus,
+  OrderStatusCounts,
 } from "./types/back-office";
 import { thimphuToday } from "./time";
 import type { Offer } from "./types/salon";
@@ -507,10 +508,14 @@ export function orderCode(id: string): string {
  * two delivery statuses went unnoticed: the customer's list read the raw wire value and
  * title-cased it, rendering "Out_for_delivery".
  *
- * "Ready" is deliberately the same word for both lifecycles. The server sends a fulfilment-aware
- * notification (`order_ready` carries `{fulfilment}` since `20260814000008`), and that message is
- * where "ready to collect" versus "ready to go out" belongs; the pill is a state, and the state
- * is the same one.
+ * **The base word for `ready` is the pickup one, and `orderStatusLabel` overrides it.** This
+ * docblock used to argue that "Ready" should be the same word for both lifecycles — the pill is a
+ * state, the state is the same one, and the fulfilment-aware wording belongs in the notification.
+ * That was coherent in isolation and wrong in place: `nextStep` on the customer's order page
+ * already says *"Packed and waiting to go out"*, and `notification-copy.ts` already says *"Packed
+ * and waiting to go out — pay cash when it arrives"*, both directly under a pill reading "Ready".
+ * The state having one name is the rule; what broke it was the pill being the only surface that
+ * had not been told which lifecycle it was on.
  */
 /**
  * When an order was placed, in Thimphu time — "Monday, 18 Aug 2026, 14:05".
@@ -561,8 +566,26 @@ const CUSTOMER_ORDER_STATUS_LABEL: ReadonlyMap<OrderStatus, string> = new Map([
  *
  * The owner's vocabulary is the base table rather than a second map, because the wire value is
  * written from the salon's point of view — the divergence belongs to the customer.
+ *
+ * ## `fulfilment` renames exactly one state, for both audiences
+ *
+ * `ready` is the only status both lifecycles pass through — `collected` cannot happen on a
+ * delivery order and `delivered` cannot happen on a pickup one — so it is the only one that needs
+ * two names. On a delivery order it reads **"Packed"**: nothing is ready *to collect* on an order
+ * somebody is about to drive to your house, and both this repo's own prose and the customer's
+ * notification already used that word while the pill above them said otherwise.
+ *
+ * **Required rather than optional**, the same call `canOwnerTransition` makes: a signature that
+ * lets a caller forget the lifecycle is a signature that lets one surface disagree with the next,
+ * which is the whole defect. Making it required is what turns adding a call site into a compile
+ * error instead of a wrong word on a page.
  */
-export function orderStatusLabel(status: OrderStatus, audience: OrderAudience): string {
+export function orderStatusLabel(
+  status: OrderStatus,
+  audience: OrderAudience,
+  fulfilment: OrderFulfilment,
+): string {
+  if (status === "ready" && fulfilment === "delivery") return "Packed";
   if (audience === "customer") {
     const relabelled = CUSTOMER_ORDER_STATUS_LABEL.get(status);
     if (relabelled) return relabelled;
@@ -631,6 +654,22 @@ export function orderSegmentFor(value: string | null | undefined) {
   return ORDER_SEGMENTS.find((s) => s.value === value) ?? ORDER_SEGMENTS[0];
 }
 
+/**
+ * The number on one segment's tab.
+ *
+ * **Done gets no count, and it falls out of the rule rather than needing a case.** Only open
+ * statuses are ever counted, and none of Done's four are open, so it sums to zero and renders as
+ * a bare label. That is the wanted behaviour on its own terms: a count there would be a lifetime
+ * total of finished orders, which never goes down, names no work the owner can do, and by the
+ * second month is a four-digit number decorating a tab.
+ */
+export function orderSegmentCount(
+  segment: { statuses: OrderStatus[] },
+  counts: OrderStatusCounts,
+): number {
+  return segment.statuses.reduce((total, s) => total + (counts[s] ?? 0), 0);
+}
+
 /** Total units in an order, not lines — two bottles of one oil is 2 items, not 1. */
 export function orderItemCount(items: { qty: number }[]): number {
   return items.reduce((sum, it) => sum + it.qty, 0);
@@ -638,13 +677,35 @@ export function orderItemCount(items: { qty: number }[]): number {
 
 // ==================================================================== offers ===
 
+/** Whether customers can see an offer right now, and if not, why not. */
+export type OfferVisibility = "live" | "paused" | "ended" | "scheduled";
+
+/** An offer's state, with the date that explains it where a date is what explains it. */
+export type OfferStatus = {
+  visibility: OfferVisibility;
+  /**
+   * `endsOn` for `ended`, `startsOn` for `scheduled`, null for the two states no date improves.
+   *
+   * A `Date` rather than a finished sentence: this module decides *what is true*, and
+   * `offerStatusLine` below decides how it reads. Threading a formatter through the state
+   * function — which is what upstream does, and what this did — forces every caller that only
+   * wants the state to invent one, and `app/business/settings/page.tsx` was passing `() => ""`
+   * to count the live offers.
+   */
+  on: Date | null;
+};
+
 /**
- * Why an offer is not currently visible to customers, or null when it is.
+ * Whether customers can see an offer right now, and if not, why not.
  *
  * The owner's list shows every offer, including the ones the public read policy filters out,
- * so each row has to say *which* of the three reasons applies — "Paused" and "Ended" and
- * "Starts" look identical on the page otherwise, and only one of them is something the owner
- * should act on.
+ * so each row has to say *which* of the four states applies — Paused and Ended and Scheduled
+ * look identical on the page otherwise, and only one of them is something the owner should act
+ * on.
+ *
+ * **A paused offer reports `paused` even when its end date has also passed.** That is the
+ * precedence upstream settled on and the reason is the switch: reporting `ended` would leave the
+ * owner's own control reading "off" beside a state that has nothing to do with it.
  *
  * **Today is the salon's today, not the server's.** `offers_public_read` compares against
  * `(now() at time zone 'Asia/Thimphu')::date`, so this has to as well, and `thimphuToday` is the
@@ -657,20 +718,36 @@ export function orderItemCount(items: { qty: number }[]): number {
  *
  * An offer ending *today* is still live today, which is why the test is strictly `<`.
  */
-export function offerHiddenReason(
+export function offerVisibility(
   offer: Pick<Offer, "isActive" | "startsOn" | "endsOn">,
   now: Date,
-  formatDay: (d: Date) => string,
-): string | null {
-  if (!offer.isActive) return "Paused";
+): OfferStatus {
+  if (!offer.isActive) return { visibility: "paused", on: null };
   const today = thimphuToday(now).getTime();
   if (offer.endsOn != null && dayOf(offer.endsOn) < today) {
-    return `Ended ${formatDay(offer.endsOn)}`;
+    return { visibility: "ended", on: offer.endsOn };
   }
   if (offer.startsOn != null && dayOf(offer.startsOn) > today) {
-    return `Starts ${formatDay(offer.startsOn)}`;
+    return { visibility: "scheduled", on: offer.startsOn };
   }
-  return null;
+  return { visibility: "live", on: null };
+}
+
+/**
+ * The line under the title — "Ended 3 Sep", "Starts 12 Sep" — or null when the state speaks for
+ * itself.
+ *
+ * Live and Paused get nothing: the pill has already said both, and a second line repeating it
+ * would push the offer's own description off a row that has one line to spend.
+ */
+export function offerStatusLine(
+  status: OfferStatus,
+  formatDay: (d: Date) => string,
+): string | null {
+  if (status.on == null) return null;
+  return status.visibility === "ended"
+    ? `Ended ${formatDay(status.on)}`
+    : `Starts ${formatDay(status.on)}`;
 }
 
 /** A `date` column's midnight, in the same frame `thimphuToday` returns. */

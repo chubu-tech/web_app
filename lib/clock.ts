@@ -79,6 +79,20 @@ export function dateLabel(instant: Date, timeZone: string = THIMPHU_TZ): string 
 }
 
 /**
+ * `3 Sep` — a day with no year, no weekday and no time.
+ *
+ * `dateLabel` without its year, for a date the reader is holding against *today*: an offer's end
+ * date, a promotion's start. Those are all within weeks of now, so the year is noise — and where
+ * it is not noise, the record outlives a year and `dateLabel` is the one to reach for.
+ *
+ * A `date` column parses to UTC midnight, which in Thimphu is 06:00 the same morning, so a bare
+ * date renders as itself here rather than slipping a day.
+ */
+export function dayLabel(instant: Date, timeZone: string = THIMPHU_TZ): string {
+  return datePart(instant, timeZone, "dateOnly");
+}
+
+/**
  * `3 Sep · 2:00 PM` — a dated stamp with no weekday, for lists of records (payments, order
  * events) where the day of the week carries nothing.
  */

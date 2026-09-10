@@ -222,7 +222,22 @@ export function ownerErrorMessage(action: OwnerAction, error: unknown): string {
     }
   }
   if (code === OWNER_ERROR.duplicate) {
-    return "Those hours are already listed for that day.";
+    /*
+      Which unique constraint depends entirely on the form, and since
+      `20260901000001` there are two live ones that a person can reach.
+      `services_business_catalog_uniq` is `(business_id, catalog_id) where catalog_id is
+      not null`, so a double-tap on a catalogue switch now **fails** where it used to
+      quietly create the duplicate that broke the read-back — which is better, but not if
+      it is reported as a clash of opening hours.
+    */
+    switch (action) {
+      case "enableCatalogService":
+        return "That service is already on your menu.";
+      case "saveService":
+        return "You already offer that service.";
+      default:
+        return "Those hours are already listed for that day.";
+    }
   }
 
   if (code === OWNER_ERROR.guestRefused) {

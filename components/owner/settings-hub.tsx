@@ -1,14 +1,11 @@
 import Link from "next/link";
 import { DeleteAccountCard } from "@/components/auth/delete-account";
 import { SignOutButton } from "@/components/auth/sign-out-button";
-import {
-  BACK_OFFICE_DESTINATIONS,
-  SETUP_DESTINATIONS,
-} from "@/components/owner/destinations";
+import { rowIcon } from "@/components/owner/destinations";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
 import { DAY_NAMES, openWeekdaysFrom } from "@/lib/hours";
-import { hasFeature } from "@/lib/entitlements";
+import { BACK_OFFICE_ROWS, SETUP_ROWS, tierNoteFor, type OwnerRow } from "@/lib/owner/destinations";
 import type { WorkingHour } from "@/lib/types/booking";
 import type { LoyaltyProgram, LoyaltyReward } from "@/lib/types/back-office";
 import type { Business, Product, ServiceItem, StaffMember } from "@/lib/types/salon";
@@ -70,26 +67,29 @@ export function SettingsHub({
   loyaltyRewards: LoyaltyReward[] | null;
   pendingPlanRequests: number;
 }) {
-  const setupState: Record<string, string> = {
+  /*
+    What each row says about itself today.
+
+    **Only the unlocked case is written here.** A locked row's line is `tierNoteFor`, derived from
+    the row's own `feature`, so the tier named on the row and the tier that unlocks the screen
+    behind it are one fact rather than two strings. This used to be inferred from a null count
+    handed down by the page and the tier written out by hand at four rows — a rule expressed four
+    times, in a component nothing can test, which is how "Product orders" went gated-but-unmarked
+    upstream.
+  */
+  const state: Record<string, string> = {
     "/business/settings/salon": salonLine(business),
     "/business/hours": hoursLine(hours),
     "/business/services": servicesLine(services),
     "/business/staff": staffLine(staff, staffWithoutHours),
-  };
-
-  const backOfficeState: Record<string, string> = {
-    "/business/clients": clientCount == null ? locked("Growth") : clientsLine(clientCount),
-    "/business/orders": newOrderCount == null ? locked("Growth") : ordersLine(newOrderCount),
-    "/business/products": products == null ? locked("Growth") : productsLine(products),
+    "/business/clients": clientCount == null ? "" : clientsLine(clientCount),
+    "/business/orders": newOrderCount == null ? "" : ordersLine(newOrderCount),
+    "/business/products": products == null ? "" : productsLine(products),
     "/business/offers": offersLine(offerCount, liveOfferCount),
     "/business/loyalty":
-      loyaltyRewards == null ? locked("Growth") : loyaltyLine(loyaltyProgram, loyaltyRewards),
-    "/business/payroll": hasFeature(business.plan, "commissions")
-      ? "Commission and base pay, month by month"
-      : locked("Pro"),
-    "/business/tax": hasFeature(business.plan, "commissions")
-      ? "Turnover and estimated income tax"
-      : locked("Pro"),
+      loyaltyRewards == null ? "" : loyaltyLine(loyaltyProgram, loyaltyRewards),
+    "/business/payroll": "Commission and base pay, month by month",
+    "/business/tax": "Turnover and estimated income tax",
     "/business/plans": planLine(business, pendingPlanRequests),
   };
 
@@ -100,14 +100,14 @@ export function SettingsHub({
         What customers see, and what the booking engine works from.
       </p>
 
-      <Rows destinations={SETUP_DESTINATIONS} state={setupState} />
+      <Rows rows={SETUP_ROWS} state={state} plan={business.plan} />
 
       <div className="mt-xl">
         <SectionHeader title="Run the business" />
         <p className="text-body-sm text-muted mb-lg">
           Your clients, your shop, your numbers and your plan.
         </p>
-        <Rows destinations={BACK_OFFICE_DESTINATIONS} state={backOfficeState} />
+        <Rows rows={BACK_OFFICE_ROWS} state={state} plan={business.plan} />
       </div>
 
       <p className="text-caption-sm text-muted mt-lg">
@@ -145,16 +145,23 @@ export function SettingsHub({
 }
 
 function Rows({
-  destinations,
+  rows,
   state,
+  plan,
 }: {
-  destinations: readonly { href: string; label: string; icon: typeof Icons.salon; blurb: string }[];
+  rows: readonly OwnerRow[];
   state: Record<string, string>;
+  plan: string;
 }) {
   return (
     <ul className="gap-md grid tablet:grid-cols-2">
-      {destinations.map((d) => {
-        const Icon = d.icon;
+      {rows.map((d) => {
+        const Icon = rowIcon(d.icon);
+        // The tier note wins over the state line, and there is never both: a locked row has
+        // nothing to count yet, and naming the tier is the more useful of the two things it
+        // could say. The row stays a live link either way — the note is a courtesy, and the
+        // server is the authority.
+        const note = tierNoteFor(d, plan);
         return (
           <li key={d.href}>
             <Link
@@ -168,7 +175,7 @@ function Rows({
                 <span className="text-title text-ink block font-medium">{d.label}</span>
                 <span className="text-body-sm text-muted block">{d.blurb}</span>
                 <span className="text-caption text-ink mt-xs block font-medium">
-                  {state[d.href]}
+                  {note ?? state[d.href]}
                 </span>
               </span>
               <Icons.chevronRight
@@ -182,11 +189,6 @@ function Rows({
       })}
     </ul>
   );
-}
-
-/** A locked row states the tier rather than a count — there is nothing to count yet. */
-function locked(tier: string): string {
-  return `${tier} plan and up`;
 }
 
 function salonLine(b: Business): string {

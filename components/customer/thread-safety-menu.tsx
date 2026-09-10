@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Icons, IconSize } from "@/components/ui/icons";
+import { MenuItem, MenuSheet } from "@/components/ui/menu-sheet";
 import { ReportSheet } from "@/components/ui/report-sheet";
 import { Sheet } from "@/components/ui/sheet";
 import { blockUser } from "@/lib/api/moderation";
@@ -25,10 +26,9 @@ import { createClient } from "@/lib/supabase/client";
  *
  * ## A sheet, not a popup menu
  *
- * The Flutter original is a `PopupMenuButton`. A popup on the web needs its own outside-click
- * handling, Escape, focus trap and focus restore — the five things `Sheet` already has and
- * that `collapse-nav.tsx` documents the marketing site getting wrong. So the menu is a sheet
- * with two rows, and there is one modal implementation in this app rather than two.
+ * The Flutter original is a `PopupMenuButton`. `MenuSheet` is the kit's answer to those, and it
+ * was extracted from this file when the owner's offer row wanted the same gesture — see its
+ * docblock for why a popup is not it.
  *
  * ## Blocking navigates away, because the thread stops existing
  *
@@ -85,32 +85,30 @@ export function ThreadSafetyMenu({
         <Icons.more style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
       </button>
 
-      <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Safety">
-        <ul className="p-base gap-sm flex flex-col">
-          <li>
-            <MenuRow
-              icon={Icons.error}
-              label={`Report ${counterpartyName}`}
-              hint="Tell our moderators about this account. They aren't told who reported them."
-              onClick={() => {
-                setMenuOpen(false);
-                setReportOpen(true);
-              }}
-            />
-          </li>
-          <li>
-            <MenuRow
-              icon={Icons.locked}
-              label={`Block ${counterpartyName}`}
-              hint="Their messages stop reaching you, and yours stop reaching them."
-              onClick={() => {
-                setMenuOpen(false);
-                setBlockOpen(true);
-              }}
-            />
-          </li>
-        </ul>
-      </Sheet>
+      <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Safety">
+        {/* Both glyphs stay in `danger`: neither of these is a routine action, and the red is
+            what stops the menu reading as a settings list. */}
+        <MenuItem
+          icon={Icons.error}
+          tone="danger"
+          label={`Report ${counterpartyName}`}
+          hint="Tell our moderators about this account. They aren't told who reported them."
+          onClick={() => {
+            setMenuOpen(false);
+            setReportOpen(true);
+          }}
+        />
+        <MenuItem
+          icon={Icons.locked}
+          tone="danger"
+          label={`Block ${counterpartyName}`}
+          hint="Their messages stop reaching you, and yours stop reaching them."
+          onClick={() => {
+            setMenuOpen(false);
+            setBlockOpen(true);
+          }}
+        />
+      </MenuSheet>
 
       <ReportSheet
         open={reportOpen}
@@ -175,34 +173,3 @@ export function ThreadSafetyMenu({
     </>
   );
 }
-
-function MenuRow({
-  icon: Icon,
-  label,
-  hint,
-  onClick,
-}: {
-  icon: typeof Icons.error;
-  label: string;
-  hint: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="border-hairline-soft p-base gap-md hover:bg-surface-soft focus-visible:outline-ink flex w-full items-start rounded-md border text-left focus-visible:outline-2"
-    >
-      <Icon
-        className="text-error-text mt-0.5 shrink-0"
-        style={{ width: IconSize.sm, height: IconSize.sm }}
-        aria-hidden
-      />
-      <span className="min-w-0 flex-1">
-        <span className="text-title text-ink block font-medium">{label}</span>
-        <span className="text-body-sm text-muted mt-xxs block">{hint}</span>
-      </span>
-    </button>
-  );
-}
-

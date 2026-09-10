@@ -70,7 +70,8 @@ export default async function OwnerInsightsPage({
   const [bookings, hours, newOrders, roster, services] = await Promise.all([
     fetchBusinessBookings(supabase, active.id, bounds).catch(() => []),
     fetchBusinessHours(supabase, active.id).catch(() => []),
-    storefront ? countNewOrders(supabase, active.id).catch(() => 0) : Promise.resolve(0),
+    // `null`, not `0`: see `OrdersInboxCard`. A failed count must not report an empty inbox.
+    storefront ? countNewOrders(supabase, active.id).catch(() => null) : Promise.resolve(null),
     /*
       For the header's stylist count **and** the setup checklist, which is why it is
       `activeOnly: false` now: "have you added your team?" is answered by the roster

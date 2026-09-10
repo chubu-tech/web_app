@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { ConfettiBurst } from "@/components/ui/confetti-burst";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/sheet";
@@ -112,12 +111,9 @@ export function BookingConfirmedSheet({
         </p>
 
         <div className="gap-sm mt-lg flex flex-col">
-          <Link
-            href={`/bookings/${bookingId}`}
-            className="bg-rausch-cta text-on-primary text-title hover:bg-rausch-cta-pressed flex min-h-12 items-center justify-center rounded-sm font-medium"
-          >
+          <ButtonLink href={`/bookings/${bookingId}`} fullWidth>
             View booking
-          </Link>
+          </ButtonLink>
           <Button variant="outlined" fullWidth onClick={onDone}>
             Done
           </Button>

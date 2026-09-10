@@ -38,11 +38,18 @@ export default async function OwnerMessageThreadPage({
   if (!active) return <NoSalonYet />;
 
   const { id } = await params;
+  /*
+    One wave: both reads key off the id in the URL. See the customer thread page for the
+    argument — and note the salon check below is unaffected, because `messages_select`
+    scopes to a thread the caller belongs to, so the transcript is empty for one that is
+    about to be refused.
+  */
   const supabase = await createClient();
-  const conversation = await fetchConversationById(supabase, id);
+  const [conversation, messages] = await Promise.all([
+    fetchConversationById(supabase, id),
+    fetchMessages(supabase, id).catch(() => []),
+  ]);
   if (!conversation || conversation.businessId !== active.id) notFound();
-
-  const messages = await fetchMessages(supabase, id).catch(() => []);
   const name = conversation.customerName?.trim() || "Customer";
 
   return (

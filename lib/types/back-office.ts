@@ -84,6 +84,22 @@ export const ORDER_STATUSES = [
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 /**
+ * The statuses that still name work for the salon — everything the owner's tabs put a number on.
+ *
+ * `out_for_delivery` is open because the order is still the salon's problem until it lands, which
+ * is the same reason it has a tab of its own rather than sitting with the finished ones. The
+ * closed statuses are the ones that accumulate, and counting them would produce a lifetime total
+ * that never goes down.
+ *
+ * Beside the union rather than in `analytics.ts` because the reader that filters on it lives
+ * under `lib/api/`, and nothing there imports the analytics module.
+ */
+export const OPEN_ORDER_STATUSES: OrderStatus[] = ["new", "ready", "out_for_delivery"];
+
+/** How many orders sit at each open status. An absent key is zero, not unknown. */
+export type OrderStatusCounts = Partial<Record<OrderStatus, number>>;
+
+/**
  * Wire string → status. Anything unrecognised becomes `new`.
  *
  * The same shape as `queueStatusFromWire`, and the same kind of default: an unknown status

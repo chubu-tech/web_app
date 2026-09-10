@@ -2,16 +2,27 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { BusinessCard } from "@/components/ui/business-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { RatingPill } from "@/components/ui/rating";
-import { formatKm, kmTo, type Coords } from "@/lib/discover-logic";
+import { Sheet } from "@/components/ui/sheet";
+import { formatKm, kmTo, withinDistance, type Coords } from "@/lib/discover-logic";
 import { mapCenter, nearestTo, resolveLocation, THIMPHU_CENTER } from "@/lib/geo";
+import {
+  EMPTY_FILTERS,
+  hasDistance,
+  isActive as filtersAreActive,
+  minDistanceKm,
+  toParams,
+  type SalonFilters,
+} from "@/lib/salon-filters";
 import { salonPath } from "@/lib/slug";
-import { cardMetaLine, hasLocation, type Business } from "@/lib/types/salon";
+import { cardMetaLine, hasLocation, type Business, type Category } from "@/lib/types/salon";
 import { cn } from "@/lib/utils";
+import { FilterPanel } from "./filter-panel";
 
 /**
  * The Map tab, ported from `MapTab` in `tho/app/lib/customer/map_tab.dart`: a
@@ -42,9 +53,20 @@ const SalonMap = dynamic(() => import("./salon-map").then((m) => m.SalonMap), {
  */
 type Choice = { query: string; id: string | null };
 
-export function MapView({ salons }: { salons: Business[] }) {
+export function MapView({
+  salons,
+  categories,
+  filters,
+}: {
+  /** Already narrowed server-side by category, gender and price — see the page. */
+  salons: Business[];
+  categories: Category[];
+  filters: SalonFilters;
+}) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [choice, setChoice] = useState<Choice | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [fix, setFix] = useState<Coords>(THIMPHU_CENTER);
 
   /**
@@ -64,15 +86,64 @@ export function MapView({ salons }: { salons: Business[] }) {
 
   const located = useMemo(() => salons.filter(hasLocation), [salons]);
 
+  /**
+   * Distance is measured **from the map's own centre**, never from the raw fix.
+   *
+   * `fix` is already `mapCenter(resolveLocation())`, which is the plausibility-checked
+   * value the map is actually drawn around — a denied prompt, a missing sensor or a
+   * reading somewhere off the coast of Africa all resolve to the Thimphu centre. Measuring
+   * from the raw reading instead would filter against a point the map had refused to show,
+   * and "within 5 km" would empty a screen full of pins.
+   *
+   * Applied here rather than server-side for the same reason Discover does it: there is no
+   * PostGIS, and the coordinates are already in hand. Both thumbs, so "10–20 km" does not
+   * return the salon 500 m away.
+   */
+  const inRange = useMemo(
+    () =>
+      hasDistance(filters)
+        ? withinDistance(located, {
+            from: fix,
+            minKm: minDistanceKm(filters) ?? 0,
+            maxKm: filters.distance.end,
+          })
+        : located,
+    [located, filters, fix],
+  );
+
+  /** Rating is the other facet the server cannot narrow — it is an aggregate, not a join. */
+  const rated = useMemo(
+    () =>
+      filters.minRating == null
+        ? inRange
+        : inRange.filter((b) => (b.avgRating ?? 0) >= filters.minRating!),
+    [inRange, filters.minRating],
+  );
+
   const needle = query.trim().toLowerCase();
   const filtered = useMemo(() => {
-    if (needle === "") return located;
-    return located.filter(
+    if (needle === "") return rated;
+    return rated.filter(
       (b) =>
         b.name.toLowerCase().includes(needle) ||
         (b.addressText ?? "").toLowerCase().includes(needle),
     );
-  }, [located, needle]);
+  }, [rated, needle]);
+
+  const active = filtersAreActive(filters);
+
+  /**
+   * Filters live in the URL, exactly as Discover's do, so the server re-runs the
+   * category/gender/price half of the query and a narrowed map can be shared.
+   *
+   * The search term is browser state here and deliberately stays that way: this page
+   * searches the pins already on screen, and there is no server-side `?q=` for the map.
+   */
+  function apply(next: SalonFilters) {
+    const qs = new URLSearchParams(toParams(next)).toString();
+    router.push(qs ? `/map?${qs}` : "/map", { scroll: false });
+    setFilterOpen(false);
+  }
 
   // Derived, not stored — see `Choice`.
   const selectedId =
@@ -114,15 +185,13 @@ export function MapView({ salons }: { salons: Business[] }) {
       <div className="relative min-w-0 flex-1">
         {filtered.length === 0 ? (
           <div className="grid h-full place-items-center">
-            {/* Two states, kept apart as the app keeps them: an empty map is a
-                platform fact, an empty search is something you can undo. */}
-            {located.length === 0 ? (
-              <EmptyState
-                icon={Icons.map}
-                title="No mapped salons"
-                message="Salons appear on the map once they add a location."
-              />
-            ) : (
+            {/*
+              Three states, and each names a different cause with a different way out. An
+              empty map is a platform fact with nothing to undo; a filter and a search are
+              both the reader's own doing, and only they can say which one they meant — so
+              the more recent, more visible act is answered first.
+            */}
+            {needle !== "" ? (
               <EmptyState
                 icon={Icons.searchEmpty}
                 title="No matches"
@@ -136,6 +205,27 @@ export function MapView({ salons }: { salons: Business[] }) {
                     Clear search
                   </button>
                 }
+              />
+            ) : active ? (
+              <EmptyState
+                icon={Icons.searchEmpty}
+                title="No matches"
+                message="No mapped salon matches these filters."
+                action={
+                  <button
+                    type="button"
+                    onClick={() => apply(EMPTY_FILTERS)}
+                    className="text-title text-rausch-cta min-h-12 font-medium"
+                  >
+                    Clear filters
+                  </button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={Icons.map}
+                title="No mapped salons"
+                message="Salons appear on the map once they add a location."
               />
             )}
           </div>
@@ -178,6 +268,20 @@ export function MapView({ salons }: { salons: Business[] }) {
                 />
               </button>
             ) : null}
+            {/* Inside the pill rather than beside it: this page has one floating control
+                and a second one would be a second thing covering the map. */}
+            <button
+              type="button"
+              onClick={() => setFilterOpen(true)}
+              aria-label={active ? "Filters (active)" : "Filters"}
+              aria-pressed={filterOpen}
+              className="text-ink hover:bg-surface-soft relative -mr-3 flex size-12 shrink-0 items-center justify-center rounded-full"
+            >
+              <Icons.filter style={{ width: IconSize.md, height: IconSize.md }} aria-hidden />
+              {active ? (
+                <span className="bg-rausch absolute top-2.5 right-2.5 size-[7px] rounded-full" />
+              ) : null}
+            </button>
           </div>
         </div>
 
@@ -208,6 +312,18 @@ export function MapView({ salons }: { salons: Business[] }) {
           </div>
         ) : null}
       </div>
+
+      {/* The same panel Discover uses, in a sheet at every width — the desktop rail here
+          is already the salon list, and a second permanent rail would leave the map itself
+          the narrowest thing on the page. */}
+      <Sheet open={filterOpen} onClose={() => setFilterOpen(false)} title="Filter">
+        <FilterPanel
+          categories={categories}
+          initial={filters}
+          onApply={apply}
+          onClose={() => setFilterOpen(false)}
+        />
+      </Sheet>
     </div>
   );
 }

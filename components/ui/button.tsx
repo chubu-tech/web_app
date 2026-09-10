@@ -1,4 +1,5 @@
 import { Loader2 } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /**
@@ -51,6 +52,24 @@ const variants: Record<Variant, string> = {
     "rounded-full h-13 bg-surface-soft text-rausch-cta hover:bg-surface-strong",
 };
 
+/**
+ * The class string for a button, without the element.
+ *
+ * Exported so `ButtonLink` below and `Button` cannot drift: one place decides what a filled
+ * button looks like, and the two elements differ only in being an `<a>` or a `<button>`.
+ */
+export function buttonClasses({
+  variant = "filled",
+  fullWidth = false,
+  className,
+}: {
+  variant?: Variant;
+  fullWidth?: boolean;
+  className?: string;
+}): string {
+  return cn(base, variants[variant], fullWidth && "w-full", className);
+}
+
 export type ButtonProps = React.ComponentPropsWithoutRef<"button"> & {
   variant?: Variant;
   /** Shows a spinner and blocks the press. */
@@ -76,13 +95,11 @@ export function Button({
       // `disabledBackgroundColor` for exactly this reason.
       aria-busy={busy || undefined}
       disabled={disabled || busy}
-      className={cn(
-        base,
-        variants[variant],
-        busy && "bg-rausch-cta text-on-primary disabled:bg-rausch-cta",
-        fullWidth && "w-full",
-        className,
-      )}
+      className={buttonClasses({
+        variant,
+        fullWidth,
+        className: cn(busy && "bg-rausch-cta text-on-primary disabled:bg-rausch-cta", className),
+      })}
       {...rest}
     >
       {busy ? (
@@ -91,5 +108,38 @@ export function Button({
         children
       )}
     </button>
+  );
+}
+
+/**
+ * A link that looks and measures like a `Button`.
+ *
+ * **Why it exists.** Six product surfaces hand-rolled this string
+ * (`bg-rausch-cta text-on-primary text-title hover:bg-rausch-cta-pressed inline-flex min-h-12
+ * …`) because navigation is an `<a>` and `Button` renders a `<button>`. Every copy was a chance
+ * to drop the 48px floor, the press scale or the AA-safe fill — and one of them had already
+ * lost the press state, which is the only feedback a touch device gets between tap and route
+ * change. `error-state.tsx` hand-rolled the same thing for a `<button>`.
+ *
+ * **A separate component rather than `asChild` on `Button`.** Cloning a child to merge classes
+ * loses the child's own typing and hides which element ends up in the DOM; two exports over one
+ * shared class function keeps both obvious and both typed. There is deliberately no `busy` and
+ * no `disabled`: a link that cannot be followed is not a link, and the caller should render a
+ * `Button` — or nothing — instead.
+ */
+export function ButtonLink({
+  variant = "filled",
+  fullWidth = false,
+  className,
+  children,
+  ...rest
+}: React.ComponentPropsWithoutRef<typeof Link> & {
+  variant?: Variant;
+  fullWidth?: boolean;
+}) {
+  return (
+    <Link className={buttonClasses({ variant, fullWidth, className })} {...rest}>
+      {children}
+    </Link>
   );
 }

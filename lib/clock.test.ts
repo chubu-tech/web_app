@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   clockLabel,
+  dateLabel,
   dateTimeLabel,
+  dayLabel,
   dayTimeLabel,
   fullDayTimeLabel,
   hoursLabel,
@@ -70,6 +72,28 @@ describe("the dated stamps", () => {
     expect(dayTimeLabel(afternoon)).toBe("Wed 2 Sep · 2:00 PM");
     expect(fullDayTimeLabel(afternoon)).toBe("Wednesday 2 Sep 2026 · 2:00 PM");
     expect(dateTimeLabel(afternoon)).toBe("2 Sep · 2:00 PM");
+    expect(dateLabel(afternoon)).toBe("2 Sep 2026");
+    expect(dayLabel(afternoon)).toBe("2 Sep");
+  });
+
+  /*
+    September is the month that catches a locale swap: `en-GB` abbreviates it "Sept" — four
+    letters, for exactly one month of the year — where Dart's `DateFormat('d MMM')` upstream
+    gives "Sep". The two clients would then disagree about the current month, which is why
+    `datePart` formats in `en-US` and assembles the order itself.
+  */
+  it("abbreviates September the way the app does", () => {
+    expect(dayLabel(afternoon)).not.toContain("Sept");
+  });
+
+  /*
+    A `date` column — `offers.ends_on`, say — parses to UTC midnight, and Thimphu is six hours
+    ahead of it, so the salon reads that instant as 06:00 on the same morning. A bare date must
+    therefore render as itself, not as the day before.
+  */
+  it("renders a bare date as itself", () => {
+    expect(dayLabel(utc("2026-09-02"))).toBe("2 Sep");
+    expect(dayLabel(utc("2026-01-01"))).toBe("1 Jan");
   });
 
   /*

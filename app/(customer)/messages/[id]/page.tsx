@@ -34,12 +34,20 @@ export default async function MessageThreadPage({
   const account = await getAccount();
   if (account.state !== "registered") notFound();
 
+  /*
+    Both reads key off the id in the URL, so they go together rather than the transcript
+    waiting for the header — a serial round trip on the one surface where a reply is being
+    waited for. The ownership check below still gates the render, and reading the messages
+    first leaks nothing: `messages_select` scopes to a thread the caller belongs to, so a
+    stranger's id comes back empty and is then discarded anyway.
+  */
   const supabase = await createClient();
-  const conversation = await fetchConversationById(supabase, id);
+  const [conversation, messages] = await Promise.all([
+    fetchConversationById(supabase, id),
+    fetchMessages(supabase, id).catch(() => []),
+  ]);
   if (!conversation) notFound();
   if (conversation.customerProfileId !== account.user.id) notFound();
-
-  const messages = await fetchMessages(supabase, id).catch(() => []);
 
   return (
     <div className="px-base py-lg mx-auto w-full max-w-[720px] tablet:px-lg">

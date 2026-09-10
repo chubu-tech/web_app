@@ -3,20 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 import { PaywallSheet } from "@/components/owner/paywall-sheet";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field } from "@/components/ui/field";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { SectionHeader } from "@/components/ui/section-header";
-import { Sheet } from "@/components/ui/sheet";
 import { StatusPill } from "@/components/ui/status-pill";
-import { ownerErrorMessage } from "@/lib/api/owner-errors";
-import { createStaff } from "@/lib/api/owner-setup";
 import { maxActiveStylists } from "@/lib/entitlements";
-import { createClient } from "@/lib/supabase/client";
 import { isLinked, type Business, type StaffMember } from "@/lib/types/salon";
 
 /**
@@ -29,9 +23,15 @@ import { isLinked, type Business, type StaffMember } from "@/lib/types/salon";
  * about: the paywall here stops a *new* stylist rather than undoing an existing one, and the
  * copy names the cap instead of saying "upgrade".
  *
- * **Add creates and then opens the editor**, which is the app's flow and the right one: a
- * stylist with a name and nothing else can do nothing — no services, no hours, so not
- * bookable — and the editor is where that gets fixed.
+ * **Add is its own page now**, not the one-field sheet it was. A stylist with a name and
+ * nothing else can do nothing, and *which services they perform* is the half of that which
+ * belongs in the same gesture as creating them — see `staff-add-form.tsx`. The button still
+ * checks the cap before navigating, so nothing is created and then refused.
+ *
+ * **The subtitle on each row is this list's own contribution**, and it is what lets the add
+ * flow return here rather than pushing on into the editor: "no hours yet, so not bookable"
+ * names the one thing still standing between a new chair and a booking. The app's team list
+ * says nothing of the kind.
  */
 export function StaffList({
   business,
@@ -43,9 +43,6 @@ export function StaffList({
   staffWithHours: string[];
 }) {
   const router = useRouter();
-  const [adding, setAdding] = useState(false);
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
   const [paywall, setPaywall] = useState(false);
 
   const withHours = new Set(staffWithHours);
@@ -53,29 +50,19 @@ export function StaffList({
   const cap = maxActiveStylists(business.plan);
   const atCap = cap != null && activeCount >= cap;
 
+  /**
+   * The cap is checked before the form opens, so nothing is created and then rejected.
+   *
+   * A button rather than a `ButtonLink`, precisely so this check can happen. `/business/staff/new`
+   * makes it again for a direct visit — the two are not redundant: this one avoids a pointless
+   * navigation, that one covers a bookmark.
+   */
   function startAdd() {
-    // The cap is checked before the form opens, so nothing is created and then rejected.
     if (atCap) {
       setPaywall(true);
       return;
     }
-    setName("");
-    setAdding(true);
-  }
-
-  async function add() {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setBusy(true);
-    try {
-      const created = await createStaff(createClient(), business.id, trimmed);
-      setAdding(false);
-      router.push(`/business/staff/${created.id}`);
-    } catch (caught) {
-      toast.error(ownerErrorMessage("createStaff", caught));
-    } finally {
-      setBusy(false);
-    }
+    router.push("/business/staff/new");
   }
 
   return (
@@ -139,26 +126,6 @@ export function StaffList({
           ))}
         </ul>
       )}
-
-      <Sheet
-        open={adding}
-        onClose={() => setAdding(false)}
-        title="Add staff member"
-        footer={
-          <Button fullWidth busy={busy} disabled={!name.trim()} onClick={() => void add()}>
-            Add
-          </Button>
-        }
-      >
-        <Field
-          label="Name"
-          value={name}
-          onChange={setName}
-          placeholder="e.g. Sonam Dorji"
-          autoFocus
-          hint="You'll set their services and hours next."
-        />
-      </Sheet>
 
       <PaywallSheet
         open={paywall}

@@ -199,7 +199,17 @@ export function SpecialistCard({
       <CoverImage
         label={name}
         imageUrl={photoUrl}
-        sizes="(min-width: 744px) 25vw, 50vw"
+        /*
+          Three columns inside the salon page's main body, two below the tablet
+          breakpoint — which is not what a quarter of the viewport is at any width.
+
+          `25vw` was wrong in **both** directions. Between 744 and 1128 the body is the
+          full page, so a card is `(100vw - 64) / 3` — 312px at a 1024 laptop, where
+          `25vw` claimed 256 and the browser duly fetched an image too small for the box
+          and upscaled it. Above 1128 the 360px rail and the 1280px cap hold the body at
+          852px, so a card stops at 276px, where `25vw` claimed 480 on a 1920 display.
+        */
+        sizes="(min-width: 1128px) 276px, (min-width: 744px) 33vw, 50vw"
         className="aspect-square w-full"
       />
       <div className="p-sm">

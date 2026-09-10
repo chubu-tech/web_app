@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { SelectTile } from "@/components/ui/select-tile";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -170,12 +169,9 @@ export function SalonBooking({
 function BookCta({ href, note }: { href: string | null; note: string | null }) {
   if (href) {
     return (
-      <Link
-        href={href}
-        className="bg-rausch-cta text-on-primary text-title hover:bg-rausch-cta-pressed flex min-h-12 items-center justify-center rounded-sm font-medium"
-      >
+      <ButtonLink href={href} fullWidth>
         Book appointment
-      </Link>
+      </ButtonLink>
     );
   }
   return (
@@ -200,10 +196,10 @@ function BookCta({ href, note }: { href: string | null; note: string | null }) {
 function CallCta({ href }: { href: string | null }) {
   if (!href) return null;
   return (
-    <a
-      href={href}
-      className="bg-rausch-cta text-on-primary text-title hover:bg-rausch-cta-pressed gap-sm flex min-h-12 items-center justify-center rounded-sm font-medium"
-    >
+    /* A `tel:` href, so a plain anchor rather than `ButtonLink` — `next/link` is for routes.
+       `buttonClasses` is exported for exactly this: the styling stays in one place even where
+       the element cannot be. */
+    <a href={href} className={buttonClasses({ fullWidth: true })}>
       <Icons.phone style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
       Call to book
     </a>

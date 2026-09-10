@@ -163,6 +163,18 @@ const googleSiteVerification = process.env.GOOGLE_SITE_VERIFICATION;
  *
  * Inlined at `next build` like every other `NEXT_PUBLIC_` value, so setting it needs a
  * rebuild rather than a redeploy of the same output.
+ *
+ * ## Adding a custom event is a privacy-policy change, not a code change
+ *
+ * The app reports into **this same GA4 property**, and it deliberately sends nothing but
+ * Firebase's automatic `screen_view`. Its own note says why: on both store forms every custom
+ * event is a **new declared data collection**, to be added deliberately and disclosed in the
+ * same change. That constraint reaches the website through the property, not through the code.
+ *
+ * So: `gtag('event', …)` anywhere in this repo needs a matching edit to `/privacy` in the same
+ * change — and `/privacy` is the URL both app-store listings point at, so it is the document
+ * the reviewers read. Page views are already covered by what is disclosed; a click, a search
+ * term or a booking funnel is not.
  */
 const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 

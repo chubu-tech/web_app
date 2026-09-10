@@ -19,6 +19,12 @@ import { cn } from "@/lib/utils";
  * keys. The closed-union form (`Record<OrderStatus, string>`, the way `ORDER_STATUS_LABEL` is
  * written) is the better tool where the key space *is* closed — here it is not, by design, so
  * the lookup has to be safe rather than the type.
+ *
+ * **The offer states are keys here, not labels passed in.** Their words — Live, Paused, Ended,
+ * Scheduled — are exactly what `titleCaseStatus` makes of the state, so the owner's Offers list
+ * hands over the bare state and gets both halves right. That is upstream's rule for this widget
+ * (`status_pill.dart:28-33`), and the reason it has one: a caller passing a finished label
+ * instead goes through the *default* branch, which is how "Sold out" ends up in the live tint.
  */
 const TONE: ReadonlyMap<string, string> = new Map([
   // Finished well.
@@ -30,6 +36,14 @@ const TONE: ReadonlyMap<string, string> = new Map([
   ["no_show", "bg-surface-strong text-muted"],
   ["declined", "bg-surface-strong text-muted"],
   ["inactive", "bg-surface-strong text-muted"],
+  // Offer visibility, for the owner's Offers list. `live` is the one of the four worth
+  // signalling — it takes the same green as a finished booking — and the other three all mean
+  // the same thing to a customer: they cannot see it. The owner reads *which* reason off the
+  // word and the line under it, not off a third and fourth colour.
+  ["live", "bg-success-soft text-success-text"],
+  ["paused", "bg-surface-strong text-muted"],
+  ["ended", "bg-surface-strong text-muted"],
+  ["scheduled", "bg-surface-strong text-muted"],
 ]);
 
 /**

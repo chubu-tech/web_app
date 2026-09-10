@@ -68,7 +68,10 @@ export default async function OwnerOrderDetailPage({
           a blank pill; the audience argument is what keeps the customer's "Placed" out of the
           salon's console without a second conditional written here.
         */}
-        <StatusPill status={order.status} label={orderStatusLabel(order.status, "owner")} />
+        <StatusPill
+          status={order.status}
+          label={orderStatusLabel(order.status, "owner", fulfilment)}
+        />
       </div>
       <p className="text-body-sm text-muted mb-lg">{orderPlacedLabel(order.placedAt)}</p>
 

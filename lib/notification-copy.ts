@@ -5,13 +5,31 @@ import { dayTimeLabel } from "./clock";
 /**
  * What a notification looks like and what it says.
  *
- * **Two systems in `../tho` disagree about this, and only one of them is right.**
+ * ## Where the words actually come from, checked against the live system
  *
- * 1. `supabase/functions/process-notifications/index.ts:54`'s `compose()` switches
- *    **exactly** on `event_type` and returns a title *and* a body with the payload
- *    interpolated — "Your appointment is set for Fri 7 Aug, 09:00."
- * 2. `app/lib/notifications_screen.dart:41`'s `notificationStyleFor()` matches
- *    **loosely** with `contains`, and returns a title only.
+ * **`process-notifications` composes nothing.** Its own header says so: *"Every claimed row
+ * arrives with the title and body that were written to it at enqueue time
+ * (`private.notification_copy`)."* The `compose()` switch this file was ported from is gone,
+ * and the authority is now that plpgsql function — verified by reading the deployed source at
+ * live version 7, which matches `supabase/functions/process-notifications/index.ts` in the repo
+ * marker for marker. **Version 7 is a deploy count, not evidence of drift.**
+ *
+ * **And every row carries its copy.** Since `20260807000020` the enqueue trigger stamps `title`
+ * and `body`, `notification-list.tsx` renders `n.title ?? composed.title`, and all **202** live
+ * rows have both — measured. So everything below is a *fallback* that nothing currently
+ * reaches: it renders a row written before that migration, or an `event_type` the trigger's
+ * `case` does not answer.
+ *
+ * That is why it is still here and still has to be complete — *"unreachable" and "wrong" are
+ * one schema change apart* — and also why it is allowed to differ from the SQL in wording where
+ * the web is a better place to say it ("Leave a review to help other customers", not "Tap to
+ * leave a review", on a page with no tapping). What it must never do is **contradict** the
+ * server: a title that disagrees is the inbox and the push saying different things about one
+ * event, which is the exact failure `private.notification_copy` was centralised to prevent.
+ *
+ * The other original is still a live comparison, and still wrong:
+ * `app/lib/notifications_screen.dart:41`'s `notificationStyleFor()` matches **loosely** with
+ * `contains`, and returns a title only.
  *
  * The second has a hole: `booking_no_show` matches none of its specific tests and
  * falls through to `['confirm','creat','book']` — because "booking_no_show" contains
@@ -23,11 +41,11 @@ import { dayTimeLabel } from "./clock";
  * date, no salon, no points, though the payload holds all three.
  *
  * So: `notificationStyle` keeps the loose chain for **icon, accent and filter bucket**
- * with the no-show hole closed, and `notificationText` ports `compose()` for the words.
- * Neither invents copy — the bodies are the ones the product already sends.
+ * with the no-show hole closed, and `notificationText` carries the words. Neither invents
+ * copy — the bodies are the ones the product already sends.
  *
- * **Keep this in step with both originals.** If a new `event_type` appears in either,
- * it needs a case here and a test beside it.
+ * **Keep this in step with `private.notification_copy`**, not with the worker. If a new
+ * `event_type` appears in that function's `case`, it needs a case here and a test beside it.
  */
 
 /**
@@ -235,16 +253,28 @@ export function notificationText(
       pickup is what the server does (`coalesce(v_o.fulfilment, 'pickup')`), so a row from before
       the column existed still reads correctly.
     */
-    case "order_ready":
-      // The title is the same either way — the state is the same one. Only what to do next
-      // differs, which is the whole reason the server sends the fulfilment along.
+    case "order_ready": {
+      /*
+        **Two titles, because `ready` means two different things.**
+
+        This used to say the title was "the same either way — the state is the same one",
+        with the body carrying the difference. `private.notification_copy` disagrees: it
+        sends **"Your order is packed"** on a delivery and "Your order is ready" on a
+        pickup. And so does this repo now — the same split settled the status pill, where
+        the owner's button said "Mark packed" under a chip reading "Ready".
+
+        `ready` is the only state both fulfilment paths pass through, so it is the only one
+        that needs two names. A fallback whose *title* disagreed with the stored copy would
+        be the inbox and the push saying different things about one order.
+      */
+      const delivery = stringOf(payload.fulfilment) === "delivery";
       return {
-        title: "Your order is ready",
-        body:
-          stringOf(payload.fulfilment) === "delivery"
-            ? "Packed and waiting to go out — pay cash when it arrives."
-            : "Your order is ready for pickup — pay cash on collection.",
+        title: delivery ? "Your order is packed" : "Your order is ready",
+        body: delivery
+          ? "Packed and waiting to go out — pay cash when it arrives."
+          : "Your order is ready for pickup — pay cash on collection.",
       };
+    }
     /*
       New event type, added by the delivery half of `set_order_status`. Without a case it fell to
       the default branch, which produces the loose chain's generic title and an **empty body** —
