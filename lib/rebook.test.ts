@@ -23,6 +23,7 @@ function svc(id: string, over: Partial<ServiceItem> = {}): ServiceItem {
     gender: null,
     catalogId: null,
     category: null,
+    categorySort: null,
     ...over,
   };
 }

@@ -75,7 +75,14 @@ export type ServiceFields = {
   price: number;
   /** `'female' | 'male' | 'unisex'`. */
   gender: string | null;
-  /** One of `SERVICE_CATEGORIES`, or null for a service that belongs in no group. */
+  /**
+   * The group heading this service files under — one of `SERVICE_CATEGORY_PRESETS`, a name
+   * the owner typed, or null for a service that belongs in no group. Trimmed and at most
+   * `SERVICE_CATEGORY_MAX_LENGTH` characters (`services_category_check`).
+   *
+   * `category_sort` is deliberately absent: the trigger derives it from this on every
+   * write, so a client that sent it would be overwritten anyway.
+   */
   category: string | null;
   imageUrl: string | null;
 };

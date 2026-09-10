@@ -9,6 +9,7 @@ import {
   groupByDayPart,
   noSlotsForSelection,
   serviceCategories,
+  serviceCategoriesInMenuOrder,
   staffStillEligible,
 } from "./booking-basket";
 import { EMPTY_FILTERS, GENDER_SERVICE_KINDS, serviceGenders } from "./salon-filters";
@@ -25,6 +26,7 @@ function service(over: Partial<ServiceItem> & { id: string }): ServiceItem {
     gender: null,
     catalogId: null,
     category: null,
+    categorySort: null,
     ...over,
   };
 }
@@ -129,14 +131,37 @@ describe("serviceCategories", () => {
     ).toEqual([]);
   });
 
-  it("keeps first-seen order — the salon's own", () => {
+  it("orders by the salon's own category_sort, not by name or by row order", () => {
+    // `fetchServices` orders by name, so row order says nothing about the menu. The sort
+    // is stamped server-side in the order the owner opened each group.
     expect(
       serviceCategories([
-        service({ id: "a", category: "Spa" }),
-        service({ id: "b", category: "Hair" }),
-        service({ id: "c", category: "Spa" }),
+        service({ id: "a", category: "Highlights", categorySort: 2 }),
+        service({ id: "b", category: "Hair Care Services", categorySort: 0 }),
+        service({ id: "c", category: "Normal Hair Colouring", categorySort: 1 }),
       ]),
-    ).toEqual(["Spa", "Hair"]);
+    ).toEqual(["Hair Care Services", "Normal Hair Colouring", "Highlights"]);
+  });
+
+  it("gives a group the lowest sort any of its rows carries", () => {
+    // One service edited into a group late must not drag the heading down the page.
+    expect(
+      serviceCategories([
+        service({ id: "a", category: "Hair", categorySort: 0 }),
+        service({ id: "b", category: "Spa", categorySort: 1 }),
+        service({ id: "c", category: "Hair", categorySort: 9 }),
+      ]),
+    ).toEqual(["Hair", "Spa"]);
+  });
+
+  it("sorts an unstamped category last, by name — rows predating the trigger", () => {
+    expect(
+      serviceCategories([
+        service({ id: "a", category: "Zebra", categorySort: null }),
+        service({ id: "b", category: "Anchor", categorySort: null }),
+        service({ id: "c", category: "Spa", categorySort: 4 }),
+      ]),
+    ).toEqual(["Spa", "Anchor", "Zebra"]);
   });
 
   it("ignores null and blank, which is 31 of the 33 live rows", () => {
@@ -147,6 +172,24 @@ describe("serviceCategories", () => {
         service({ id: "c", category: "Hair" }),
       ]),
     ).toEqual([]);
+  });
+});
+
+describe("serviceCategoriesInMenuOrder", () => {
+  it("keeps a single group, which the chip row drops", () => {
+    const one = [service({ id: "a", category: "Hair Care Services", categorySort: 0 })];
+    expect(serviceCategories(one)).toEqual([]);
+    expect(serviceCategoriesInMenuOrder(one)).toEqual(["Hair Care Services"]);
+  });
+
+  it("orders the same way, and still ignores the unfiled", () => {
+    expect(
+      serviceCategoriesInMenuOrder([
+        service({ id: "a", category: "Body Massage", categorySort: 11 }),
+        service({ id: "b", category: null }),
+        service({ id: "c", category: "Hair Care Services", categorySort: 0 }),
+      ]),
+    ).toEqual(["Hair Care Services", "Body Massage"]);
   });
 });
 

@@ -13,14 +13,26 @@ import { ownerErrorMessage } from "@/lib/api/owner-errors";
 import { createService, updateService, uploadOwnerImage } from "@/lib/api/owner-setup";
 import { downscaleImage, imageRejection, releasePreview } from "@/lib/images";
 import { createClient } from "@/lib/supabase/client";
-import { SERVICE_CATEGORIES, SERVICE_GENDERS, type ServiceItem } from "@/lib/types/salon";
+import {
+  SERVICE_CATEGORY_MAX_LENGTH,
+  SERVICE_CATEGORY_PRESETS,
+  SERVICE_GENDERS,
+  type ServiceItem,
+} from "@/lib/types/salon";
 
 /**
  * Add or edit one service — a port of `_ServiceForm` in `business_services_tab.dart`.
  *
  * **The validation mirrors the CHECK constraints**, so a bad value comes back as a sentence
  * rather than as `services_duration_minutes_check`. `duration_minutes > 0`, `price >= 0`, and
- * `category` must be one of seven strings or null — `SERVICE_CATEGORIES` is that exact list.
+ * `category` is null or a trimmed string of at most `SERVICE_CATEGORY_MAX_LENGTH` characters.
+ *
+ * **The owner names their own categories.** `SERVICE_CATEGORY_PRESETS` used to be the whole
+ * vocabulary the column allowed; it is now a row of suggestions, and `salonCategories` — the
+ * groups this salon already files under — comes first, because on a long menu those are the
+ * ones being reused and seven generic suggestions above them buries them. A name typed here
+ * is held in state and only becomes real when the service saves: `services.category` is the
+ * record, so there is nothing to clean up after an abandoned sheet.
  *
  * **Tapping the chosen category again clears it**, which is the app's behaviour and the only
  * way to un-file a service: the column is nullable and a service that belongs in no group has
@@ -41,10 +53,13 @@ import { SERVICE_CATEGORIES, SERVICE_GENDERS, type ServiceItem } from "@/lib/typ
 export function ServiceFormSheet({
   businessId,
   service,
+  salonCategories,
   onClose,
 }: {
   businessId: string;
   service: ServiceItem | null;
+  /** The groups this salon already files services under, in menu order. */
+  salonCategories: string[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -54,10 +69,50 @@ export function ServiceFormSheet({
   const [gender, setGender] = useState<string>(service?.gender ?? "unisex");
   const [category, setCategory] = useState<string | null>(service?.category ?? null);
   const [imageUrl, setImageUrl] = useState<string | null>(service?.imageUrl ?? null);
+  /** A group typed in this sheet and not yet saved under anything. */
+  const [typedCategory, setTypedCategory] = useState<string | null>(null);
+  const [newCategory, setNewCategory] = useState("");
+  const [addingCategory, setAddingCategory] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  /**
+   * Every chip the category row offers: this salon's own groups first, in its own order,
+   * then the presets it has not used, then whatever has just been typed. Compared
+   * case-insensitively so "hair care" cannot appear beside "Hair Care" — in a price list
+   * those are one heading, and two chips claiming to be it is worse than a rejection.
+   */
+  const categoryChips: string[] = [];
+  const seen = new Set<string>();
+  for (const c of [...salonCategories, ...SERVICE_CATEGORY_PRESETS, typedCategory]) {
+    const trimmed = c?.trim();
+    if (!trimmed || seen.has(trimmed.toLowerCase())) continue;
+    seen.add(trimmed.toLowerCase());
+    categoryChips.push(trimmed);
+  }
+
+  /** Take the typed name — or, if it already exists in any casing, select that one. */
+  function addCategory() {
+    const trimmed = newCategory.trim();
+    if (!trimmed) {
+      setAddingCategory(false);
+      return;
+    }
+    if (trimmed.length > SERVICE_CATEGORY_MAX_LENGTH) {
+      setError(
+        `Keep a category under ${SERVICE_CATEGORY_MAX_LENGTH} characters — it has to fit a heading.`,
+      );
+      return;
+    }
+    const existing = categoryChips.find((c) => c.toLowerCase() === trimmed.toLowerCase());
+    setCategory(existing ?? trimmed);
+    if (!existing) setTypedCategory(trimmed);
+    setNewCategory("");
+    setAddingCategory(false);
+    setError(null);
+  }
 
   async function pickImage(files: FileList | null) {
     const file = files?.[0];
@@ -216,7 +271,7 @@ export function ServiceFormSheet({
         <fieldset>
           <legend className="text-caption text-muted mb-sm font-medium">Category</legend>
           <div className="gap-sm flex flex-wrap">
-            {SERVICE_CATEGORIES.map((c) => (
+            {categoryChips.map((c) => (
               <Chip
                 key={c}
                 label={c}
@@ -225,9 +280,46 @@ export function ServiceFormSheet({
                 onClick={() => setCategory((current) => (current === c ? null : c))}
               />
             ))}
+            {/* Not a Chip: it files this service under nothing by itself, and dressing it
+                as one of the choices would say it does. */}
+            {!addingCategory ? (
+              <Button variant="quiet" onClick={() => setAddingCategory(true)}>
+                <Icons.add style={{ width: IconSize.xs, height: IconSize.xs }} aria-hidden />
+                New category
+              </Button>
+            ) : null}
           </div>
+
+          {addingCategory ? (
+            <div className="gap-sm mt-sm flex items-end">
+              <span className="flex-1">
+                <Field
+                  label="New category"
+                  value={newCategory}
+                  onChange={setNewCategory}
+                  placeholder="e.g. Threading & Waxing"
+                  maxLength={SERVICE_CATEGORY_MAX_LENGTH}
+                  autoFocus
+                  // Enter is the fast path — an owner filing a dozen groups is typing,
+                  // not reaching for a button. Not a nested <form>: this sheet's Save is
+                  // the submit, and Enter here must not trigger it.
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addCategory();
+                    }
+                  }}
+                />
+              </span>
+              <Button variant="quiet" onClick={addCategory} className="mb-1">
+                Add
+              </Button>
+            </div>
+          ) : null}
+
           <p className="text-caption-sm text-muted mt-sm">
-            Groups this service on your salon page. Optional.
+            Groups this service on your salon page, under a heading you name. New categories
+            go to the bottom of your menu. Optional.
           </p>
         </fieldset>
 

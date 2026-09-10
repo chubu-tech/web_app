@@ -195,19 +195,65 @@ export function noSlotsForSelection({
  * The category chips above the service list — **only when the data can fill them.**
  *
  * Fresha's own flow opens with a row of them (`Featured`, `Summer Packages`, …), and
- * copying that shape unconditionally would put a single chip reading "Other" above every
- * salon on this platform: `services.category` is filled on **2 of 33 live rows**. So the
- * row appears only where there are at least two real groups to switch between, which is
- * the condition under which a filter is a filter rather than a label.
+ * copying that shape unconditionally would put a single chip reading "Other" above a
+ * salon that has filed one group. So the row appears only where there are at least two
+ * real groups to switch between, which is the condition under which a filter is a filter
+ * rather than a label. That gate used to be doing most of the work — `services.category`
+ * was filled on 2 of 33 live rows — and does less of it now that a salon can name its own
+ * groups and a full menu carries a dozen.
  *
- * Returns them in first-seen order — the salon's own order, which is the only ordering
- * information the column carries.
+ * **The order is the owner's, not this function's.** `category_sort` is stamped server-side
+ * in the order the salon first opened each group (`20260910000001`), so a price list reads
+ * the way its owner built it — Hair Care before Colouring before Highlights — rather than
+ * alphabetically or by whatever `order("name")` happened to surface first, which for a menu
+ * is no order at all. A group takes the lowest sort any of its services carries, so one row
+ * edited into it late does not drag the heading down the page.
+ *
+ * A category with no sort sorts last, by name. Only reachable on a row written before the
+ * trigger existed — a fallback, not a case the schema still produces.
+ *
+ * The Dart twin is `salonCategories` in `customer/booking/service_filters.dart`.
  */
 export function serviceCategories(services: ServiceItem[]): string[] {
-  const seen: string[] = [];
+  const named = orderedCategories(services);
+  return named.length >= 2 ? named : [];
+}
+
+/**
+ * The same groups, without the two-group gate — for a list that *lays itself out* under
+ * headings rather than offering a filter.
+ *
+ * The gate is about whether a chip ROW is worth showing: one chip is a label, not a
+ * filter. A menu with one named group still wants that group's heading over its rows, so
+ * the owner's console and the salon page's price list read this, and the booking flow's
+ * chips read `serviceCategories`.
+ */
+export function serviceCategoriesInMenuOrder(services: ServiceItem[]): string[] {
+  return orderedCategories(services);
+}
+
+function orderedCategories(services: ServiceItem[]): string[] {
+  const sortByCategory = new Map<string, number | null>();
   for (const s of services) {
     const category = s.category?.trim();
-    if (category && !seen.includes(category)) seen.push(category);
+    if (!category) continue;
+    if (!sortByCategory.has(category)) {
+      sortByCategory.set(category, s.categorySort);
+      continue;
+    }
+    const held = sortByCategory.get(category) ?? null;
+    const offered = s.categorySort;
+    if (offered != null && (held == null || offered < held)) {
+      sortByCategory.set(category, offered);
+    }
   }
-  return seen.length >= 2 ? seen : [];
+  const names = [...sortByCategory.keys()].sort((a, b) => {
+    const sa = sortByCategory.get(a) ?? null;
+    const sb = sortByCategory.get(b) ?? null;
+    if (sa == null && sb == null) return a.localeCompare(b);
+    if (sa == null) return 1;
+    if (sb == null) return -1;
+    return sa === sb ? a.localeCompare(b) : sa - sb;
+  });
+  return names;
 }

@@ -630,8 +630,14 @@ project's life the database only moved when this project moved it.
   reminder-toggle gate falsifiable on one page.
 - **Not one day in `staff_working_hours` holds more than a single segment**, so the touching-pair
   merge rewrote nothing and governs future writes only.
-- 24 of 34 services have no `gender`; `services.category` is filled on **3**; 12 of the 14
-  approved salons have coordinates; 5 have no cover; `city` contradicts `address_text` on 12.
+- 24 of 34 services have no `gender`; 12 of the 14 approved salons have coordinates; 5 have
+  no cover; `city` contradicts `address_text` on 12.
+- `services.category` **was** filled on 3 of 34 rows, which is the measurement most of the
+  code's caution about the column was built on. It no longer holds: `20260910000001` made the
+  column free text, and Xpress Hair And Beauty Therapy now carries **117 services across 13
+  categories of its own** — Hair Care Services through Body Massage, in the salon's own order
+  via `category_sort`. So the category chip row and the grouped price list are live paths on
+  at least one salon, not dormant ones, and any change to them should be checked there.
 - **Nine Basic salons have two active stylists**, so the seed is over the client-side Basic cap
   and `staff_insert` has no count check.
 

@@ -137,8 +137,20 @@ export type ServiceItem = {
   /** 'male' | 'female' | 'unisex' | null. Null groups under OTHER. */
   gender: string | null;
   catalogId: string | null;
-  /** The salon's own grouping ('Hair', 'Grooming', …). Null = ungrouped. */
+  /**
+   * The salon's own grouping ('Hair', 'Highlights', 'Japanese Head Spa', …). Null =
+   * ungrouped. Free text the owner types since `20260910000001` — `SERVICE_CATEGORY_PRESETS`
+   * is what it used to be limited to.
+   */
   category: string | null;
+  /**
+   * Where `category` sits in this salon's menu, lowest first. Server-derived
+   * (`services_category_sort`), null exactly when `category` is null.
+   *
+   * Read it through `serviceCategories` rather than directly — the ordering rule, and what
+   * to do with a row whose sort predates the trigger, lives in one place.
+   */
+  categorySort: number | null;
 };
 
 export type StaffMember = {
@@ -184,11 +196,18 @@ export type CatalogService = {
 };
 
 /**
- * Every category a service may be filed under, in menu order — `ServiceItem.categories`
- * in `models.dart`, and exactly the values `services_category_check` allows. A service may
- * also be filed under none, which is why the chip row clears on a second tap.
+ * The categories the service form offers as a starting point, in menu order —
+ * `ServiceItem.presetCategories` in `models.dart`.
+ *
+ * **Not a closed set.** `services_category_check` took these seven values and nothing else
+ * until `20260910000001`; it now takes any trimmed string of 1–`SERVICE_CATEGORY_MAX_LENGTH`
+ * characters, because seven groups cannot express a twelve-group price list — "Normal Hair
+ * Colouring" and "Professional Hair Colouring" are different shelves at different prices,
+ * and "Threading & Waxing" is not "Other". The owner types their own beside these.
+ *
+ * A service may also be filed under none, which is why the chip row clears on a second tap.
  */
-export const SERVICE_CATEGORIES = [
+export const SERVICE_CATEGORY_PRESETS = [
   "Hair",
   "Grooming",
   "Skin",
@@ -197,6 +216,9 @@ export const SERVICE_CATEGORIES = [
   "Makeup",
   "Other",
 ] as const;
+
+/** `services_category_check`'s upper bound. A category is a chip and a heading; past this it is neither. */
+export const SERVICE_CATEGORY_MAX_LENGTH = 40;
 
 /**
  * `businesses.business_type`, with the label and the line each one shows an owner.

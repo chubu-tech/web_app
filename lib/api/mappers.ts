@@ -179,6 +179,7 @@ export function toServiceItem(m: Row): ServiceItem {
     gender: str(m.gender),
     catalogId: str(m.catalog_id),
     category: str(m.category),
+    categorySort: numOrNull(m.category_sort),
   };
 }
 

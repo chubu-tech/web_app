@@ -13,6 +13,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { StatusPill } from "@/components/ui/status-pill";
 import { ownerErrorMessage } from "@/lib/api/owner-errors";
 import { setServiceActive } from "@/lib/api/owner-setup";
+import { serviceCategoriesInMenuOrder } from "@/lib/booking-basket";
 import { createClient } from "@/lib/supabase/client";
 import { SERVICE_GENDERS, type ServiceItem } from "@/lib/types/salon";
 import { formatDuration, formatNu } from "@/lib/utils";
@@ -23,6 +24,14 @@ import { formatDuration, formatNu } from "@/lib/utils";
  * **The active switch writes immediately; everything else waits for Save.** Same split as
  * the app, and the same reason as the customer profile's avatar: a switch is already a
  * deliberate, complete act, whereas a half-typed price is not.
+ *
+ * **Grouped under the owner's own headings**, in the salon's own order — the same order the
+ * customer's price list and the booking flow's chips read (`category_sort`). A flat grid was
+ * fine while `services.category` was a closed set of seven that almost nobody filled; it is
+ * not fine for a salon that files twelve groups of its own, where the point of the grouping
+ * is that the owner edits the menu in the shape it is read in. Anything unfiled collects
+ * under "Other services" at the end — not swept into a group called "Other", which is a
+ * heading an owner can deliberately choose.
  *
  * **"Performed by nobody" is a warning this screen invented.** `compute_availability` and
  * `create_booking` both require a `service_staff` row, so a service with no stylist mapped is
@@ -42,6 +51,15 @@ export function ServiceList({
   const router = useRouter();
   const [editing, setEditing] = useState<ServiceItem | "new" | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const categories = serviceCategoriesInMenuOrder(services);
+  const groups: { heading: string | null; rows: ServiceItem[] }[] = [
+    ...categories.map((heading) => ({
+      heading,
+      rows: services.filter((s) => s.category?.trim() === heading),
+    })),
+    { heading: null, rows: services.filter((s) => !s.category?.trim()) },
+  ].filter((group) => group.rows.length > 0);
 
   async function toggle(service: ServiceItem) {
     setBusyId(service.id);
@@ -85,64 +103,79 @@ export function ServiceList({
           message="Switch on a common service, or add your own."
         />
       ) : (
-        <ul className="gap-md grid tablet:grid-cols-2">
-          {services.map((s) => {
-            const mapped = staffCountByService[s.id] ?? 0;
-            return (
-              <li
-                key={s.id}
-                className="border-hairline-soft p-sm gap-md flex items-center rounded-md border"
-              >
-                <span className="size-13 shrink-0 overflow-hidden rounded-sm">
-                  <CoverImage label={s.name} imageUrl={s.imageUrl} sizes="52px" className="size-full" />
-                </span>
-
-                <span className="min-w-0 flex-1">
-                  <span className="gap-sm flex items-center">
-                    <span className="text-title text-ink truncate font-medium">{s.name}</span>
-                    {s.gender ? (
-                      <span className="bg-surface-strong text-caption-sm text-muted shrink-0 rounded-full px-2 py-0.5">
-                        {genderLabel(s.gender)}
-                      </span>
-                    ) : null}
-                    {!s.isActive ? <StatusPill status="inactive" /> : null}
-                  </span>
-                  <span className="text-body-sm text-muted block">
-                    {formatDuration(s.durationMinutes)} · {formatNu(s.price)}
-                    {s.category ? ` · ${s.category}` : ""}
-                  </span>
-                  {s.isActive && mapped === 0 ? (
-                    <span className="text-caption-sm text-rausch-cta block">
-                      Nobody performs this yet — add it to a stylist so it can be booked.
+        groups.map((group) => (
+          <section
+            key={group.heading === null ? "__unfiled__" : `named:${group.heading}`}
+            className="mb-lg"
+          >
+            {/* Quiet and small: it groups rows, it does not compete with the page title.
+                Suppressed when there is only one group — a single heading over the whole
+                list is a label, not a grouping. */}
+            {groups.length > 1 ? (
+              <h2 className="text-caption text-muted mb-sm font-semibold tracking-wide uppercase">
+                {group.heading ?? "Other services"}
+              </h2>
+            ) : null}
+            <ul className="gap-md grid tablet:grid-cols-2">
+              {group.rows.map((s) => {
+                const mapped = staffCountByService[s.id] ?? 0;
+                return (
+                  <li
+                    key={s.id}
+                    className="border-hairline-soft p-sm gap-md flex items-center rounded-md border"
+                  >
+                    <span className="size-13 shrink-0 overflow-hidden rounded-sm">
+                      <CoverImage label={s.name} imageUrl={s.imageUrl} sizes="52px" className="size-full" />
                     </span>
-                  ) : null}
-                </span>
 
-                <Button
-                  variant="quiet"
-                  onClick={() => setEditing(s)}
-                  aria-label={`Edit ${s.name}`}
-                  className="px-sm shrink-0"
-                >
-                  <Icons.edit style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
-                </Button>
-                {/* A real checkbox rather than a styled div: the switch is the one control on
-                    this row that changes the database, and it has to be reachable by keyboard
-                    and announced as a state. */}
-                <label className="gap-xs flex shrink-0 cursor-pointer items-center">
-                  <span className="sr-only">{s.isActive ? "Switch off" : "Switch on"} {s.name}</span>
-                  <input
-                    type="checkbox"
-                    checked={s.isActive}
-                    disabled={busyId === s.id}
-                    onChange={() => void toggle(s)}
-                    className="accent-rausch-cta size-5"
-                  />
-                </label>
-              </li>
-            );
-          })}
-        </ul>
+                    <span className="min-w-0 flex-1">
+                      <span className="gap-sm flex items-center">
+                        <span className="text-title text-ink truncate font-medium">{s.name}</span>
+                        {s.gender ? (
+                          <span className="bg-surface-strong text-caption-sm text-muted shrink-0 rounded-full px-2 py-0.5">
+                            {genderLabel(s.gender)}
+                          </span>
+                        ) : null}
+                        {!s.isActive ? <StatusPill status="inactive" /> : null}
+                      </span>
+                      <span className="text-body-sm text-muted block">
+                        {formatDuration(s.durationMinutes)} · {formatNu(s.price)}
+                        {s.category ? ` · ${s.category}` : ""}
+                      </span>
+                      {s.isActive && mapped === 0 ? (
+                        <span className="text-caption-sm text-rausch-cta block">
+                          Nobody performs this yet — add it to a stylist so it can be booked.
+                        </span>
+                      ) : null}
+                    </span>
+
+                    <Button
+                      variant="quiet"
+                      onClick={() => setEditing(s)}
+                      aria-label={`Edit ${s.name}`}
+                      className="px-sm shrink-0"
+                    >
+                      <Icons.edit style={{ width: IconSize.sm, height: IconSize.sm }} aria-hidden />
+                    </Button>
+                    {/* A real checkbox rather than a styled div: the switch is the one control on
+                        this row that changes the database, and it has to be reachable by keyboard
+                        and announced as a state. */}
+                    <label className="gap-xs flex shrink-0 cursor-pointer items-center">
+                      <span className="sr-only">{s.isActive ? "Switch off" : "Switch on"} {s.name}</span>
+                      <input
+                        type="checkbox"
+                        checked={s.isActive}
+                        disabled={busyId === s.id}
+                        onChange={() => void toggle(s)}
+                        className="accent-rausch-cta size-5"
+                      />
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))
       )}
 
       {/* Mounted only while open, and keyed by what is being edited, so the sheet's fields
@@ -152,6 +185,7 @@ export function ServiceList({
           key={editing === "new" ? "new" : editing.id}
           businessId={businessId}
           service={editing === "new" ? null : editing}
+          salonCategories={categories}
           onClose={() => setEditing(null)}
         />
       ) : null}
