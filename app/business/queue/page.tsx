@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-import QRCode from "qrcode";
 import { NoSalonYet } from "@/components/owner/no-salon-yet";
 import { QueueBoard } from "@/components/owner/queue-board";
 import { fetchBusinessQueue } from "@/lib/api/owner";
@@ -8,6 +6,7 @@ import { fetchClientBook } from "@/lib/api/owner-back-office";
 import { fetchServices, fetchStaff } from "@/lib/api/salon";
 import { hasFeature } from "@/lib/entitlements";
 import { getOwnerContext } from "@/lib/owner/context";
+import { qrSvg, queueScanUrl } from "@/lib/qr";
 import { createClient } from "@/lib/supabase/server";
 import type { QueueEntry } from "@/lib/types/queue";
 import { runsQueue } from "@/lib/types/salon";
@@ -71,7 +70,7 @@ export default async function OwnerQueuePage() {
       ])
     : [[] as QueueEntry[], [], [], [] as string[]];
 
-  const link = open ? await queueLinkFor(active.id) : "";
+  const link = open ? await queueScanUrl(active.id) : "";
   const svg = link ? await qrSvg(link) : null;
 
   return (
@@ -86,43 +85,4 @@ export default async function OwnerQueuePage() {
       clientProfileIds={clientProfileIds}
     />
   );
-}
-
-/**
- * The URL the printed QR encodes — this deployment's own `/q/<businessId>`.
- *
- * Built from the request rather than an env var so it is right in every environment without
- * one more thing to configure, and so a QR generated from a preview deployment points at
- * that preview instead of silently at production.
- */
-async function queueLinkFor(businessId: string): Promise<string> {
-  const h = await headers();
-  const host = h.get("host") ?? "";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}/q/${businessId}`;
-}
-
-/**
- * The QR as an inline SVG string.
- *
- * Rendered here rather than in the browser: it costs no client bundle, it prints as vectors
- * at any paper size, and it is on screen before any JavaScript has run. Error correction
- * level M is the encoder's default and the right trade for a code that will be printed and
- * then photographed under salon lighting.
- *
- * A failure returns null rather than throwing — the sheet still shows the link, which is the
- * part that actually has to be right.
- */
-async function qrSvg(link: string): Promise<string | null> {
-  try {
-    return await QRCode.toString(link, {
-      type: "svg",
-      margin: 1,
-      // Drawn to fill its container; the width only sets the SVG's intrinsic ratio.
-      width: 220,
-      color: { dark: "#222222", light: "#ffffff" },
-    });
-  } catch {
-    return null;
-  }
 }

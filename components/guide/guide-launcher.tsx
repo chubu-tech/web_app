@@ -107,6 +107,10 @@ export function GuideLauncher({
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={open}
+        /* Never part of anything printed. It is `position: fixed`, so it survives a print
+           that has hidden the page around it — caught on the QR poster, where it landed in
+           the corner of the sheet. See the `@media print` block in `app/globals.css`. */
+        data-print-hide
         // Below 744 the label is not rendered, so without this the button is a glyph with no
         // name. The two facts after it are the ones somebody uses to decide whether to start
         // now: how long it runs, and that it is divided rather than one unbroken block.

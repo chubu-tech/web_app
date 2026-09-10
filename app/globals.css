@@ -969,3 +969,100 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   The salon QR poster — a port of `Tho QR Poster.dc.html`.
+
+   The third and last block of component CSS in this project, and it is here for
+   the reason the leaflet block above is: none of it is expressible as a utility.
+   Two things in particular have no Tailwind form — "hide every element that is
+   not this one" across a print boundary, and `@page`.
+
+   ## The canvas is fixed and scaled whole
+
+   The design is 1240x1754 (A4's ratio at 150dpi) and every value in it is a
+   pixel at that size. So `.tho-poster` is rendered at exactly that and scaled by
+   `--poster-scale`; the frame reserves the scaled box, because a transform does
+   not affect layout and the card would otherwise reserve the full 1754px.
+
+   `transform: scale()` takes a unitless number, so the print scale cannot be
+   written `calc(210mm / 1240)`. It is 0.6400813 — A4's 210mm is 793.7008px at
+   the 96dpi CSS fixes for physical units, and 793.7008 / 1240 = 0.6400813. The
+   height falls out exactly: 1754 x 0.6400813 = 1122.7px = 297mm.
+   --------------------------------------------------------------------------- */
+.tho-poster-frame {
+  width: calc(1240px * var(--poster-scale));
+  height: calc(1754px * var(--poster-scale));
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.tho-poster {
+  transform: scale(var(--poster-scale));
+  transform-origin: top left;
+}
+
+@media print {
+  /* The console's chrome is not part of a poster: the sticky header, the salon
+     switcher, the page heading, and each card's own name and buttons. */
+  body[data-print-mode] header,
+  body[data-print-mode] nav,
+  body[data-print-mode] [data-print-hide] {
+    display: none !important;
+  }
+
+  /* Every other salon's card. */
+  body[data-print-mode] .qr-poster:not([data-printing]) {
+    display: none !important;
+  }
+
+  /* The card being printed stops being a card: it is only a positioning context
+     for the sheet inside it. `fixed` rather than `absolute` because the
+     ancestors it is escaping are themselves in flow, so an absolute box would
+     still be offset by whatever remains above it. */
+  body[data-print-mode] .qr-poster[data-printing] {
+    position: fixed;
+    inset: 0;
+    display: block;
+    margin: 0;
+    padding: 0;
+    gap: 0;
+    background: transparent;
+    border: 0 !important;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* The poster itself, at A4.
+
+     `!important` on the custom property is load-bearing, not defensive. The preview
+     scale is an **inline** style — the component sets `--poster-scale` on this same
+     element so each caller can size its own preview — and an inline declaration
+     outranks any selector in a stylesheet. Without it this rule loses, and the sheet
+     prints at whatever the on-screen preview happened to be: measured at 124mm wide
+     on a 210mm page, which reads as a layout bug rather than a specificity one. */
+  body[data-print-mode] .qr-poster[data-printing] .tho-poster-frame {
+    --poster-scale: 0.6400813 !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+  }
+
+  /* Without this the sheet prints as white paper with black text: browsers drop
+     background images and colours by default, and on this design the background
+     *is* the poster — a red gradient, a gold dot texture, two gold rules and a
+     cream QR card. Applied to the descendants too, because each carries its own
+     background. */
+  body[data-print-mode] .tho-poster,
+  body[data-print-mode] .tho-poster * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Borderless A4: the design owns its own 74px/92px margins, so a printer
+     margin on top of them would shrink the sheet and break the ratio. */
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}

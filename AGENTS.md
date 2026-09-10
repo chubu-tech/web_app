@@ -324,13 +324,20 @@ are live**: Insights · Calendar · Queue · Messages · Settings, the app's own
 order.
 
 Settings is a **hub with two groups**, which is where the whole of the app's ten-item drawer
-went: `SETUP_DESTINATIONS` (Salon details, Opening hours, Services, Staff) and
+went: `SETUP_DESTINATIONS` (Salon details, Opening hours, Services, **QR posters**, Staff) and
 `BACK_OFFICE_DESTINATIONS` (Client book, Product orders, Products, Offers, Loyalty, Payroll, Tax
-estimate, Plan & billing). Two groups rather than one list of twelve because they answer different
+estimate, Plan & billing). Two groups rather than one list of thirteen because they answer different
 questions: setup is what you finish once, the back office is what you come back to. Every row
 carries the live state of what it leads to — *"1 new order"*, *"4 products · 1 sold out"*,
 *"Growth · 3 requests pending"* — and a locked row states the tier instead of a count, and is not
 fetched at all.
+
+**QR posters is the one row in either group whose state is not about the active salon.** Its
+line reads *"9 of 10 posters ready to print"*, counted across every salon the owner runs,
+because the page behind it is estate-wide (see *One permanent link per salon* under the walk-in
+queue). `SettingsHub` therefore takes `qrReady`/`qrTotal` rather than deriving them from
+`business` like every other row — if a second cross-salon destination ever lands, that is the
+seam it follows.
 
 **The phone bar carries four of the five.** `phoneOwnerTabs()` drops Settings, which moves to a
 gear beside the bell in the header: five fixed items at 390px leaves each 78px, which is where
@@ -514,6 +521,95 @@ Renaming it breaks every QR already on a counter.
 - **The owner board can now call the next customer** — `/business/queue`, added in 3a. Until
   then the salon had to run its line in the Flutter app while the customer held their place
   here, which is the hole 3a closed.
+
+### One permanent link per salon, and what happens after the scan
+
+`/business/qr` gives every salon the owner runs a printable A4 poster, and `/q/<businessId>`
+is the one address it encodes — **for the life of the salon**. Seven things are load-bearing.
+
+- **The origin is a constant, not the request host.** `DEEP_LINK_ORIGIN` in `lib/app-links.ts`
+  pins every printed code to `https://bhutansalons.com`. This is not a preference: the app's
+  `AndroidManifest.xml` pins its App Links filter to `android:host="bhutansalons.com"` with
+  `pathPrefix="/q/"`, and the Apple file is served from that domain — so a code on any other
+  host **cannot** hand off to Tho. An earlier version built it from the `host` header so a
+  preview produced a preview code, which is right for a link you click and wrong for one you
+  laminate. `NEXT_PUBLIC_SITE_URL` is deliberately not consulted either: it is inlined at build
+  time and a misconfigured build would bake `localhost:3000` onto paper.
+- **The encoders are one module.** `lib/qr.ts` owns `queueScanUrl`, `qrSvg` and `qrPath`, and
+  the queue sheet was moved onto it. Two encoders would eventually disagree about a URL, and
+  for a code already on a counter that is unrecoverable.
+- **`/q/<id>` is a hub, which is what unlocked the poster for every salon.** It used to be a
+  walk-in join form and nothing else, so a poster needed `runsQueue` — one salon in ten on the
+  live estate. `components/customer/scan-actions.tsx` adds booking, the shop (gated on the
+  salon actually having products, as the salon page's own tab is) and the salon page, with the
+  queue form still the primary content when there is one. Booking works for every approved
+  salon, so nothing is left for the queue to gate.
+- **What still blocks a poster is only a printed 404.** `posterBlockReason` defers to
+  **`isListed`** — the same `status === "approved" && isActive` predicate every customer
+  surface uses — and only *explains* a refusal it has already made. That shared authority is
+  the point: a poster printable for a salon Discover will not show would mean the two
+  disagreeing about "reachable". `businesses_select` requires approval on its public branch,
+  so an owner previewing their own poster sees a working page while every customer who scans
+  it does not; `Highland Barbers` is a live pending example, and it is the case most likely to
+  be printed by accident precisely because the owner cannot reproduce it.
+- **`qrPath` fills; `qrSvg` strokes. They are not interchangeable.** This cost a build where
+  the markup was perfect and the card rendered empty: `qrcode` emits horizontal segments on
+  half-pixel centre lines, zero-area, which only become squares under `stroke-width: 1`. The
+  design fills its own `<svg>`, so `qrPath` builds one closed rectangle per dark module
+  (`M{c} {r}h1v1h-1z`) exactly as the design's `qr.js` does. `path.getBBox()` returning an
+  empty rect is the tell. Proved equivalent to the shipping renderer by module set: 740 dark
+  modules, zero difference.
+- **The print scale needs `!important`.** The preview scale is an **inline** style, because
+  each caller sizes its own preview, and an inline declaration outranks any stylesheet
+  selector — including one setting a custom property. Without it the sheet printed at 124mm on
+  a 210mm page, which reads as a layout bug rather than a specificity one.
+- **The image is saved to the `media` bucket, not to a column.** There is no
+  `businesses.qr_image_url` and adding one would be a migration, which belongs upstream. The
+  path is a pure function of uid and salon id (`lib/api/qr-storage.ts`), so the public URL is
+  derivable with no row to keep in sync — better than a column would have been. It is a
+  **stable** path, deliberately against AGENTS.md's "fresh path per upload", because a
+  timestamped name would mint a new URL on every save, which is the changing link the feature
+  exists to prevent. It still never upserts: a duplicate is removed and rewritten, so "save
+  again" does what it says. That matters — when the origin moved to `bhutansalons.com` every
+  saved PNG became stale, and the first version had no way to correct one.
+
+**The poster is a port of `Tho QR Poster.dc.html`** (Claude Design project
+`8479738e-09c5-4f7e-a267-576fe9322fee`), rendered by `components/owner/salon-poster.tsx` on a
+fixed **1240×1754** canvas scaled whole — A4's ratio at 150dpi, print scale **0.6400813**,
+since `transform: scale()` takes no units. Three copy decisions diverge from the design and
+all three are about permanence:
+
+- **The headline is one word, `SCAN`.** The design drew *"SCAN / TO BOOK"*; the destination is
+  a hub, so a headline naming one of its three actions is the thing most likely to go stale on
+  a sheet that hangs for years.
+- **The URL is not printed.** It read `bhutansalons.com/q/<uuid>` — a v4 UUID wrapping onto two
+  lines, which no customer will ever type. `www.bhutansalons.com` is printed instead: short,
+  memorable, and verified to resolve. The real target survives as the `<svg>`'s `aria-label`,
+  for the one audience that needs it and cannot scan.
+- **Hours are 12-hour**, a port of the app's own `formatMinutes12`. AGENTS.md's standing
+  divergence (`lib/hours.ts` is 24-hour) is about the *editor*, where a pill saying "1:00 pm"
+  beside an input saying "13:00" would be worse. Nothing here sits beside a time input, so
+  this is a **return** to upstream rather than a second divergence. `posterHoursLine` prints
+  the longest run of consecutive days that genuinely share hours — always true, only ever
+  incomplete, because the alternative is a poster that is false on one day.
+
+**The OS already opens the app, and `OpenInApp` is for when it does not.**
+`public/.well-known/assetlinks.json` and `apple-app-site-association` mean a camera scan is
+handed straight to Tho when it is installed — and when that fires nobody sees the component.
+It exists for the cases where it demonstrably did not: an **in-app browser** (WhatsApp,
+Instagram — how these links actually spread here) ignores App Links entirely; iOS suppresses
+Universal Links on same-domain navigation; Android caches its verdict at install time.
+
+- **The printed code stays https and the button uses the custom scheme.** Each covers the
+  other's failure. Do not collapse them into one link.
+- **It is an anchor, never a scripted `location` assignment.** A browser asked to follow an
+  unhandled scheme *from a link* quietly does nothing; the scripted form throws up *"Safari
+  cannot open the page because the address is invalid"*.
+- **Both store listings are live**, verified by request. `chubu-tech`'s
+  `STORE_DEPLOYMENT_CHECKLIST.md:456` still shows Play as unpromoted — **that line is stale**,
+  and it is upstream's document, so it is noted rather than edited.
+- **"Continue in browser" is not a courtesy.** The web join is a complete working feature and a
+  modal with no way past it would break the thing this route is for.
 
 **The app notifies; the browser does not. This paragraph said "nothing promises a
 notification" and that stopped being true on 2026-08-06.**
@@ -1333,9 +1429,21 @@ npm run lint
 npm run test      # ported pure logic
 ```
 
-A clean build, lint and test run is the bar — currently **789 tests across 37 files** and **80
-route entries** in the build tree (re-measured 2026-09-01, when the walkthrough feature was
-removed; the route count is unchanged, because the guide never added a route). Count routes with the tree itself
+A clean build, lint and test run is the bar — currently **1145 tests across 52 files** and **81
+route entries** in the build tree (re-measured 2026-09-10, after the QR posters were rebased
+onto the 13-commit upstream batch). Lint reports **0 errors and 3 warnings**, all of them
+unused `no-img-element` disables in `app/apple-icon.tsx`, `app/icon.tsx` and
+`app/opengraph-image.tsx` — pre-existing, and cheap to clear next time those files are open.
+
+**Both of those numbers had drifted, and the route count had drifted in the direction that
+hides a new route.** The line here read *789 tests across 37 files* and *80 route entries*;
+measured on the commit before the posters landed, the truth was **968 tests across 41 files
+and 79 routes**. So the stated route count already matched what the tree would say *after* a
+route was added — an agent adding one and re-counting would have found 80, matched the
+document, and concluded nothing had changed. Re-measure both halves against a stash of your
+own work rather than against this paragraph.
+
+Count routes with the tree itself
 (`npm run build | sed -n '/^Route (app)/,/(Dynamic)/p'` piped to `grep -c "^[├└]"`) rather than by
 eye: a loose grep over that output has produced 66, 69 and 70 for the same build.
 

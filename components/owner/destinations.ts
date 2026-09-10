@@ -92,6 +92,7 @@ export const OWNER_TABS: OwnerDestination[] = [
       "/business/offers",
       "/business/loyalty",
       "/business/plans",
+      "/business/qr",
     ],
   },
 ];
@@ -126,6 +127,19 @@ export const SETUP_DESTINATIONS = [
     label: "Staff",
     icon: Icons.people,
     blurb: "Your team, what each of them does, and when they work",
+  },
+  /**
+   * Setup rather than back office, and it is the one row here that is not about *this*
+   * salon: the page covers every salon the owner runs. It sits in this group because
+   * equipping a counter is a thing you finish once — print it, stick it up, done — and
+   * because it belongs beside the other "get the shop ready" rows rather than beside the
+   * reports you come back to weekly. See the page's own note on why it is cross-salon.
+   */
+  {
+    href: "/business/qr",
+    label: "QR posters",
+    icon: Icons.qr,
+    blurb: "One permanent code per salon — book, shop or join the line",
   },
 ] as const;
 

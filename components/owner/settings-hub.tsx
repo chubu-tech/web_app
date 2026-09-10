@@ -54,6 +54,8 @@ export function SettingsHub({
   loyaltyProgram,
   loyaltyRewards,
   pendingPlanRequests,
+  qrReady,
+  qrTotal,
 }: {
   business: Business;
   services: ServiceItem[];
@@ -69,12 +71,18 @@ export function SettingsHub({
   loyaltyProgram: LoyaltyProgram | null;
   loyaltyRewards: LoyaltyReward[] | null;
   pendingPlanRequests: number;
+  /** How many of the owner's salons have a printable QR, and how many there are. */
+  qrReady: number;
+  qrTotal: number;
 }) {
   const setupState: Record<string, string> = {
     "/business/settings/salon": salonLine(business),
     "/business/hours": hoursLine(hours),
     "/business/services": servicesLine(services),
     "/business/staff": staffLine(staff, staffWithoutHours),
+    // The one row here that is not about the active salon — the page covers the whole
+    // estate, so the count does too.
+    "/business/qr": qrLine(qrReady, qrTotal),
   };
 
   const backOfficeState: Record<string, string> = {
@@ -185,6 +193,17 @@ function Rows({
 }
 
 /** A locked row states the tier rather than a count — there is nothing to count yet. */
+/**
+ * "3 of 9 ready to print" — and the blocked ones are the useful half of that sentence,
+ * since a salon without a walk-in queue cannot have a poster at all.
+ */
+function qrLine(ready: number, total: number): string {
+  if (total === 0) return "A poster for each salon's counter";
+  if (ready === 0) return `No posters yet \u2014 ${total === 1 ? "this salon is" : "these salons are"} not approved yet`;
+  if (ready === total) return `${ready} ${ready === 1 ? "poster" : "posters"} ready to print`;
+  return `${ready} of ${total} ready to print`;
+}
+
 function locked(tier: string): string {
   return `${tier} plan and up`;
 }

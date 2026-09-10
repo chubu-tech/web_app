@@ -26,6 +26,7 @@ import {
   Coffee,
   Compass,
   CreditCard,
+  Download,
   Eye,
   EyeOff,
   Filter,
@@ -72,6 +73,7 @@ import {
   Send,
   Settings,
   Share2,
+  Smartphone,
   ShoppingBag,
   ShoppingCart,
   Sparkles,
@@ -330,6 +332,17 @@ export const Icons = {
   /** The bell with something in it. Paired with `notification`: one concept, two states. */
   notificationActive: BellDot,
   phone: Phone,
+  /**
+   * The Tho app itself, as a thing you can hold — the "Open in the app" hand-off on a
+   * scanned queue link.
+   *
+   * **Deliberately not `phone`.** That one is a handset and means *call this salon*; this
+   * one is a device and means *the app on it*. One name per concept is the whole point of
+   * this file, and collapsing the two would put a "ring them" glyph on a download.
+   */
+  mobileApp: Smartphone,
+  /** Get the app from a store — paired with `mobileApp`, which is where it lands. */
+  download: Download,
   /** `AppIcons.mail` — the email row on Profile, which is a fact and not a channel. */
   mail: Mail,
   /**
