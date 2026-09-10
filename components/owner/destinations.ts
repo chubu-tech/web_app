@@ -102,6 +102,7 @@ export const OWNER_TABS: OwnerDestination[] = [
       "/business/offers",
       "/business/loyalty",
       "/business/plans",
+      "/business/qr",
     ],
   },
 ];
@@ -115,6 +116,7 @@ export const OWNER_TABS: OwnerDestination[] = [
  * `Record<OwnerRowIcon, …>` so a name with no glyph behind it is a compile error rather than a
  * blank square on the page.
  */
+<<<<<<< HEAD
 const ROW_ICONS: Record<OwnerRowIcon, typeof Icons.salon> = {
   salon: Icons.salon,
   clock: Icons.clock,
@@ -129,6 +131,47 @@ const ROW_ICONS: Record<OwnerRowIcon, typeof Icons.salon> = {
   tax: Icons.tax,
   premium: Icons.premium,
 };
+=======
+export const SETUP_DESTINATIONS = [
+  {
+    href: "/business/settings/salon",
+    label: "Salon details",
+    icon: Icons.salon,
+    blurb: "Name, type, address, contact, photos and the map pin",
+  },
+  {
+    href: "/business/hours",
+    label: "Opening hours",
+    icon: Icons.clock,
+    blurb: "When the shop is open, day by day",
+  },
+  {
+    href: "/business/services",
+    label: "Services",
+    icon: Icons.haircut,
+    blurb: "What you offer, how long it takes and what it costs",
+  },
+  {
+    href: "/business/staff",
+    label: "Staff",
+    icon: Icons.people,
+    blurb: "Your team, what each of them does, and when they work",
+  },
+  /**
+   * Setup rather than back office, and it is the one row here that is not about *this*
+   * salon: the page covers every salon the owner runs. It sits in this group because
+   * equipping a counter is a thing you finish once — print it, stick it up, done — and
+   * because it belongs beside the other "get the shop ready" rows rather than beside the
+   * reports you come back to weekly. See the page's own note on why it is cross-salon.
+   */
+  {
+    href: "/business/qr",
+    label: "QR posters",
+    icon: Icons.qr,
+    blurb: "One permanent code per salon — book, shop or join the line",
+  },
+] as const;
+>>>>>>> c67eb6b8491c7e8a01a1c510d39504e66ac7bef3
 
 export function rowIcon(name: OwnerRowIcon): typeof Icons.salon {
   return ROW_ICONS[name];

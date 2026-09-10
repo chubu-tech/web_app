@@ -15,6 +15,7 @@ import { fetchServices, fetchStaff } from "@/lib/api/salon";
 import { offerVisibility } from "@/lib/analytics";
 import { hasFeature } from "@/lib/entitlements";
 import { getOwnerContext } from "@/lib/owner/context";
+import { posterBlockReason } from "@/lib/poster";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -37,7 +38,7 @@ export const metadata: Metadata = { title: "Settings" };
  * would only fail.
  */
 export default async function OwnerSettingsPage() {
-  const { active } = await getOwnerContext();
+  const { active, businesses } = await getOwnerContext();
   if (!active) return <NoSalonYet />;
 
   const supabase = await createClient();
@@ -88,6 +89,10 @@ export default async function OwnerSettingsPage() {
       loyaltyProgram={program}
       loyaltyRewards={rewards}
       pendingPlanRequests={requests.filter((r) => r.status === "pending").length}
+      /* Across every salon, not just the active one — the QR posters page is the one
+         destination in this hub that is estate-wide. */
+      qrReady={businesses.filter((b) => posterBlockReason(b) == null).length}
+      qrTotal={businesses.length}
     />
   );
 }
