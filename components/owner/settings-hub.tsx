@@ -87,21 +87,12 @@ export function SettingsHub({
     "/business/hours": hoursLine(hours),
     "/business/services": servicesLine(services),
     "/business/staff": staffLine(staff, staffWithoutHours),
-<<<<<<< HEAD
-    "/business/clients": clientCount == null ? "" : clientsLine(clientCount),
-    "/business/orders": newOrderCount == null ? "" : ordersLine(newOrderCount),
-    "/business/products": products == null ? "" : productsLine(products),
-=======
     // The one row here that is not about the active salon — the page covers the whole
     // estate, so the count does too.
     "/business/qr": qrLine(qrReady, qrTotal),
-  };
-
-  const backOfficeState: Record<string, string> = {
-    "/business/clients": clientCount == null ? locked("Growth") : clientsLine(clientCount),
-    "/business/orders": newOrderCount == null ? locked("Growth") : ordersLine(newOrderCount),
-    "/business/products": products == null ? locked("Growth") : productsLine(products),
->>>>>>> c67eb6b8491c7e8a01a1c510d39504e66ac7bef3
+    "/business/clients": clientCount == null ? "" : clientsLine(clientCount),
+    "/business/orders": newOrderCount == null ? "" : ordersLine(newOrderCount),
+    "/business/products": products == null ? "" : productsLine(products),
     "/business/offers": offersLine(offerCount, liveOfferCount),
     "/business/loyalty":
       loyaltyRewards == null ? "" : loyaltyLine(loyaltyProgram, loyaltyRewards),
@@ -208,12 +199,10 @@ function Rows({
   );
 }
 
-<<<<<<< HEAD
-=======
-/** A locked row states the tier rather than a count — there is nothing to count yet. */
 /**
  * "3 of 9 ready to print" — and the blocked ones are the useful half of that sentence,
- * since a salon without a walk-in queue cannot have a poster at all.
+ * since a salon still in review cannot have a poster at all. `posterBlockReason` is the
+ * authority on which those are, and it defers to `isListed`.
  */
 function qrLine(ready: number, total: number): string {
   if (total === 0) return "A poster for each salon's counter";
@@ -222,11 +211,6 @@ function qrLine(ready: number, total: number): string {
   return `${ready} of ${total} ready to print`;
 }
 
-function locked(tier: string): string {
-  return `${tier} plan and up`;
-}
-
->>>>>>> c67eb6b8491c7e8a01a1c510d39504e66ac7bef3
 function salonLine(b: Business): string {
   const bits: string[] = [];
   bits.push(b.addressText?.trim() ? b.addressText.trim() : "No address yet");

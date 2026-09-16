@@ -84,7 +84,7 @@ export default async function JoinQueuePage({
     a whole round trip. The redirect path is no slower either way, because it still waits
     for the same two hops.
   */
-  const [business, account, services, staff, line] = await Promise.all([
+  const [business, account, services, staff, line, products] = await Promise.all([
     loadBusiness(id),
     // Memoised and already resolved by the shell layout, so this costs nothing here.
     getAccount(),
@@ -94,6 +94,15 @@ export default async function JoinQueuePage({
     // signed-out visitor. Caught on its own, and `null` reaches the badge as
     // "Wait unknown" rather than a fabricated zero.
     fetchActiveLine(supabase, id).catch(() => null as QueueEntry[] | null),
+    /*
+      Gated on the salon having products, not on its plan allowing them — the same test
+      the salon page's own Shop tab uses. A plan that permits an empty shelf is not a shop,
+      and a row leading to one is the dead end `destinations.ts` exists to prevent.
+
+      Caught into `[]`: a failed read costs the shop row, and the rest of the page — which
+      is the part somebody standing at a counter needs — is unaffected.
+    */
+    fetchProductsForBusiness(supabase, id).catch(() => []),
   ]);
   if (!business) notFound();
 
@@ -119,8 +128,6 @@ export default async function JoinQueuePage({
     if (mine) redirect(`/queue/${mine.id}`);
   }
 
-<<<<<<< HEAD
-=======
   /**
    * Does this salon actually take walk-ins?
    *
@@ -131,29 +138,6 @@ export default async function JoinQueuePage({
    */
   const queueOpen = runsQueue(business);
 
-  const [services, staff, line, products] = await Promise.all([
-    // Only the walk-in form uses these two, so they are skipped entirely on a salon
-    // without a queue — which is most of them.
-    queueOpen ? fetchServices(supabase, id) : Promise.resolve([]),
-    queueOpen ? fetchStaff(supabase, id) : Promise.resolve([]),
-    // `queue_active_line` is revoked from `anon`, so this simply fails for a
-    // signed-out visitor. Caught on its own, and `null` reaches the badge as
-    // "Wait unknown" rather than a fabricated zero.
-    queueOpen
-      ? fetchActiveLine(supabase, id).catch(() => null as QueueEntry[] | null)
-      : Promise.resolve(null),
-    /*
-      Gated on the salon having products, not on its plan allowing them — the same test
-      the salon page's own Shop tab uses. A plan that permits an empty shelf is not a shop,
-      and a row leading to one is the dead end `destinations.ts` exists to prevent.
-
-      Caught into `[]`: a failed read costs the shop row, and the rest of the page — which
-      is the part somebody standing at a counter needs — is unaffected.
-    */
-    fetchProductsForBusiness(supabase, id).catch(() => []),
-  ]);
-
->>>>>>> c67eb6b8491c7e8a01a1c510d39504e66ac7bef3
   return (
     <div className="px-base py-lg mx-auto w-full max-w-[560px] tablet:px-lg">
       {/*
