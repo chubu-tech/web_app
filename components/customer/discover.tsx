@@ -27,7 +27,7 @@ import {
 } from "@/lib/salon-filters";
 import {
   EMPTY_PRODUCT_FILTER,
-  priceBounds,
+  PRODUCT_PAGE_SIZE,
   productFilterCount,
   productFilterIsActive,
   productFilterToParams,
@@ -76,6 +76,10 @@ export function Discover({
   favouriteIds,
   filters,
   products,
+  hasMoreProducts,
+  take,
+  productBounds,
+  stockedCategoryIds,
   productCategories,
   categorySlug,
   productFilter,
@@ -95,13 +99,36 @@ export function Discover({
    * visitor — the RPC is revoked from `anon` — so the row is absent rather than broken.
    */
   availability: SalonAvailability[];
-  /** Every buyable product, across every salon — the Products segment's whole catalogue. */
+  /**
+   * **One page of the storefront, already narrowed and sorted by the server** — not the
+   * catalogue. Every facet is applied across the whole of it before paging, so this is the
+   * right twenty-four rows rather than the first twenty-four filtered afterwards.
+   */
   products: Product[];
+  /** Whether the server had a row past this page — drives "Load more" and nothing else. */
+  hasMoreProducts: boolean;
+  /** How much of the run is on screen, from `?take=`. The next press asks for one page more. */
+  take: number;
+  /**
+   * The cheapest and dearest in the browse's scope, measured across the **catalogue**.
+   *
+   * Not from `products`: page one is not the catalogue, so a slider built from it would be
+   * wrong and would silently widen as somebody pressed "Load more".
+   */
+  productBounds: { lowest: number; highest: number };
+  /**
+   * The categories that have something buyable on them, by id.
+   *
+   * Also a consequence of paging: the strip only offers stocked shelves, and that rule used to
+   * be free because the browse held everything. One `distinct`-shaped read buys it back — and
+   * it earns its keep today, when every live product has a null category.
+   */
+  stockedCategoryIds: string[];
   /** The platform taxonomy, in its own `sort` order. Empty when the read failed. */
   productCategories: ProductCategory[];
   /** From `?cat=`, a slug. Null on the unnarrowed browse. */
   categorySlug: string | null;
-  /** From `?sort=&min=&max=`, already reconciled against the loaded bounds by the page. */
+  /** From `?sort=&min=&max=&brands=&rating=&sale=`, reconciled against the bounds by the page. */
   productFilter: ProductFilter;
   /** From `?tab=`. Anything but `products` is the salon list. */
   tab: "salons" | "products";
@@ -180,6 +207,17 @@ export function Discover({
    * the URL is updated once when the search is actually meant.
    */
   function applySearch(term: string) {
+    /*
+      **The box belongs to whichever segment is on screen.** This built a salon-filter URL
+      whatever the tab, so submitting a search from Products dropped `tab=products` along with
+      the shelf and the filter and landed the customer back among salons. Harmless while the
+      products term was browser state that survived the navigation; not harmless now that the
+      server is the thing applying it.
+    */
+    if (tab === "products") {
+      router.replace(productHref(productFilter, categorySlug, term), { scroll: false });
+      return;
+    }
     const params = new URLSearchParams(toParams(filters));
     const trimmed = term.trim();
     if (trimmed) params.set("q", trimmed);
@@ -200,8 +238,7 @@ export function Discover({
       router.push(CUSTOMER_HOME, { scroll: false });
       return;
     }
-    const params = new URLSearchParams({ tab: "products", ...productFilterToParams(productFilter) });
-    router.push(`${CUSTOMER_HOME}?${params.toString()}`, { scroll: false });
+    router.push(productHref(productFilter, categorySlug, query), { scroll: false });
   }
 
   /*
@@ -211,23 +248,46 @@ export function Discover({
     the bug the salon side already documents in `goToTab`.
   */
   function applyProducts(next: ProductFilter) {
-    pushProducts(productFilterToParams(next), categorySlug);
+    router.push(productHref(next, categorySlug, query), { scroll: false });
   }
 
   function applyCategory(slug: string | null) {
-    pushProducts(productFilterToParams(productFilter), slug);
+    router.push(productHref(productFilter, slug, query), { scroll: false });
   }
 
-  function pushProducts(filterParams: Record<string, string>, cat: string | null) {
-    const params = new URLSearchParams({ tab: "products", ...filterParams });
+  /**
+   * Every Products URL, from one place.
+   *
+   * Each axis states all four rather than patching the current URL, which is what makes each of
+   * them preserve the other three by construction instead of by remembering to. **`take` is the
+   * exception and is deliberately omitted by default**: changing the shelf, the filter or the
+   * search term is a new run, and carrying the old depth would make a narrowing action fetch two
+   * hundred rows of something else.
+   */
+  function productHref(
+    filter: ProductFilter,
+    cat: string | null,
+    term: string,
+    depth?: number,
+  ): string {
+    const params = new URLSearchParams({ tab: "products", ...productFilterToParams(filter) });
     if (cat) params.set("cat", cat);
-    router.push(`${CUSTOMER_HOME}?${params.toString()}`, { scroll: false });
+    if (term.trim()) params.set("q", term.trim());
+    if (depth != null) params.set("take", String(depth));
+    return `${CUSTOMER_HOME}?${params.toString()}`;
   }
 
   const onProducts = tab === "products";
-  // The range control spans what is actually loaded, so the bounds come from the catalogue rather
-  // than from a constant nobody maintains.
-  const bounds = useMemo(() => priceBounds(products), [products]);
+
+  /*
+    One page more of the same run, as a link rather than a button: the browse is a server
+    render, so "Load more" is a navigation and gets RSC prefetch, a shareable URL for what is
+    on screen, and a back button that steps back through the presses. `scroll: false` is what
+    keeps it feeling like an append instead of a page change.
+  */
+  const loadMoreHref = hasMoreProducts
+    ? productHref(productFilter, categorySlug, query, take + PRODUCT_PAGE_SIZE)
+    : null;
 
   // Distance is applied here rather than server-side: there is no PostGIS, and the
   // coordinates are already in hand. Both thumbs, not just the far one — the control
@@ -542,8 +602,8 @@ export function Discover({
               // the URL claiming a term the visitor has just removed.
               if (next === "" && searchTerm !== "") applySearch("");
             }}
-            placeholder="Search salons & barbers"
-            aria-label="Search salons and barbers"
+            placeholder={onProducts ? "Search products" : "Search salons & barbers"}
+            aria-label={onProducts ? "Search products" : "Search salons and barbers"}
             className="text-body-md text-ink placeholder:text-muted min-h-12 flex-1 bg-transparent outline-none"
           />
         </form>
@@ -554,11 +614,13 @@ export function Discover({
           <ProductsBrowse
             products={products}
             categories={productCategories}
+            stockedCategoryIds={stockedCategoryIds}
             categorySlug={categorySlug}
             onSelectCategory={applyCategory}
             query={query}
             filter={productFilter}
             onClearFilter={() => applyProducts(EMPTY_PRODUCT_FILTER)}
+            loadMoreHref={loadMoreHref}
           />
         </div>
       ) : (
@@ -792,7 +854,7 @@ export function Discover({
         open={productFilterOpen}
         onClose={() => setProductFilterOpen(false)}
         filter={productFilter}
-        bounds={bounds}
+        bounds={productBounds}
         onApply={applyProducts}
       />
     </div>

@@ -23,8 +23,12 @@ export const SHOP_ERROR = {
   guestRefused: "P0010",
   /** Something in the cart is no longer buyable. `place_order` only. */
   unavailable: "P0002",
-  /** The catch-all raise: a plan gate, a missing reward, or not enough points. */
+  /** The catch-all raise: a plan gate, a bad fulfilment, a missing reward, or not enough points. */
   raised: "P0001",
+  /** `place_order` only: the promo code was refused. The sentence names which of the five reasons. */
+  promoRefused: "P0003",
+  /** `place_order` only: the reward cannot be spent on this order. */
+  rewardRefused: "P0004",
   /** Acting on somebody else's order or redemption. Should be unreachable. */
   notYours: "42501",
 } as const;
@@ -34,6 +38,7 @@ export type ShopAction =
   | "cancelOrder"
   | "redeem"
   | "cancelRedemption"
+  | "submitReview"
   | "loadProducts";
 
 const FALLBACK: Record<ShopAction, string> = {
@@ -41,6 +46,7 @@ const FALLBACK: Record<ShopAction, string> = {
   cancelOrder: "Couldn't cancel that order.",
   redeem: "Couldn't redeem that reward.",
   cancelRedemption: "Couldn't cancel that redemption.",
+  submitReview: "Couldn't save your rating. Please try again.",
   loadProducts: "Couldn't load products.",
 };
 
@@ -85,6 +91,17 @@ export function shopErrorMessage(action: ShopAction, error: unknown): string {
     return "That isn't yours to change.";
   }
 
+  /*
+    Both are `place_order`'s and both are **races the customer can act on**, so both hand back
+    the server's own sentence rather than a generic one: 'that promo code has expired', 'that
+    reward is already on another order'. The checkout previews the code and filters the reward
+    list, so reaching either means the world moved between the render and the press — which is
+    exactly when saying *which* thing moved is worth the words.
+  */
+  if (code === SHOP_ERROR.promoRefused || code === SHOP_ERROR.rewardRefused) {
+    return messageOf(error, fallback);
+  }
+
   if (code === SHOP_ERROR.raised) {
     switch (action) {
       case "placeOrder":
@@ -102,6 +119,15 @@ export function shopErrorMessage(action: ShopAction, error: unknown): string {
         // 'redemption is not pending' — the salon honoured it while the screen was open, which is
         // good news wearing an error's clothes.
         return "That reward was already used.";
+      case "submitReview":
+        /*
+          Four different raises share this code, and each one names the thing that is actually
+          wrong: 'order not found', 'you can rate a product once the order is collected', 'that
+          product was not in this order', 'rating must be between 1 and 5'. The form only appears
+          on a collected order and only against its own lines, so all four mean the world moved
+          — and the server's own sentence is the only one that says which way.
+        */
+        return messageOf(error, fallback);
       default:
         return messageOf(error, fallback);
     }

@@ -48,6 +48,27 @@ export type Business = {
   /** Owner switch for the walk-in queue, independent of the plan gate. */
   queueEnabled: boolean;
   queueJoinMode: QueueJoinMode;
+  /*
+    Delivery. All three columns are granted to `anon` (checked), so they ride in
+    `BUSINESS_PUBLIC_SELECT` and a signed-out visitor filling a cart sees the same offer a
+    customer does.
+
+    **`deliveryEnabled` is the only thing that decides whether delivery is offered at all.**
+    `place_order` refuses `p_fulfilment = 'delivery'` at a salon with the switch off, so the
+    checkout must not draw the toggle for one — and no live salon has it on today, which makes
+    this the difference between a checkout that works and one that offers an option every salon
+    on the platform will refuse.
+  */
+  deliveryEnabled: boolean;
+  /** What delivery costs. Zero is free delivery for everyone, which is not the same as no delivery. */
+  deliveryFeeNu: number;
+  /**
+   * The order value at or above which delivery stops being charged. **Null means never free.**
+   *
+   * Measured against `subtotal − discount`, not the subtotal — see `orderTotals`, where that
+   * ordering is the one a client is most likely to get wrong.
+   */
+  freeDeliveryOverNu: number | null;
   reminderChannel: string;
   /**
    * The dashboard gauge's target. **Null means "no goal"** and the gauge shows an em dash —

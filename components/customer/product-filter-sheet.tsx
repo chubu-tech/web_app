@@ -21,10 +21,23 @@ import { formatNu } from "@/lib/utils";
  * number fields are reachable, announced, and let someone type "300" instead of hunting for it —
  * which on a catalogue with a Nu 280–450 spread is the difference between a control and a toy.
  *
- * **A bound is only kept when it narrows the loaded list.** `productFilterFromParams` enforces that
+ * **A bound is only kept when it narrows the catalogue.** `productFilterFromParams` enforces that
  * on the way back in, and the same rule is applied here on Apply so the badge never claims a filter
  * that matches everything. When every product costs the same there is no range to offer, and the
- * sheet says so rather than showing two fields that cannot do anything.
+ * sheet says so rather than showing two fields that cannot do anything. The bounds themselves now
+ * come from `productPriceBounds` — the whole catalogue, not the loaded page, which would have made
+ * the slider's travel depend on how far somebody had scrolled.
+ *
+ * ## Three facets the URL carries and this sheet does not draw
+ *
+ * `brandIds`, `minRating` and `onSale` are part of `ProductFilter`, are applied by the server, and
+ * survive a round trip through here untouched — hence the spread on Apply rather than a fresh
+ * object, which would silently drop a shared link's facets the first time somebody changed the
+ * sort. They get no controls yet **because there is nothing behind them**: live today the platform
+ * has no brands, no rated products and nothing marked down. Drawing three controls whose every
+ * setting returns an empty grid is the same mistake as a category strip full of empty shelves —
+ * so they arrive with the surfaces that give them something to narrow (a Deals rail for `onSale`,
+ * a brand list once brands exist), not before.
  */
 export function ProductFilterSheet({
   open,
@@ -53,6 +66,7 @@ export function ProductFilterSheet({
       hasRange &&
       ((lower != null && lower > bounds.lowest) || (upper != null && upper < bounds.highest));
     onApply({
+      ...filter,
       sort,
       minNu: narrows ? lower : null,
       maxNu: narrows ? upper : null,

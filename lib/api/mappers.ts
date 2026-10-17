@@ -50,6 +50,7 @@ import type {
   LoyaltyTransactionKind,
   Order,
   OrderItem,
+  ProductReview,
   PayrollRow,
   PlanChangeRequest,
   TaxEstimate,
@@ -114,6 +115,15 @@ export function toBusiness(m: Row): Business {
     // Defaults true — an owner opts *out* of the queue, not in.
     queueEnabled: (m.queue_enabled as boolean | null) ?? true,
     queueJoinMode: ((str(m.queue_join_mode) ?? "anywhere") as QueueJoinMode),
+    /*
+      `delivery_enabled` defaults **false** rather than true: a projection that does not name the
+      column must not make a salon look as though it delivers, because the checkout would then
+      offer a fulfilment `place_order` refuses. The fee and the threshold are read the same way
+      they are used — a missing fee is no fee, a missing threshold is no free delivery.
+    */
+    deliveryEnabled: m.delivery_enabled === true,
+    deliveryFeeNu: numOrNull(m.delivery_fee_nu) ?? 0,
+    freeDeliveryOverNu: numOrNull(m.free_delivery_over_nu),
     reminderChannel: str(m.reminder_channel) ?? "push",
     // The owner console's settings form is the only reader of these three, added in 3b so a
     // field can show what is stored rather than an empty box over a real value. `null` is a
@@ -720,6 +730,17 @@ export function toClientHistoryEntry(m: Row): ClientHistoryEntry {
   };
 }
 
+export function toProductReview(m: Row): ProductReview {
+  return {
+    id: m.id as string,
+    productId: m.product_id as string,
+    orderId: m.order_id as string,
+    rating: num(m.rating),
+    body: str(m.body),
+    createdAt: new Date(m.created_at as string),
+  };
+}
+
 export function toOrderItem(m: Row): OrderItem {
   return {
     id: m.id as string,
@@ -845,6 +866,10 @@ export function toLoyaltyRedemption(m: Row): LoyaltyRedemption {
     rewardId: str(m.reward_id),
     nameSnapshot: m.name_snapshot as string,
     typeSnapshot: (str(m.type_snapshot) ?? "percent_discount") as LoyaltyRewardType,
+    valueSnapshot:
+      typeof m.value_snapshot === "object" && m.value_snapshot !== null
+        ? (m.value_snapshot as Record<string, unknown>)
+        : null,
     pointCost: num(m.point_cost),
     code: m.code as string,
     status: (str(m.status) ?? "pending") as LoyaltyRedemptionStatus,

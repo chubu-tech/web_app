@@ -1,4 +1,4 @@
-import { Icons } from "./icons";
+import { Icons, IconSize } from "./icons";
 import { cn } from "@/lib/utils";
 
 /**
@@ -167,5 +167,91 @@ export function RatingPill({
         </span>
       ) : null}
     </span>
+  );
+}
+
+/**
+ * The interactive form of `StarBar` — five whole stars, as a radio group.
+ *
+ * Extracted from `review-sheet.tsx`, which had the only copy, at the moment a second surface
+ * needed one. Two private star pickers is how one gesture drifts into two controls that
+ * disagree about their own keyboard behaviour, which is the same reasoning that moved
+ * `MenuSheet` out of the chat menu.
+ *
+ * **Radios, not buttons.** A rating is one answer to one question, so the platform's own
+ * roving-focus and arrow-key behaviour is exactly right and comes free; five buttons would
+ * mean re-implementing it and announcing five unrelated controls. The inputs are `sr-only`
+ * and the glyphs are `aria-hidden`, so what a screen reader hears is "3 stars, radio button,
+ * selected" rather than a row of pictures.
+ *
+ * **Whole stars only**, which is why it draws `Icons.star` directly rather than going through
+ * `StarBar`: a picker cannot produce a half, so the half-fill machinery would be dead weight
+ * and a second interpretation of the same glyph.
+ *
+ * `name` must be unique on the page — a list of products each with its own picker is a list of
+ * separate radio groups, and sharing a name would make them one, so rating the shampoo would
+ * un-rate the conditioner.
+ */
+export function StarPicker({
+  value,
+  onChange,
+  name,
+  label = "Your rating out of 5",
+  size = IconSize.xl,
+  disabled = false,
+  className,
+}: {
+  /** 1–5, or 0 for "not rated yet" — which lights no stars. */
+  value: number;
+  onChange: (value: number) => void;
+  name: string;
+  label?: string;
+  size?: number;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <fieldset disabled={disabled} className={className}>
+      <legend className="sr-only">{label}</legend>
+      <div className="gap-xs flex">
+        {[1, 2, 3, 4, 5].map((star) => {
+          const lit = star <= value;
+          return (
+            <label
+              key={star}
+              className={cn(
+                "flex items-center justify-center",
+                // The 48px target the kit holds everywhere, independent of the glyph size,
+                // so a compact picker in a list row is still thumb-sized.
+                "size-12",
+                disabled ? "cursor-default opacity-60" : "cursor-pointer",
+              )}
+            >
+              <input
+                type="radio"
+                name={name}
+                value={star}
+                checked={value === star}
+                onChange={() => onChange(star)}
+                className="sr-only"
+              />
+              <span className="sr-only">
+                {star} star{star === 1 ? "" : "s"}
+              </span>
+              <Icons.star
+                aria-hidden
+                style={{ width: size, height: size }}
+                className={cn(
+                  "transition-transform duration-[var(--duration-fast)]",
+                  lit
+                    ? "text-star scale-100 fill-current drop-shadow-[0_0_12px_rgba(232,163,23,0.35)]"
+                    : "text-hairline scale-[0.88]",
+                )}
+              />
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }

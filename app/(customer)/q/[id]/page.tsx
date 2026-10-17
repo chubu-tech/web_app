@@ -71,29 +71,32 @@ export default async function JoinQueuePage({
   const supabase = await createClient();
 
   /*
-    ## One wave, then the redirect check
+    ## Two waves, and the second one was already unavoidable
 
     A poster is scanned by somebody standing at a counter, so every serial round trip here
-    is one the customer feels. This awaited four times — the salon row, the account, the
-    caller's own entry, then the three reads for the form — and only the entry read is a
-    real dependency: everything else keys off the id in the URL or off nothing at all.
+    is one the customer feels. This awaited **four** times — the salon row, the account, the
+    caller's own entry, then the reads behind the page — and only two of those are real
+    dependencies.
 
-    So the form's reads are paid up front rather than after the redirect check. On the
-    re-scan path (already in the line → redirected to `/queue/<entry>`) that spends three
-    reads nobody looks at; on the first-scan path, which is what a poster is for, it saves
-    a whole round trip. The redirect path is no slower either way, because it still waits
-    for the same two hops.
+    The split is by what a read needs, not by what the page shows. Nothing below keys off
+    anything but the id in the URL, so it goes first; the entry check needs the account, so
+    it cannot. That second hop exists whatever else happens, which is what makes the walk-in
+    form's three reads free: they ride **with** the entry check rather than after it, and the
+    only path that pays for them is one where somebody is about to fill the form in.
   */
-  const [business, account, services, staff, line] = await Promise.all([
+  const [business, account, products] = await Promise.all([
     loadBusiness(id),
     // Memoised and already resolved by the shell layout, so this costs nothing here.
     getAccount(),
-    fetchServices(supabase, id),
-    fetchStaff(supabase, id),
-    // `queue_active_line` is revoked from `anon`, so this simply fails for a
-    // signed-out visitor. Caught on its own, and `null` reaches the badge as
-    // "Wait unknown" rather than a fabricated zero.
-    fetchActiveLine(supabase, id).catch(() => null as QueueEntry[] | null),
+    /*
+      Gated on the salon having products, not on its plan allowing them — the same test the
+      salon page's own Shop tab uses. A plan that permits an empty shelf is not a shop, and a
+      row leading to one is the dead end `destinations.ts` exists to prevent.
+
+      Caught into an empty list: a failed read costs the shop row, and the rest of the page —
+      which is the part somebody standing at a counter needs — is unaffected.
+    */
+    fetchProductsForBusiness(supabase, id).catch(() => []),
   ]);
   if (!business) notFound();
 
@@ -110,50 +113,52 @@ export default async function JoinQueuePage({
   const hasSession = account.user != null;
   const registeredId = account.state === "registered" ? account.user.id : null;
 
-  // Already holding a place here? Re-scanning the same QR while waiting is a
-  // "where am I?" gesture, not a second join — send them to their position.
-  if (registeredId) {
-    const mine = await fetchActiveEntryForBusiness(supabase, registeredId, id).catch(
-      () => null,
-    );
-    if (mine) redirect(`/queue/${mine.id}`);
-  }
-
-<<<<<<< HEAD
-=======
   /**
    * Does this salon actually take walk-ins?
    *
-   * `queueEnabled && hasFeature(plan, "walkInQueue")` — the salon's own switch *and* the
-   * plan, the same pair the owner's board gates on. Nine of the ten live salons fail it,
-   * and before this page became a hub that meant nine salons could not have a poster at
-   * all: the only thing the destination did was refuse them with `P0001`.
+   * **The salon's own switch, and nothing else.** `join_queue` lost its plan gate in
+   * `20260902000003`, so `runsQueue` is `queueEnabled` alone and a Basic salon can run a
+   * line. Most live salons still have the switch off — the migration turned it off for
+   * every existing Basic salon rather than publishing a live "join the queue" surface at
+   * shops whose owners had never opened the board — and before this page became a hub,
+   * that meant those salons could not have a poster at all: the only thing the destination
+   * did was refuse them.
    */
   const queueOpen = runsQueue(business);
 
-  const [services, staff, line, products] = await Promise.all([
-    // Only the walk-in form uses these two, so they are skipped entirely on a salon
-    // without a queue — which is most of them.
-    queueOpen ? fetchServices(supabase, id) : Promise.resolve([]),
-    queueOpen ? fetchStaff(supabase, id) : Promise.resolve([]),
+  /*
+    ## Wave two: the entry check, and the form's reads beside it
+
+    The redirect check has to wait for the account, so this hop is already being paid. The
+    three reads behind the walk-in form key off the id alone and could have gone in wave
+    one — but putting them here costs no extra round trip and lets them be **skipped**, and
+    the two conditions they are skipped under are most of the traffic: a salon with the
+    switch off (most of them, and `queue_active_line` would only refuse), and a visitor with
+    no session (who is shown the sign-in prompt instead of the form, and whom
+    `queue_active_line` is revoked from anyway).
+
+    The re-scan path — already in the line, so redirected to `/queue/<entry>` — does spend
+    three reads nobody looks at. It is the one path where the answer is known only after the
+    read that would have gated them, and a serial hop for the other cases is the worse trade.
+  */
+  const needsForm = queueOpen && hasSession;
+  const [mine, services, staff, line] = await Promise.all([
+    // Already holding a place here? Re-scanning the same QR while waiting is a
+    // "where am I?" gesture, not a second join — send them to their position.
+    registeredId
+      ? fetchActiveEntryForBusiness(supabase, registeredId, id).catch(() => null)
+      : null,
+    needsForm ? fetchServices(supabase, id) : [],
+    needsForm ? fetchStaff(supabase, id) : [],
     // `queue_active_line` is revoked from `anon`, so this simply fails for a
     // signed-out visitor. Caught on its own, and `null` reaches the badge as
     // "Wait unknown" rather than a fabricated zero.
-    queueOpen
+    needsForm
       ? fetchActiveLine(supabase, id).catch(() => null as QueueEntry[] | null)
-      : Promise.resolve(null),
-    /*
-      Gated on the salon having products, not on its plan allowing them — the same test
-      the salon page's own Shop tab uses. A plan that permits an empty shelf is not a shop,
-      and a row leading to one is the dead end `destinations.ts` exists to prevent.
-
-      Caught into `[]`: a failed read costs the shop row, and the rest of the page — which
-      is the part somebody standing at a counter needs — is unaffected.
-    */
-    fetchProductsForBusiness(supabase, id).catch(() => []),
+      : null,
   ]);
+  if (mine) redirect(`/queue/${mine.id}`);
 
->>>>>>> c67eb6b8491c7e8a01a1c510d39504e66ac7bef3
   return (
     <div className="px-base py-lg mx-auto w-full max-w-[560px] tablet:px-lg">
       {/*

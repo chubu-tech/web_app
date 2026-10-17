@@ -12,11 +12,22 @@ import {
 } from "@/lib/api/discovery";
 import { fetchMyFavouriteIds } from "@/lib/api/favourites";
 import { fetchLiveOffers } from "@/lib/api/salon";
-import { fetchProductCategories, fetchProducts } from "@/lib/api/shop";
+import {
+  browseProducts,
+  fetchProductCategories,
+  fetchProductCategoryIdBySlug,
+  fetchStockedCategoryIds,
+  productPriceBounds,
+} from "@/lib/api/shop";
 import { CUSTOMER_HOME, homeForRole } from "@/lib/auth";
 import { shareCard } from "@/lib/seo";
-import { priceBounds, productFilterFromParams } from "@/lib/product-filter";
+import {
+  productFilterFromParams,
+  productTakeFromParam,
+  type ProductFilter,
+} from "@/lib/product-filter";
 import { fromParams, hasPrice, serviceGenders } from "@/lib/salon-filters";
+import type { Product } from "@/lib/types/salon";
 import { getAccount } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 
@@ -36,9 +47,15 @@ import { createClient } from "@/lib/supabase/server";
  * **Products are a segment of this page, not a route.** `?tab=products` swaps the salon list for
  * the cross-salon catalogue and the two share this page's search box — the app's own arrangement
  * (THO-51), and `components/customer/destinations.ts` deliberately declares no Products destination.
- * The catalogue is fetched here on every visit rather than behind the segment: it is one small query
- * against an RLS-filtered table, and paying for it up front means switching segments is instant and
- * needs no loading state.
+ *
+ * **The shop is read on every visit, both segments, and it is now a page rather than the whole
+ * catalogue.** It used to be `fetchProducts` — every buyable product on the platform, unbounded,
+ * with the search, the price range and the sort all applied in the browser. That was the last
+ * unbounded catalogue read on either platform and its own note said the trade "will not hold at
+ * four hundred". Every facet is applied by the **server across the whole catalogue before
+ * paging** now, because a filter over page one is not a filter and a sort over page one sorts the
+ * wrong twenty-four rows. Paying for it up front on both segments is unchanged, and still buys an
+ * instant segment switch with no loading state — it is just bounded.
  *
  * **This is the one customer route that turns an owner away**, and only because it is
  * the one an owner arrives at by accident: a bookmark from before they were an owner, or
@@ -138,6 +155,42 @@ export default async function DiscoverPage({
     priceMax: one("priceMax"),
   });
 
+  /*
+    The category axis, as a **slug** rather than an id: a shared `?cat=hair-care` says what it
+    is, where a uuid says nothing. It is deliberately not part of `ProductFilter` — that type
+    is the sort-and-price sheet, and the category is the strip's own axis, carried beside the
+    filter exactly as `?q=` is. An unknown slug resolves to no id and narrows nothing.
+  */
+  const categorySlug = one("cat") ?? null;
+
+  /*
+    How much of the run "Load more" has asked for, capped at ten pages.
+
+    **Paging is in the URL like every other axis on this page**, which is what keeps the browse
+    a plain server render: no read from a client component, a shareable link to what somebody is
+    actually looking at, and a back button that steps back through the presses. Every other
+    product axis rebuilds its URL from scratch, so changing the shelf, the filter or the search
+    term resets the run to page one — which is the behaviour you want and comes for free.
+  */
+  const take = productTakeFromParam(one("take"));
+
+  /*
+    What the URL asks for, before the loaded bounds have anything to say about it.
+
+    Two passes, and they are not the same question. The **query** wants the bounds exactly as
+    typed: a range that spans everything simply returns everything, so nothing is gained by
+    tidying it first. The **badge** must not claim an active filter over an unnarrowed list, so
+    the copy handed to the client is reconciled against the real bounds once they are known.
+  */
+  const requestedFilter = productFilterFromParams({
+    sort: one("sort"),
+    min: one("min"),
+    max: one("max"),
+    brands: one("brands"),
+    rating: one("rating"),
+    sale: one("sale"),
+  });
+
   const supabase = await createClient();
 
   const [
@@ -147,7 +200,7 @@ export default async function DiscoverPage({
     categoriesByBusiness,
     offers,
     favouriteIds,
-    products,
+    shop,
     productCategories,
     staffInvites,
     availability,
@@ -189,10 +242,26 @@ export default async function DiscoverPage({
       fetchLiveOffers(supabase).catch(() => []),
       // Empty for a visitor with no session, which is the common case.
       fetchMyFavouriteIds(supabase).catch(() => new Set<string>()),
-      // `products_select_public` requires the salon to be on growth or pro, so RLS already limits
-      // this to salons that actually sell — nothing here filters by plan. Decorative in the sense
-      // that the salon list must survive it failing.
-      fetchProducts(supabase).catch(() => []),
+      /*
+        One page of the storefront, its price bounds, and which shelves have anything on them.
+
+        `products_select_public` requires the salon to be on growth or pro, so RLS already limits
+        this to salons that actually sell — nothing here filters by plan. Decorative in the sense
+        that the salon list must survive it failing, which is why the whole branch is caught into
+        an empty shop rather than each read separately: with no page there is nothing for bounds
+        or shelves to be about.
+
+        The slug lookup is serial ahead of the other three because they need the id it produces.
+        It is one indexed row and it only happens when a `?cat=` is present, and it sits inside a
+        branch of a wave that is already waiting on the salon list and every salon's hours — so
+        it is not on this page's critical path.
+      */
+      loadShop(supabase, {
+        categorySlug,
+        search: searchTerm,
+        filter: requestedFilter,
+        take,
+      }).catch(() => EMPTY_SHOP),
       /*
         The product taxonomy — platform-owned, eight rows, and the same for every visitor.
 
@@ -223,21 +292,21 @@ export default async function DiscoverPage({
       fetchSalonsAvailableToday(supabase).catch(() => []),
     ]);
 
-  // Reconciled against the loaded bounds here rather than in the component: a bound that does not
-  // narrow the catalogue is stored as cleared, so a stale or hand-edited URL cannot show an active
-  // filter badge over an unfiltered list.
   /*
-    The category axis, as a **slug** rather than an id: a shared `?cat=hair-care` says what it
-    is, where a uuid says nothing. It is deliberately not part of `ProductFilter` — that type
-    is the sort-and-price sheet, and the category is the strip's own axis, carried beside the
-    filter exactly as `?q=` is. Validated against the loaded taxonomy in `ProductsBrowse`, so
-    a hand-edited slug narrows nothing rather than emptying the grid.
+    Reconciled here rather than in the component, and against the **catalogue's** bounds rather
+    than the loaded page's: a bound that does not narrow anything is stored as cleared, so a
+    stale or hand-edited URL cannot show an active filter badge over an unnarrowed list.
   */
-  const categorySlug = one("cat") ?? null;
-
   const productFilter = productFilterFromParams(
-    { sort: one("sort"), min: one("min"), max: one("max") },
-    priceBounds(products),
+    {
+      sort: one("sort"),
+      min: one("min"),
+      max: one("max"),
+      brands: one("brands"),
+      rating: one("rating"),
+      sale: one("sale"),
+    },
+    shop.bounds,
   );
 
   return (
@@ -259,7 +328,11 @@ export default async function DiscoverPage({
         availability={availability}
         favouriteIds={[...favouriteIds]}
         filters={filters}
-        products={products}
+        products={shop.products}
+        hasMoreProducts={shop.hasMore}
+        take={take}
+        productBounds={shop.bounds}
+        stockedCategoryIds={shop.stockedCategoryIds}
         productCategories={productCategories}
         categorySlug={categorySlug}
         productFilter={productFilter}
@@ -268,4 +341,70 @@ export default async function DiscoverPage({
       />
     </>
   );
+}
+
+/** What the Products segment needs, and what a failed shop read costs: all of it, and nothing else. */
+type Shop = {
+  products: Product[];
+  hasMore: boolean;
+  bounds: { lowest: number; highest: number };
+  stockedCategoryIds: string[];
+};
+
+const EMPTY_SHOP: Shop = {
+  products: [],
+  hasMore: false,
+  bounds: { lowest: 0, highest: 0 },
+  stockedCategoryIds: [],
+};
+
+/**
+ * The shop segment's reads, as one branch of the page's wave.
+ *
+ * Composed here rather than in `lib/api/shop.ts` because it is this page's arrangement of four
+ * readers, not a fourth reader: the bounds and the stocked shelves are scoped to the *browse*,
+ * and what a browse is scoped by is a decision this page makes.
+ *
+ * **Bounds and shelves carry the category but not the price**, which is the point of asking for
+ * them separately. Bounds are what the slider can travel between, not where it currently sits, so
+ * feeding the price filter back into them would let the range collapse onto itself with every
+ * apply. Shelves are measured across the whole catalogue for the same reason the strip is: a
+ * shelf must not appear and disappear as somebody types in the search box.
+ */
+async function loadShop(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  {
+    categorySlug,
+    search,
+    filter,
+    take,
+  }: {
+    categorySlug: string | null;
+    search: string | null;
+    filter: ProductFilter;
+    take: number;
+  },
+): Promise<Shop> {
+  const categoryId = await fetchProductCategoryIdBySlug(supabase, categorySlug);
+  const [page, bounds, stocked] = await Promise.all([
+    browseProducts(supabase, {
+      search,
+      categoryId,
+      brandIds: filter.brandIds,
+      minNu: filter.minNu,
+      maxNu: filter.maxNu,
+      minRating: filter.minRating,
+      onSale: filter.onSale,
+      sort: filter.sort,
+      limit: take,
+    }),
+    productPriceBounds(supabase, { categoryId, brandIds: filter.brandIds }),
+    fetchStockedCategoryIds(supabase),
+  ]);
+  return {
+    products: page.products,
+    hasMore: page.hasMore,
+    bounds,
+    stockedCategoryIds: [...stocked],
+  };
 }

@@ -495,6 +495,27 @@ export function canCustomerCancel(from: OrderStatus): boolean {
   return from === "new";
 }
 
+/**
+ * Whether the customer may rate what was in this order — the mirror of
+ * `submit_product_review`'s own gate:
+ *
+ * ```sql
+ * if v_order.status::text not in ('collected', 'delivered') then
+ *   raise exception 'you can rate a product once the order is collected' using errcode = 'P0001';
+ * ```
+ *
+ * Beside `canCustomerCancel` for the same reason that one is here: both are a client copy of a
+ * predicate `set_order_status` or `submit_product_review` enforces, and keeping them together is
+ * what stops one being updated without the other.
+ *
+ * **`delivered` counts and `ready` does not.** The rule is "has it actually reached them",
+ * not "has the salon finished with it" — an order sitting packed on a shelf is one nobody has
+ * opened, and a rating of an unopened bottle is worth nothing to the next customer.
+ */
+export function canReviewOrder(status: OrderStatus): boolean {
+  return status === "collected" || status === "delivered";
+}
+
 /** Short human code, `ORD-` prefixed — mirrors `Order.code`, and `Booking.code`'s shape. */
 export function orderCode(id: string): string {
   return `ORD-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;

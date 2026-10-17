@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { recordProductView } from "@/lib/api/shop";
+import { claimProductView } from "@/lib/viewed-products";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { CoverImage } from "@/components/ui/cover-image";
 import { Icons, IconSize } from "@/components/ui/icons";
@@ -94,6 +97,29 @@ function OpenProductSheet({
     the first one just by touching the control.
   */
   const [pending, setPending] = useState(1);
+
+  /*
+    Count the view.
+
+    **Fire and forget, and deliberately unguarded by a loading state**: nothing on screen waits
+    for it, and a customer looking at a shampoo does not need to be told that an analytics
+    counter did not increment. `record_product_view` needs a session (`28000`), so a signed-out
+    visitor's call simply fails and is swallowed — a real hole in the signal, since guest
+    browsing is the front door of this product, but it is the server's rule and calling it
+    anyway costs one refused request rather than a wrong number.
+
+    `claimProductView` is what stops a customer comparing two bottles from inventing a trend:
+    the RPC de-duplicates nothing, so once per product per session is this side's job. It marks
+    as it tests, which is what makes React's development double-invoke count once.
+
+    In an effect rather than in the click that opened the sheet, because this component is also
+    where the future `/product/[id]` route will render from — one place that means "somebody is
+    looking at this", rather than a call at each thing that can open it.
+  */
+  useEffect(() => {
+    if (!claimProductView(product.id)) return;
+    void recordProductView(createClient(), product.id).catch(() => {});
+  }, [product.id]);
 
   const inOrder = qty > 0;
   // What the selector shows: the cart's own count once this is in the order, the pre-add

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { CartView } from "@/components/customer/cart-view";
+import { fetchMyPendingRedemptions } from "@/lib/api/shop";
 import { getAccount } from "@/lib/session";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Your cart",
@@ -16,12 +18,27 @@ export const metadata: Metadata = {
  * the tab and come back to it. A sheet has no URL to come back to.
  *
  * The page itself knows nothing about the cart — `localStorage` is a browser fact, so the whole thing
- * is a client component. What the server contributes is the one thing the browser cannot decide:
+ * is a client component. What the server contributes is the two things the browser cannot decide:
  * **whether this session is a real account**, since `place_order` refuses a guest with `P0010` and
- * the wall has to know before the press, not after.
+ * the wall has to know before the press, not after; and **what rewards are waiting to be spent**.
+ *
+ * The rewards are read across every salon rather than for the cart's salon, because which salon
+ * the cart belongs to is in `localStorage` and the server cannot see it. That is the cheaper shape
+ * anyway — the same policy admits them all, so filtering by business would have cost a client read
+ * to save nothing — and the client narrows to the one salon before showing anything.
  */
 export default async function CartPage() {
   const account = await getAccount();
+
+  /*
+    Only a registered customer has any. A guest cannot hold a redemption — `request_redemption`
+    refuses them — so the read is skipped rather than returning empty, and caught because a
+    checkout must not fail over a reward somebody may not even have.
+  */
+  const redemptions =
+    account.state === "registered"
+      ? await fetchMyPendingRedemptions(await createClient(), account.user.id).catch(() => [])
+      : [];
 
   return (
     <div className="px-base py-lg mx-auto w-full max-w-[720px] tablet:px-lg">
@@ -34,6 +51,7 @@ export default async function CartPage() {
       <CartView
         signedIn={account.state === "registered"}
         isGuest={account.state === "guest"}
+        redemptions={redemptions}
       />
     </div>
   );

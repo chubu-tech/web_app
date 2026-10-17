@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { dayLabel } from "./clock";
 import {
   canCustomerCancel,
+  canReviewOrder,
   canOwnerTransition,
   clientBookStats,
   clientInSegment,
@@ -559,6 +560,29 @@ describe("canOwnerTransition", () => {
     expect(canCustomerCancel("collected")).toBe(false);
     expect(canCustomerCancel("out_for_delivery")).toBe(false);
     expect(canCustomerCancel("delivered")).toBe(false);
+  });
+
+  /*
+    `submit_product_review`'s own gate, mirrored: `status not in ('collected','delivered')` is
+    refused with P0001. Both arrivals count and nothing before them does — the rule is "has it
+    reached them", not "has the salon finished with it", so a packed order sitting on a shelf is
+    one nobody has opened.
+  */
+  it("lets a customer rate only once the order has actually arrived", () => {
+    expect(canReviewOrder("collected")).toBe(true);
+    expect(canReviewOrder("delivered")).toBe(true);
+    expect(canReviewOrder("new")).toBe(false);
+    expect(canReviewOrder("ready")).toBe(false);
+    expect(canReviewOrder("out_for_delivery")).toBe(false);
+    expect(canReviewOrder("cancelled")).toBe(false);
+    expect(canReviewOrder("declined")).toBe(false);
+  });
+
+  /** Nothing is both cancellable and rateable: the two buttons can never appear together. */
+  it("never offers cancel and rate on the same order", () => {
+    for (const status of ORDER_STATUSES) {
+      expect(canCustomerCancel(status) && canReviewOrder(status)).toBe(false);
+    }
   });
 });
 

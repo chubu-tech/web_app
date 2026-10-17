@@ -2,13 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { OrderCancelButton } from "@/components/customer/order-cancel-button";
+import {
+  OrderReviewList,
+  type ReviewableItem,
+} from "@/components/customer/order-review-list";
 import { Icons, IconSize } from "@/components/ui/icons";
 import { OrderDeliveryBlock, OrderLines } from "@/components/ui/order-lines";
 import { SectionHeader } from "@/components/ui/section-header";
 import { StatusPill } from "@/components/ui/status-pill";
-import { fetchMyOrderById } from "@/lib/api/shop";
+import { fetchMyOrderById, fetchMyProductReviewsForOrder } from "@/lib/api/shop";
 import {
   canCustomerCancel,
+  canReviewOrder,
   orderCode,
   orderFulfilment,
   orderPlacedLabel,
@@ -38,6 +43,11 @@ export const metadata: Metadata = {
  *
  * `Cancel` appears only while the order is `new`, which `canCustomerCancel` decides from the same
  * rule `set_order_status` enforces.
+ *
+ * **Ratings appear only once it is `collected` or `delivered`**, which `canReviewOrder` decides
+ * from `submit_product_review`'s gate. This page is the *only* place a product can be rated on
+ * either platform, because the RPC is the only door into `product_reviews` and it takes an order
+ * id — which is what makes every rating on the storefront a verified purchase.
  */
 export default async function MyOrderPage({
   params,
@@ -54,7 +64,34 @@ export default async function MyOrderPage({
 
   const code = orderCode(order.id);
   const cancellable = canCustomerCancel(order.status);
+  const reviewable = canReviewOrder(order.status);
   const delivery = orderFulfilment(order) === "delivery";
+
+  /*
+    Second wave, and a real dependency: whether to read the ratings at all depends on the
+    order's status, which is what the first read returns. Caught into an empty list rather than
+    thrown — a receipt that will not render because a ratings read failed is a worse page than
+    one whose stars start empty, and the RPC upserts, so a rating re-given is not a duplicate.
+  */
+  const reviews = reviewable
+    ? await fetchMyProductReviewsForOrder(supabase, order.id).catch(() => [])
+    : [];
+
+  /*
+    One row per **product**, not per line.
+
+    `order_items` can carry the same product twice (the cart is de-duplicated, but an older
+    order or a hand-written row need not be), while the review key is `(order_id, product_id)`
+    — so two rows for one product would be two pickers writing over each other. A line whose
+    `productId` is null is a product that has since been deleted: the snapshot keeps the receipt
+    honest, but there is nothing left to rate.
+  */
+  const reviewable_items: ReviewableItem[] = [];
+  for (const item of order.items) {
+    if (item.productId == null) continue;
+    if (reviewable_items.some((r) => r.productId === item.productId)) continue;
+    reviewable_items.push({ productId: item.productId, name: item.nameSnapshot });
+  }
 
   return (
     <div className="px-base py-lg mx-auto w-full max-w-[720px] tablet:px-lg">
@@ -142,6 +179,21 @@ export default async function MyOrderPage({
         the three it is depends on the lifecycle, not on one status.
       */}
       <OrderLines order={order} totalLabel={totalLabel(order.status, delivery)} />
+
+      {reviewable && reviewable_items.length > 0 ? (
+        <div className="mt-xl">
+          <SectionHeader title="Rate what you bought" />
+          <p className="text-body-sm text-muted mb-base">
+            Only people who actually bought something can rate it, so what you say here is worth
+            more to the next customer than any number of stars from strangers.
+          </p>
+          <OrderReviewList
+            orderId={order.id}
+            items={reviewable_items}
+            existing={reviews}
+          />
+        </div>
+      ) : null}
 
       {cancellable ? <OrderCancelButton orderId={order.id} code={code} /> : null}
     </div>

@@ -5,8 +5,17 @@ import type {
   LoyaltyReward,
   LoyaltyTransaction,
   Order,
+  OrderFulfilment,
+  ProductReview,
 } from "../types/back-office";
+import type { PromoRefusal } from "../order-totals";
 import type { Product, ProductCategory } from "../types/salon";
+import {
+  escapeOrFilterValue,
+  PRODUCT_PAGE_SIZE,
+  productSortColumns,
+  type ProductSort,
+} from "../product-filter";
 import {
   toLoyaltyProgram,
   toLoyaltyRedemption,
@@ -15,7 +24,9 @@ import {
   toOrder,
   toProduct,
   toProductCategory,
+  toProductReview,
 } from "./mappers";
+import { oneRow } from "./one-row";
 
 /**
  * The customer's side of the shop and the loyalty programme — the other end of what 3c gave the
@@ -66,33 +77,167 @@ export const PRODUCT_CARD_SELECT =
   "id,business_id,business_name,name,price_nu,compare_at_nu,discount_pct,description,volume,ingredients,how_to_use,tags,hair_types,concerns,in_stock,is_archived,sort_order,created_at,brand_id,brand_name,category_id,category_name,photo_url,rating_avg,rating_count,trending_views";
 
 /**
- * Every buyable product across every salon, newest first.
+ * One page of the cross-salon storefront, through `product_cards` — a port of
+ * `Api.browseProducts`.
  *
- * **Now `product_cards`, not `products`.** The old read was the bare table plus a
- * `businesses(name)` join, which is why every card in this app was missing the rating, the
- * markdown and the brand — not because the data was absent, but because the query never
- * asked the view that computes it. The view also applies `in_stock` and `not is_archived`
- * itself, so the two `.eq()` filters that used to be here are gone rather than duplicated.
+ * **This replaces `fetchProducts`, which was the last unbounded catalogue read on either
+ * platform.** It selected every buyable product with no `.range()` at all, and its own note
+ * said the trade "holds at four products and will not hold at four hundred". It does now
+ * hold at four hundred, and every facet is applied by the **server across the whole
+ * catalogue before paging** — which is the point: a filter over page one is not a filter,
+ * and a sort over page one is a sort of the wrong twenty-four rows.
  *
- * **Still no search parameter and still no pagination**, and that is now the only thing
- * separating this from the app's `browseProducts`. The whole catalogue is loaded once and
- * the name match happens in the browser, alongside the price range and the sort, because
- * Discover owns one search box serving two segments and it has to behave the same in both.
+ * The view already restricts to `in_stock` and `not is_archived`, so neither is repeated
+ * here. It is `security_invoker` over `products_select_public`, so a guest sees exactly what
+ * a registered customer sees and no plan check applies — which is why browse stays a **view
+ * read and never a read RPC**: an RPC would need a grant to `anon`, and guest browsing is
+ * the thing the whole storefront rests on.
  *
- * That trade holds at four products and will not hold at four hundred. Replacing it means
- * server-side `search` / `categoryId` / `minNu` / `maxNu` / `onSale` / `sort` / `.range()`
- * and a "Load more", which drags in the sort model and the category filter — so it lands
- * with the rest of the shop rework (`PARITY.md` §5.1) rather than here. **Do not "fix" it
- * in the meantime by adding a bare `.limit()`**: a silently truncated catalogue with no way
- * to reach the rest is a worse failure than a slow one, and it is invisible in review.
+ * `range` is inclusive at both ends, and one extra row is asked for so the caller can tell
+ * "this is the last page" from "there is more" without a second `count` query.
  */
-export async function fetchProducts(supabase: SupabaseClient): Promise<Product[]> {
+export async function browseProducts(
+  supabase: SupabaseClient,
+  {
+    search,
+    categoryId,
+    brandIds = [],
+    minNu,
+    maxNu,
+    minRating,
+    onSale = false,
+    sort = "featured",
+    offset = 0,
+    limit = PRODUCT_PAGE_SIZE,
+  }: {
+    search?: string | null;
+    categoryId?: string | null;
+    brandIds?: string[];
+    minNu?: number | null;
+    maxNu?: number | null;
+    minRating?: number | null;
+    onSale?: boolean;
+    sort?: ProductSort;
+    offset?: number;
+    limit?: number;
+  } = {},
+): Promise<{ products: Product[]; hasMore: boolean }> {
+  let q = supabase.from("product_cards").select(PRODUCT_CARD_SELECT);
+  if (categoryId) q = q.eq("category_id", categoryId);
+  if (brandIds.length > 0) q = q.in("brand_id", brandIds);
+  if (minNu != null) q = q.gte("price_nu", minNu);
+  if (maxNu != null) q = q.lte("price_nu", maxNu);
+  if (minRating != null) q = q.gte("rating_avg", minRating);
+  if (onSale) q = q.gt("discount_pct", 0);
+
+  const term = (search ?? "").trim();
+  if (term !== "") {
+    const v = escapeOrFilterValue(`%${term}%`);
+    q = q.or(`name.ilike.${v},brand_name.ilike.${v}`);
+  }
+
+  // `nullsFirst: false` on every column — see `productSortColumns` for the one it changes
+  // and why it is applied uniformly anyway.
+  let ordered = q;
+  for (const { column, ascending } of productSortColumns(sort)) {
+    ordered = ordered.order(column, { ascending, nullsFirst: false });
+  }
+
+  // One past the page, then dropped. A `count: "exact"` would answer the same question and
+  // cost a second scan of the filtered set on every page.
+  const { data, error } = await ordered.range(offset, offset + limit);
+  if (error) throw error;
+  const rows = (data ?? []) as Record<string, unknown>[];
+  return { products: rows.slice(0, limit).map(toProduct), hasMore: rows.length > limit };
+}
+
+/**
+ * The cheapest and dearest price in a browse scope, for the filter sheet's range control.
+ *
+ * **Bounds cannot come from the loaded page**, which is the whole reason this exists: page
+ * one is not the catalogue, so a slider built from it would be wrong and would silently
+ * widen as the customer scrolled. Two indexed one-row reads instead.
+ *
+ * Carries the scope's category and brand filters but **not** its price filter — the bounds
+ * are what the slider can travel between, not where it currently sits. Returns zeroes for a
+ * scope with no products, which is the same shape `priceBounds` returns for an empty list
+ * and which the sheet already handles by saying so rather than drawing a dead slider.
+ */
+export async function productPriceBounds(
+  supabase: SupabaseClient,
+  { categoryId, brandIds = [] }: { categoryId?: string | null; brandIds?: string[] } = {},
+): Promise<{ lowest: number; highest: number }> {
+  const scoped = () => {
+    let q = supabase.from("product_cards").select("price_nu");
+    if (categoryId) q = q.eq("category_id", categoryId);
+    if (brandIds.length > 0) q = q.in("brand_id", brandIds);
+    return q;
+  };
+
+  const [low, high] = await Promise.all([
+    scoped().order("price_nu", { ascending: true }).limit(1).maybeSingle(),
+    scoped().order("price_nu", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  if (low.error) throw low.error;
+  if (high.error) throw high.error;
+
+  const lowest = (low.data as { price_nu: number } | null)?.price_nu;
+  const highest = (high.data as { price_nu: number } | null)?.price_nu;
+  return { lowest: lowest ?? 0, highest: highest ?? 0 };
+}
+
+/**
+ * The id behind a `?cat=` slug, or null.
+ *
+ * The strip's axis is a **slug** because a shared `?cat=hair-care` says what it is where a uuid
+ * says nothing, but `product_cards` carries only `category_id` — so paging the browse on the
+ * server means resolving one for the other. One indexed row read, and only when a slug is
+ * actually present.
+ *
+ * **An unknown slug resolves to null, which narrows nothing.** That is the same answer
+ * `ProductsBrowse` already gives a stale `?cat=` and the same rule `productFilterFromParams`
+ * applies to a stale price bound: a hand-edited or since-deleted slug shows the whole catalogue
+ * with no shelf selected, rather than an empty shelf that does not exist.
+ */
+export async function fetchProductCategoryIdBySlug(
+  supabase: SupabaseClient,
+  slug: string | null,
+): Promise<string | null> {
+  if (!slug) return null;
+  const { data, error } = await supabase
+    .from("product_categories")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as { id: string } | null)?.id ?? null;
+}
+
+/**
+ * Which categories actually have something buyable on them.
+ *
+ * **The category strip only offers shelves that are stocked**, and that rule used to be free:
+ * the browse held the whole catalogue, so the set could be derived from it. Paging took that
+ * away — upstream renders all eight tiles for exactly this reason, and cannot do otherwise.
+ *
+ * One `distinct`-shaped read buys the rule back, and buys it at any catalogue size. It
+ * matters concretely: **every live product has a null `category_id`**, so without it the
+ * strip would be eight doors onto eight empty rooms — a narrowing control whose every option
+ * narrows to nothing, which the customer can only discover by trying one.
+ */
+export async function fetchStockedCategoryIds(
+  supabase: SupabaseClient,
+): Promise<Set<string>> {
   const { data, error } = await supabase
     .from("product_cards")
-    .select(PRODUCT_CARD_SELECT)
-    .order("created_at", { ascending: false });
+    .select("category_id")
+    .not("category_id", "is", null);
   if (error) throw error;
-  return ((data ?? []) as Record<string, unknown>[]).map(toProduct);
+  return new Set(
+    ((data ?? []) as { category_id: string | null }[])
+      .map((r) => r.category_id)
+      .filter((id): id is string => id != null),
+  );
 }
 
 /**
@@ -142,20 +287,32 @@ const ORDER_SELECT = "*, order_items(*), businesses(name)";
  * **The returned `total_nu` is authoritative.** The RPC computes it server-side; the cart's subtotal
  * never reaches it. So the confirmation shows the order's own figure, not the cart's.
  *
- * That figure is **no longer the sum of the lines**, and this doc comment used to say it was.
- * `20260814000005_place_order_checkout.sql` made it `subtotal − discount + delivery fee`, so an
- * order carrying a promo code or a delivery fee has a total that no addition of `products.price_nu`
- * reproduces. Nothing here breaks — this call places a pickup order at list price and gets a total
- * equal to the subtotal — but the arithmetic is the server's, not ours, and `OrderLines` is what
- * shows the breakdown when there is one.
+ * That figure is **no longer the sum of the lines**. `20260814000005_place_order_checkout.sql`
+ * made it `subtotal − discount + delivery fee`, so an order carrying a promo code or a delivery
+ * fee has a total that no addition of `products.price_nu` reproduces. `lib/order-totals.ts`
+ * mirrors that arithmetic so a checkout can *show* the sum before committing to it — but the
+ * mirror is a copy and this return value is the original.
  *
- * **Six of the RPC's ten arguments are not sent**, and that is the shape of the gap rather than a
- * bug: `p_fulfilment` (so every order this app places is `pickup`), `p_promo_code`,
- * `p_loyalty_redemption` and the three `p_delivery_*`. The 4-argument version was **dropped** when
- * the 10-argument one was created, so this call resolves only because all six have defaults — had
- * one not, every order on this platform would have failed at once. See `PARITY.md` §5.1.
+ * **All ten arguments now go.** Six used to be omitted, so every order this app placed was a
+ * pickup at list price: no delivery, no promo code, no reward spent. They resolved only because
+ * all six carry defaults — the 4-argument overload was **dropped** when the 10-argument one was
+ * created, so had one lacked a default, every order on this platform would have failed at once.
  *
- * Raises `P0010` for a guest (`private.is_real_user()`), `P0001` when the salon is not on
+ * ## What the server checks that this cannot
+ *
+ * Each of the new arguments has a refusal behind it, and the client's job is to make each one
+ * unreachable in the ordinary case rather than to duplicate the check:
+ *
+ * - `p_fulfilment` — `P0001` for anything but `pickup`/`delivery`, `P0001` again at a salon with
+ *   `delivery_enabled` false, and `P0001` when a delivery arrives without an address *and* a
+ *   phone. The checkout draws the toggle only when the salon delivers, and requires both fields.
+ * - `p_promo_code` — `P0003`, with the reason in the sentence. `previewPromo` is what lets the
+ *   customer find that out while they can still do something about it.
+ * - `p_loyalty_redemption` — `P0004` when it is not theirs, not pending, already on another
+ *   order, or **not a discount reward**. That last one is the live case: the only pending
+ *   redemption on this platform is a `free_service`.
+ *
+ * Still raises `P0010` for a guest (`private.is_real_user()`), `P0001` when the salon is not on
  * growth/pro, and `P0002` when anything in the payload is no longer buyable.
  */
 export async function placeOrder(
@@ -165,11 +322,25 @@ export async function placeOrder(
     items,
     note,
     clientToken,
+    fulfilment = "pickup",
+    promoCode = null,
+    loyaltyRedemptionId = null,
+    deliveryAddress = null,
+    deliveryPhone = null,
+    deliveryNote = null,
   }: {
     businessId: string;
     items: { product_id: string; qty: number }[];
     note?: string | null;
     clientToken: string;
+    fulfilment?: OrderFulfilment;
+    /** As typed. The server upper-cases and trims before matching, so neither happens here. */
+    promoCode?: string | null;
+    loyaltyRedemptionId?: string | null;
+    /** Required together on a delivery, and ignored by the server on a pickup. */
+    deliveryAddress?: string | null;
+    deliveryPhone?: string | null;
+    deliveryNote?: string | null;
   },
 ): Promise<Order> {
   const { data, error } = await supabase.rpc("place_order", {
@@ -177,10 +348,174 @@ export async function placeOrder(
     p_items: items,
     p_note: note ?? null,
     p_client_token: clientToken,
+    p_fulfilment: fulfilment,
+    p_promo_code: promoCode,
+    p_loyalty_redemption: loyaltyRedemptionId,
+    p_delivery_address: deliveryAddress,
+    p_delivery_phone: deliveryPhone,
+    p_delivery_note: deliveryNote,
   });
   if (error) throw error;
-  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
-  return toOrder(row ?? {});
+  // `oneRow`, not a local ternary answering an empty object — `place_order` is
+  // `returns orders`, so a null reaches `toOrder` as an order with no id rather than as an
+  // error naming the RPC that produced it.
+  return toOrder(oneRow(data, "place_order"));
+}
+
+/**
+ * Every review of one product, newest first.
+ *
+ * `product_reviews_select_public` is `using (true)` for both `anon` and `authenticated` and the
+ * table grant is there too (checked), so this works signed out — which it has to, because the
+ * ratings are part of what a visitor is deciding on.
+ *
+ * **`product_cards` already carries `rating_avg` and `rating_count`**, so nothing needs this to
+ * put a number on a card. It is for a detail surface that wants to show what people said, and it
+ * is capped for that reason rather than paged: a product's reviews are a paragraph of evidence,
+ * not a feed.
+ */
+export async function fetchProductReviews(
+  supabase: SupabaseClient,
+  productId: string,
+  { limit = 20 }: { limit?: number } = {},
+): Promise<ProductReview[]> {
+  const { data, error } = await supabase
+    .from("product_reviews")
+    .select("*")
+    .eq("product_id", productId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map(toProductReview);
+}
+
+/**
+ * What the caller has already said about the things in one order.
+ *
+ * Keyed by product id at the call site, because the uniqueness key is `(order_id, product_id)`:
+ * one rating per product per order, so an order containing two shampoos has one rating for the
+ * shampoo, and buying it again next month is a second, separate rating.
+ *
+ * **Filtered on the order, not on the caller**, and that is safe rather than lax: the policy is
+ * public, so scoping by caller would buy nothing, and the page that uses this has already
+ * established the order is theirs by reading it through `fetchMyOrderById`.
+ */
+export async function fetchMyProductReviewsForOrder(
+  supabase: SupabaseClient,
+  orderId: string,
+): Promise<ProductReview[]> {
+  const { data, error } = await supabase
+    .from("product_reviews")
+    .select("*")
+    .eq("order_id", orderId);
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map(toProductReview);
+}
+
+/**
+ * Rate a product that was actually bought.
+ *
+ * **The only door into `product_reviews`** — the table has no insert policy at all, so this
+ * `security definer` function is the whole of how a rating comes to exist. It checks four things
+ * the client cannot be trusted with: the order is the caller's (`42501`), it has reached
+ * `collected` or `delivered` (`P0001`), the product was in it (`P0001`), and the rating is 1–5
+ * (`P0001`). `canReviewOrder` mirrors the second of those so the form is not offered where it
+ * would be refused.
+ *
+ * **It upserts on `(order_id, product_id)`**, so calling it again edits rather than duplicates.
+ * That is the behaviour to build on: a customer who rated in haste can fix it, and the client
+ * must load the existing rating as a starting value rather than showing empty stars over a
+ * review that already exists.
+ *
+ * An empty body is stored as null, by the RPC's own `nullif(btrim(…), '')` — so a rating with
+ * no words is a rating, not a review with an empty paragraph.
+ */
+export async function submitProductReview(
+  supabase: SupabaseClient,
+  {
+    orderId,
+    productId,
+    rating,
+    body,
+  }: { orderId: string; productId: string; rating: number; body?: string | null },
+): Promise<ProductReview> {
+  const { data, error } = await supabase.rpc("submit_product_review", {
+    p_order: orderId,
+    p_product: productId,
+    p_rating: rating,
+    p_body: body ?? null,
+  });
+  if (error) throw error;
+  return toProductReview(oneRow(data, "submit_product_review"));
+}
+
+/**
+ * Count one view of a product — the trending signal.
+ *
+ * **Fire and forget, and it must stay that way.** Nothing on screen depends on it, so a failure
+ * is swallowed by the caller rather than surfaced: a customer looking at a shampoo does not need
+ * to be told that an analytics counter did not increment.
+ *
+ * **It needs a session** (`28000`), so a signed-out visitor contributes nothing and the call
+ * should simply be skipped for one. That is a real hole in the signal rather than a detail —
+ * guest browsing is the front door of this product — but it is the server's rule, and calling it
+ * anyway would just produce a refused request per product view.
+ *
+ * **The server does not de-duplicate.** `product_view_daily` is a running counter upserted on
+ * `(product_id, day)` in Thimphu time, so every call is another view. Throttling to once per
+ * product per session is the *client's* job, and without it a customer flicking back and forth
+ * between two products would invent a trend.
+ *
+ * The counts are owner-only to read (`product_view_daily_select_owner`), which is the right way
+ * round: a public per-product view count is competitive intelligence no owner agreed to publish.
+ */
+export async function recordProductView(
+  supabase: SupabaseClient,
+  productId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("record_product_view", { p_product: productId });
+  if (error) throw error;
+}
+
+/** What `preview_promo` answers: a discount, or the reason there isn't one. */
+export type PromoPreview =
+  | { valid: true; discountNu: number }
+  | { valid: false; reason: PromoRefusal | string };
+
+/**
+ * Try a promo code against a subtotal, without committing to anything.
+ *
+ * **A read RPC, and one of the few in this repo** — justified because `promo_codes` is not
+ * readable by a customer at all: its **only** select policy is `promo_codes_select_owner`
+ * (`private.is_business_owner(business_id)`, checked), which is correct — a code list is a
+ * marketing asset, and an enumerable one is a discount to whoever scrapes it. `preview_promo` is
+ * `security definer` and returns exactly one number and one reason, so a customer can test the
+ * code in their hand without being able to list anybody's.
+ *
+ * **It refuses rather than throws.** A wrong code is the ordinary case at a checkout, not an
+ * exception, so an invalid one comes back as `{valid: false, reason}` and only a genuine failure
+ * — no session, no network — throws. `promoRefusalMessage` turns the reason into the sentence;
+ * the server composes none, and the two must not both try.
+ *
+ * **The discount it quotes is against the subtotal it was given**, so it has to be re-asked
+ * whenever the cart changes. That is also why it cannot be trusted as the final figure: the
+ * order's total is `place_order`'s, and a code that lapses between the preview and the press is
+ * refused there with `P0003`.
+ */
+export async function previewPromo(
+  supabase: SupabaseClient,
+  { businessId, code, subtotalNu }: { businessId: string; code: string; subtotalNu: number },
+): Promise<PromoPreview> {
+  const { data, error } = await supabase.rpc("preview_promo", {
+    p_business: businessId,
+    p_code: code,
+    p_subtotal_nu: subtotalNu,
+  });
+  if (error) throw error;
+  const row = (data ?? {}) as Record<string, unknown>;
+  return row.valid === true
+    ? { valid: true, discountNu: Number(row.discount_nu ?? 0) }
+    : { valid: false, reason: (row.reason as string) ?? "not_found" };
 }
 
 /**
@@ -233,8 +568,7 @@ export async function cancelMyOrder(supabase: SupabaseClient, orderId: string): 
     p_reason: null,
   });
   if (error) throw error;
-  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
-  return toOrder(row ?? {});
+  return toOrder(oneRow(data, "set_order_status"));
 }
 
 /* --------------------------------------------------------------------------
@@ -312,8 +646,7 @@ export async function requestRedemption(
     p_client_token: clientToken,
   });
   if (error) throw error;
-  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
-  return toLoyaltyRedemption(row ?? {});
+  return toLoyaltyRedemption(oneRow(data, "request_redemption"));
 }
 
 /** One redemption of the caller's, by id — what `/rewards/[id]` polls. */

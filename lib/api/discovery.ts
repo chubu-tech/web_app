@@ -55,7 +55,10 @@ export const BUSINESS_PUBLIC_SELECT =
   "id, name, description, address_text, phone, cover_url, timezone, " +
   "cancellation_window_hours, is_active, lat, lng, plan, business_type, " +
   "service_radius_km, whatsapp_phone, queue_enabled, queue_join_mode, " +
-  "reminder_channel, rebooking_enabled, rebooking_days";
+  "reminder_channel, rebooking_enabled, rebooking_days, " +
+  // Delivery, so a cart can offer it. All three are in `anon`'s column grant (checked), which
+  // is what keeps this list usable on a signed-out route.
+  "delivery_enabled, delivery_fee_nu, free_delivery_over_nu";
 
 export type SalonSort = "name" | "rating";
 

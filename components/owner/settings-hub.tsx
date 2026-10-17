@@ -87,21 +87,19 @@ export function SettingsHub({
     "/business/hours": hoursLine(hours),
     "/business/services": servicesLine(services),
     "/business/staff": staffLine(staff, staffWithoutHours),
-<<<<<<< HEAD
-    "/business/clients": clientCount == null ? "" : clientsLine(clientCount),
-    "/business/orders": newOrderCount == null ? "" : ordersLine(newOrderCount),
-    "/business/products": products == null ? "" : productsLine(products),
-=======
     // The one row here that is not about the active salon — the page covers the whole
     // estate, so the count does too.
     "/business/qr": qrLine(qrReady, qrTotal),
-  };
-
-  const backOfficeState: Record<string, string> = {
-    "/business/clients": clientCount == null ? locked("Growth") : clientsLine(clientCount),
-    "/business/orders": newOrderCount == null ? locked("Growth") : ordersLine(newOrderCount),
-    "/business/products": products == null ? locked("Growth") : productsLine(products),
->>>>>>> c67eb6b8491c7e8a01a1c510d39504e66ac7bef3
+    /*
+      An empty string, not a tier line. These three arrive as `null` when the plan does not
+      include them, and the row's note is `tierNoteFor` — derived from the row's own
+      `feature`, so the tier named on a row and the tier that unlocks the screen behind it are
+      one fact rather than two strings. Naming a tier here as well would be the second place,
+      which is how a hand-written note comes to disagree with the gate it describes.
+    */
+    "/business/clients": clientCount == null ? "" : clientsLine(clientCount),
+    "/business/orders": newOrderCount == null ? "" : ordersLine(newOrderCount),
+    "/business/products": products == null ? "" : productsLine(products),
     "/business/offers": offersLine(offerCount, liveOfferCount),
     "/business/loyalty":
       loyaltyRewards == null ? "" : loyaltyLine(loyaltyProgram, loyaltyRewards),
@@ -208,25 +206,19 @@ function Rows({
   );
 }
 
-<<<<<<< HEAD
-=======
-/** A locked row states the tier rather than a count — there is nothing to count yet. */
 /**
  * "3 of 9 ready to print" — and the blocked ones are the useful half of that sentence,
  * since a salon without a walk-in queue cannot have a poster at all.
  */
 function qrLine(ready: number, total: number): string {
   if (total === 0) return "A poster for each salon's counter";
-  if (ready === 0) return `No posters yet \u2014 ${total === 1 ? "this salon is" : "these salons are"} not approved yet`;
+  if (ready === 0) {
+    return `No posters yet \u2014 ${total === 1 ? "this salon is" : "these salons are"} not approved yet`;
+  }
   if (ready === total) return `${ready} ${ready === 1 ? "poster" : "posters"} ready to print`;
   return `${ready} of ${total} ready to print`;
 }
 
-function locked(tier: string): string {
-  return `${tier} plan and up`;
-}
-
->>>>>>> c67eb6b8491c7e8a01a1c510d39504e66ac7bef3
 function salonLine(b: Business): string {
   const bits: string[] = [];
   bits.push(b.addressText?.trim() ? b.addressText.trim() : "No address yet");

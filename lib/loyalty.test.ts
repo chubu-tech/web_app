@@ -71,6 +71,7 @@ function redemption(over: Partial<LoyaltyRedemption> = {}): LoyaltyRedemption {
     rewardId: "r1",
     nameSnapshot: "Free haircut",
     typeSnapshot: "free_service",
+    valueSnapshot: null,
     pointCost: 50,
     code: "ABC123",
     status: "pending",

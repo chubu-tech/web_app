@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icons, IconSize } from "@/components/ui/icons";
+import { StarPicker } from "@/components/ui/rating";
 import { Sheet } from "@/components/ui/sheet";
 import { downscaleImage, imageRejection, releasePreview, type PickedImage } from "@/lib/images";
-import { cn } from "@/lib/utils";
 
 /**
  * Leave a review, ported from `tho/app/lib/ui/widgets/review_sheet.dart`.
@@ -84,44 +84,10 @@ export function ReviewSheet({
   return (
     <Sheet open={open} onClose={onClose} title="Leave a review">
       <div className="p-base gap-lg flex flex-col">
-        <fieldset>
-          <legend className="sr-only">Your rating out of 5</legend>
-          <div className="gap-xs flex justify-center">
-            {[1, 2, 3, 4, 5].map((value) => {
-              const lit = value <= rating;
-              return (
-                <label
-                  key={value}
-                  className="flex size-12 cursor-pointer items-center justify-center"
-                >
-                  <input
-                    type="radio"
-                    name="rating"
-                    value={value}
-                    checked={rating === value}
-                    onChange={() => setRating(value)}
-                    className="sr-only"
-                  />
-                  <span className="sr-only">
-                    {value} star{value === 1 ? "" : "s"}
-                  </span>
-                  {/* A picker only ever sets whole stars, so it draws the glyph
-                      directly rather than going through StarBar's half logic. */}
-                  <Icons.star
-                    aria-hidden
-                    style={{ width: IconSize.xl, height: IconSize.xl }}
-                    className={cn(
-                      "transition-transform duration-[var(--duration-fast)]",
-                      lit
-                        ? "text-star scale-100 fill-current drop-shadow-[0_0_12px_rgba(232,163,23,0.35)]"
-                        : "text-hairline scale-[0.88]",
-                    )}
-                  />
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
+        {/* The shared picker — this file had the only copy until product reviews needed one
+            too. Centred here and left-aligned in a list row, which is the whole of the
+            difference between the two call sites. */}
+        <StarPicker value={rating} onChange={setRating} name="rating" className="self-center" />
 
         <label className="block">
           <span className="sr-only">Your review</span>

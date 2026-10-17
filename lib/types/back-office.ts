@@ -133,6 +133,34 @@ export function orderStatusFromWire(value: string | null | undefined): OrderStat
  */
 export type OrderFulfilment = "pickup" | "delivery";
 
+/**
+ * One customer's rating of one product, tied to the order it was bought on.
+ *
+ * **There is exactly one door into this table and it is `submit_product_review`.** No insert
+ * policy exists, so nothing can write a review without an order that is the caller's own, has
+ * reached `collected` or `delivered`, and actually contained the product. That is what makes
+ * every rating on the storefront a verified purchase rather than a claim — and it is why the
+ * client has no "write a review" entry point that is not attached to an order line.
+ *
+ * **No author, deliberately** — the same shape `Review` takes for salons. The table stores
+ * `customer_profile_id` for the uniqueness key and for moderation; nothing reads it back out to
+ * put a name on a rating, and a projection that named one would need a `profiles` join that
+ * `anon` has no business making.
+ *
+ * The key is `(order_id, product_id)`, and the RPC upserts on it — so a rating is **editable**
+ * rather than final, and the client has to treat an existing one as a starting value rather
+ * than as a closed door.
+ */
+export type ProductReview = {
+  id: string;
+  productId: string;
+  orderId: string;
+  /** 1–5. The RPC refuses anything outside that with `P0001`. */
+  rating: number;
+  body: string | null;
+  createdAt: Date;
+};
+
 /** A line item, snapshotted at purchase so a later price change can't rewrite history. */
 export type OrderItem = {
   id: string;
@@ -297,6 +325,16 @@ export type LoyaltyRedemption = {
   rewardId: string | null;
   nameSnapshot: string;
   typeSnapshot: LoyaltyRewardType;
+  /**
+   * The reward's terms, frozen at request time — `{"percent_off": 20}`, `{"amount_nu": 250}`,
+   * `{"service_id": "…"}`, depending on the type.
+   *
+   * Needed because a redemption can be spent **at a product checkout**, where `place_order`
+   * reads exactly these two keys to work out what comes off. `redemptionDiscountNu` is the
+   * client's mirror of that; anything it cannot price is a reward the server will refuse with
+   * `P0004`, and must not be offered.
+   */
+  valueSnapshot: Record<string, unknown> | null;
   pointCost: number;
   /** The short code the customer reads out. `confirm_redemption` upper-cases its input. */
   code: string;

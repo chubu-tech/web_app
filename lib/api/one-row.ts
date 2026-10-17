@@ -15,10 +15,11 @@
  *
  * So this throws, and says what it actually got.
  *
- * **Every composite-returning RPC in this repo goes through it.** Five were still casting
+ * **Every composite-returning RPC in this repo goes through it.** Eight were still casting
  * straight to a row — `create_booking`, `reschedule_booking`, `record_payment`,
- * `set_booking_status` and `reconcile_booking`, all of them `returns <table>` with
- * `proretset = false`, checked against the live catalogue. A helper that half the call
+ * `set_booking_status` and `reconcile_booking` in the booking readers, and `place_order`,
+ * `set_order_status` and `request_redemption` in the shop's — all of them `returns <table>`
+ * with `proretset = false`, checked against the live catalogue. A helper that half the call
  * sites skip is the ternary again with extra steps.
  */
 export function oneRow(data: unknown, what = "RPC"): Record<string, unknown> {
