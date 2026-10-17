@@ -30,6 +30,7 @@ export type OwnerRowIcon =
   | "clock"
   | "haircut"
   | "people"
+  | "qr"
   | "clientBook"
   | "shopBag"
   | "product"
@@ -82,11 +83,19 @@ export const SETUP_ROWS: readonly OwnerRow[] = [
     blurb: "Your team, what each of them does, and when they work",
   },
   /**
+<<<<<<< HEAD
    * Setup rather than back office, and the one row here that is not about *this* salon: the
    * page covers every salon the owner runs. It sits in this group because equipping a counter
    * is a thing you finish once — print it, stick it up, done — and because it belongs beside
    * the other "get the shop ready" rows rather than beside the reports you come back to
    * weekly. See the page's own note on why it is cross-salon.
+=======
+   * Setup rather than back office, and it is the one row here that is not about *this*
+   * salon: the page covers every salon the owner runs. It sits in this group because
+   * equipping a counter is a thing you finish once — print it, stick it up, done — and
+   * because it belongs beside the other "get the shop ready" rows rather than beside the
+   * reports you come back to weekly. See the page's own note on why it is cross-salon.
+>>>>>>> 1313cd262e09197e128d300d56e61e25295ec114
    */
   {
     href: "/business/qr",

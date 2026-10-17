@@ -121,6 +121,7 @@ const ROW_ICONS: Record<OwnerRowIcon, typeof Icons.salon> = {
   clock: Icons.clock,
   haircut: Icons.haircut,
   people: Icons.people,
+  qr: Icons.qr,
   clientBook: Icons.clientBook,
   shopBag: Icons.shopBag,
   product: Icons.product,

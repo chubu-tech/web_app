@@ -84,6 +84,7 @@ export default async function JoinQueuePage({
     form's three reads free: they ride **with** the entry check rather than after it, and the
     only path that pays for them is one where somebody is about to fill the form in.
   */
+<<<<<<< HEAD
   const [business, account, products] = await Promise.all([
     loadBusiness(id),
     // Memoised and already resolved by the shell layout, so this costs nothing here.
@@ -95,6 +96,25 @@ export default async function JoinQueuePage({
 
       Caught into an empty list: a failed read costs the shop row, and the rest of the page —
       which is the part somebody standing at a counter needs — is unaffected.
+=======
+  const [business, account, services, staff, line, products] = await Promise.all([
+    loadBusiness(id),
+    // Memoised and already resolved by the shell layout, so this costs nothing here.
+    getAccount(),
+    fetchServices(supabase, id),
+    fetchStaff(supabase, id),
+    // `queue_active_line` is revoked from `anon`, so this simply fails for a
+    // signed-out visitor. Caught on its own, and `null` reaches the badge as
+    // "Wait unknown" rather than a fabricated zero.
+    fetchActiveLine(supabase, id).catch(() => null as QueueEntry[] | null),
+    /*
+      Gated on the salon having products, not on its plan allowing them — the same test
+      the salon page's own Shop tab uses. A plan that permits an empty shelf is not a shop,
+      and a row leading to one is the dead end `destinations.ts` exists to prevent.
+
+      Caught into `[]`: a failed read costs the shop row, and the rest of the page — which
+      is the part somebody standing at a counter needs — is unaffected.
+>>>>>>> 1313cd262e09197e128d300d56e61e25295ec114
     */
     fetchProductsForBusiness(supabase, id).catch(() => []),
   ]);
@@ -113,6 +133,18 @@ export default async function JoinQueuePage({
   const hasSession = account.user != null;
   const registeredId = account.state === "registered" ? account.user.id : null;
 
+<<<<<<< HEAD
+=======
+  // Already holding a place here? Re-scanning the same QR while waiting is a
+  // "where am I?" gesture, not a second join — send them to their position.
+  if (registeredId) {
+    const mine = await fetchActiveEntryForBusiness(supabase, registeredId, id).catch(
+      () => null,
+    );
+    if (mine) redirect(`/queue/${mine.id}`);
+  }
+
+>>>>>>> 1313cd262e09197e128d300d56e61e25295ec114
   /**
    * Does this salon actually take walk-ins?
    *
@@ -126,6 +158,7 @@ export default async function JoinQueuePage({
    */
   const queueOpen = runsQueue(business);
 
+<<<<<<< HEAD
   /*
     ## Wave two: the entry check, and the form's reads beside it
 
@@ -159,6 +192,8 @@ export default async function JoinQueuePage({
   ]);
   if (mine) redirect(`/queue/${mine.id}`);
 
+=======
+>>>>>>> 1313cd262e09197e128d300d56e61e25295ec114
   return (
     <div className="px-base py-lg mx-auto w-full max-w-[560px] tablet:px-lg">
       {/*

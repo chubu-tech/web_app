@@ -90,6 +90,7 @@ export function SettingsHub({
     // The one row here that is not about the active salon — the page covers the whole
     // estate, so the count does too.
     "/business/qr": qrLine(qrReady, qrTotal),
+<<<<<<< HEAD
     /*
       An empty string, not a tier line. These three arrive as `null` when the plan does not
       include them, and the row's note is `tierNoteFor` — derived from the row's own
@@ -97,6 +98,8 @@ export function SettingsHub({
       one fact rather than two strings. Naming a tier here as well would be the second place,
       which is how a hand-written note comes to disagree with the gate it describes.
     */
+=======
+>>>>>>> 1313cd262e09197e128d300d56e61e25295ec114
     "/business/clients": clientCount == null ? "" : clientsLine(clientCount),
     "/business/orders": newOrderCount == null ? "" : ordersLine(newOrderCount),
     "/business/products": products == null ? "" : productsLine(products),
@@ -208,7 +211,8 @@ function Rows({
 
 /**
  * "3 of 9 ready to print" — and the blocked ones are the useful half of that sentence,
- * since a salon without a walk-in queue cannot have a poster at all.
+ * since a salon still in review cannot have a poster at all. `posterBlockReason` is the
+ * authority on which those are, and it defers to `isListed`.
  */
 function qrLine(ready: number, total: number): string {
   if (total === 0) return "A poster for each salon's counter";
